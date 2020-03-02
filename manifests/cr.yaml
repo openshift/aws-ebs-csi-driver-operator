@@ -1,0 +1,7 @@
+apiVersion: csi.ebs.aws.com/v1alpha1
+kind: CSIEBSDriver
+metadata:
+  name: csi-ebs-driver
+spec:
+  deploymentName: csi-ebs-driver
+  replicas: 1

@@ -1,0 +1,11 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: csiebsdrivers.csi.ebs.aws.com
+spec:
+  group: csi.ebs.aws.com
+  version: v1alpha1
+  names:
+    kind: CSIEBSDriver
+    plural: csiebsdrivers
+  scope: Namespaced
