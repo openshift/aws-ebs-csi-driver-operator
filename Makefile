@@ -19,7 +19,7 @@ CODEGEN_GROUPS_VERSION :=operator:v1alpha1
 
 define run-codegen
 	"$(SHELL)" \
-        $(CODEGEN_PKG)/generate-groups.sh \
+        "$(CODEGEN_PKG)/generate-groups.sh" \
 	"$(CODEGEN_GENERATORS)" \
 	"$(CODEGEN_OUTPUT_PACKAGE)" \
 	"$(CODEGEN_API_PACKAGE)" \
