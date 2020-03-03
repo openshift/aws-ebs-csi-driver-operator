@@ -21,7 +21,7 @@ import (
 
 var crds = [...]string{"crd.yaml"}
 
-var deployment = "ebs_controller_deployment.yaml"
+var deployment = "controller_deployment.yaml"
 
 var (
 	// Technically const, but modified by unit tests...
@@ -106,7 +106,9 @@ func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*ap
 
 func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDriver) *appsv1.Deployment {
 	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
-	deployment.Spec.Template.Spec.Containers[0].Image = c.csiDriverImage
+
+	// FIXME
+	// deployment.Spec.Template.Spec.Containers[0].Image = c.csiDriverImage
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)
 	for i, arg := range deployment.Spec.Template.Spec.Containers[0].Args {

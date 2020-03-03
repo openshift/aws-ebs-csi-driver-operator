@@ -28,7 +28,8 @@ import (
 )
 
 var log = logf.Log.WithName("aws_ebs_csi_driver_operator")
-var deploymentVersionHashKey = operatorv1.GroupName + "/rvs-hash"
+
+// var deploymentVersionHashKey = operatorv1.GroupName + "/rvs-hash"
 
 const (
 	targetName        = "aws-ebs-csi-driver"
@@ -44,9 +45,9 @@ const (
 )
 
 // static environment variables from operator deployment
-var (
-	crdNames = []string{"ebscsidrivers.storage.k8s.io"}
-)
+// var (
+// crdNames = []string{"ebscsidrivers.csi.ebs.aws.com"}
+// )
 
 type csiDriverOperator struct {
 	client        OperatorClient
@@ -195,9 +196,9 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 }
 
 func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
-	if err := c.syncCustomResourceDefinitions(); err != nil {
-		return fmt.Errorf("failed to sync CRDs: %s", err)
-	}
+	// if err := c.syncCustomResourceDefinitions(); err != nil {
+	// 	return fmt.Errorf("failed to sync CRDs: %s", err)
+	// }
 
 	deployment, err := c.syncDeployment(instance)
 	if err != nil {

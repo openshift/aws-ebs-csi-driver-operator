@@ -11,7 +11,6 @@ import (
 	"k8s.io/klog"
 
 	configv1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
 	apiclientset "github.com/openshift/client-go/config/clientset/versioned"
 	apiinformers "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -19,6 +18,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/status"
 
+	op "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis/operator"
 	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/common"
 	clientset "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned"
 	informers "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions"
@@ -78,7 +78,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		[]configv1.ObjectReference{
 			{Resource: "namespaces", Name: targetNamespace},
 			{Resource: "namespaces", Name: operatorNamespace},
-			{Group: operatorv1.GroupName, Resource: "ebscsidrivers", Name: globalConfigName},
+			{Group: op.GroupName, Resource: "ebscsidrivers", Name: globalConfigName},
 		},
 		apiClientset.ConfigV1(),
 		apiInformers.Config().V1().ClusterOperators(),
