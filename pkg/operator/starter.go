@@ -10,15 +10,12 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/klog"
 
-	configv1 "github.com/openshift/api/config/v1"
 	apiclientset "github.com/openshift/client-go/config/clientset/versioned"
 	apiinformers "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/status"
 
-	op "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis/operator"
 	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/common"
 	clientset "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned"
 	informers "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions"
@@ -73,21 +70,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		os.Getenv(operandImageEnvName),
 	)
 
-	clusterOperatorStatus := status.NewClusterOperatorStatusController(
-		targetName,
-		[]configv1.ObjectReference{
-			{Resource: "namespaces", Name: targetNamespace},
-			{Resource: "namespaces", Name: operatorNamespace},
-			{Group: op.GroupName, Resource: "ebscsidrivers", Name: globalConfigName},
-		},
-		apiClientset.ConfigV1(),
-		apiInformers.Config().V1().ClusterOperators(),
-		operatorClient,
-		versionGetter,
-		controllerConfig.EventRecorder,
-	)
-
-	logLevelController := loglevel.NewClusterOperatorLoggingController(operatorClient, controllerConfig.EventRecorder)
 	// TODO remove this controller once we support Removed
 	managementStateController := management.NewOperatorManagementStateController(targetName, operatorClient, controllerConfig.EventRecorder)
 	management.SetOperatorNotRemovable()
@@ -108,8 +90,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	for _, controller := range []interface {
 		Run(ctx context.Context, workers int)
 	}{
-		clusterOperatorStatus,
-		logLevelController,
 		managementStateController,
 	} {
 		go controller.Run(ctx, 1)

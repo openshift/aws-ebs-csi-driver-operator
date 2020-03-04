@@ -6,8 +6,6 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -19,8 +17,6 @@ import (
 	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated"
 )
 
-var crds = [...]string{"crd.yaml"}
-
 var deployment = "controller_deployment.yaml"
 
 var (
@@ -28,48 +24,6 @@ var (
 	customResourceReadyInterval = time.Second
 	customResourceReadyTimeout  = 10 * time.Minute
 )
-
-func (c *csiDriverOperator) syncCustomResourceDefinitions() error {
-	for _, file := range crds {
-		crd := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(generated.MustAsset(file))
-		// TODO (bertinatto): V1?
-		_, updated, err := resourceapply.ApplyCustomResourceDefinitionV1Beta1(c.crdClient.ApiextensionsV1beta1(), c.eventRecorder, crd)
-		if err != nil {
-			return err
-		}
-		if updated {
-			if err := c.waitForCustomResourceDefinition(crd); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (c *csiDriverOperator) waitForCustomResourceDefinition(resource *apiextv1beta1.CustomResourceDefinition) error {
-	var lastErr error
-	if err := wait.Poll(customResourceReadyInterval, customResourceReadyTimeout, func() (bool, error) {
-		crd, err := c.crdLister.Get(resource.Name)
-		if err != nil {
-			lastErr = fmt.Errorf("error getting CustomResourceDefinition %s: %v", resource.Name, err)
-			return false, nil
-		}
-
-		for _, condition := range crd.Status.Conditions {
-			if condition.Type == apiextv1beta1.Established && condition.Status == apiextv1beta1.ConditionTrue {
-				return true, nil
-			}
-		}
-		lastErr = fmt.Errorf("CustomResourceDefinition %s is not ready. conditions: %v", crd.Name, crd.Status.Conditions)
-		return false, nil
-	}); err != nil {
-		if err == wait.ErrWaitTimeout {
-			return fmt.Errorf("%v during syncCustomResourceDefinitions: %v", err, lastErr)
-		}
-		return err
-	}
-	return nil
-}
 
 func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*appsv1.Deployment, error) {
 	deploy := c.getExpectedDeployment(instance)
