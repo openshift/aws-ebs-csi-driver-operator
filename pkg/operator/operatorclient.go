@@ -16,12 +16,10 @@ type OperatorClient struct {
 }
 
 func (c OperatorClient) Informer() cache.SharedIndexInformer {
-	// return c.Informers.Operator().V1().CSISnapshotControllers().Informer()
 	return c.Informers.Csi().V1alpha1().EBSCSIDrivers().Informer()
 }
 
 func (c OperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	// instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
 	instance, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().EBSCSIDrivers(operatorNamespace).Get(globalConfigName)
 	if err != nil {
 		return nil, nil, "", err
@@ -31,7 +29,6 @@ func (c OperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv
 }
 
 func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
-	// original, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
 	original, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().EBSCSIDrivers(operatorNamespace).Get(globalConfigName)
 	if err != nil {
 		return nil, "", err
@@ -49,7 +46,6 @@ func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operato
 }
 
 func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
-	// original, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
 	original, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().EBSCSIDrivers(operatorNamespace).Get(globalConfigName)
 	if err != nil {
 		return nil, err
@@ -58,7 +54,6 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 	copy.ResourceVersion = resourceVersion
 	copy.Status.OperatorStatus = *status
 
-	// ret, err := c.Client.CSISnapshotControllers().UpdateStatus(copy)
 	ret, err := c.Client.EBSCSIDrivers(operatorNamespace).UpdateStatus(copy)
 	if err != nil {
 		return nil, err
@@ -68,7 +63,6 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 }
 
 func (c OperatorClient) GetOperatorInstance() (*v1alpha1.EBSCSIDriver, error) {
-	// instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
 	instance, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().EBSCSIDrivers(operatorNamespace).Get(globalConfigName)
 	if err != nil {
 		return nil, err
