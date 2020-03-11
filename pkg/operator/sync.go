@@ -37,7 +37,7 @@ func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*ap
 		forceRollout = true
 	}
 
-	if c.versionChanged("csi-ebs-driver-controller", c.operandVersion) {
+	if c.versionChanged("aws-ebs-csi-driver", c.operandVersion) {
 		// Operand version changed. Update the deployment with a new image.
 		forceRollout = true
 	}
@@ -70,7 +70,7 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.EBSCSIDriver) (*app
 		forceRollout = true
 	}
 
-	if c.versionChanged("csi-ebs-driver-node", c.operandVersion) {
+	if c.versionChanged("aws-ebs-csi-driver", c.operandVersion) {
 		// Operand version changed. Update the deployment with a new image.
 		forceRollout = true
 	}
@@ -146,8 +146,7 @@ func (c *csiDriverOperator) syncStatus(instance *v1alpha1.EBSCSIDriver, deployme
 	}
 
 	c.setVersion("operator", c.operatorVersion)
-	c.setVersion("csi-ebs-driver", c.operandVersion)
-	c.setVersion("csi-ebs-driver-node", c.operandVersion)
+	c.setVersion("aws-ebs-csi-driver", c.operandVersion)
 
 	return nil
 }
@@ -215,11 +214,11 @@ func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDr
 
 	case deployment.Status.UpdatedReplicas < deploymentExpectedReplicas:
 		progressing = operatorv1.ConditionTrue
-		progressingMessage = "Waiting for Deployment to update csi-ebs-driver-controller pods"
+		progressingMessage = "Waiting for Deployment to update pods"
 
 	case deployment.Status.AvailableReplicas < deploymentExpectedReplicas:
 		progressing = operatorv1.ConditionTrue
-		progressingMessage = "Waiting for Deployment to deploy csi-ebs-driver-controller pods"
+		progressingMessage = "Waiting for Deployment to deploy pods"
 
 	default:
 		progressing = operatorv1.ConditionFalse
