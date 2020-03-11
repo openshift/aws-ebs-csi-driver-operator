@@ -66,6 +66,7 @@ type csiDriverOperator struct {
 func NewCSIDriverOperator(
 	client OperatorClient,
 	deployInformer appsinformersv1.DeploymentInformer,
+	dsInformer appsinformersv1.DaemonSetInformer,
 	kubeClient kubernetes.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
@@ -85,6 +86,7 @@ func NewCSIDriverOperator(
 	}
 
 	deployInformer.Informer().AddEventHandler(csiOperator.eventHandler("deployment"))
+	dsInformer.Informer().AddEventHandler(csiOperator.eventHandler("daemonSet"))
 	client.Informer().AddEventHandler(csiOperator.eventHandler("ebscsidriver"))
 
 	csiOperator.syncHandler = csiOperator.sync
@@ -174,11 +176,18 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 	deployment, err := c.syncDeployment(instance)
 	if err != nil {
-		return fmt.Errorf("failed to sync Deployments: %s", err)
+		return fmt.Errorf("failed to sync Deployment: %s", err)
 	}
-	if err := c.syncStatus(instance, deployment); err != nil {
+
+	daemonSet, err := c.syncDaemonSet(instance)
+	if err != nil {
+		return fmt.Errorf("failed to sync DaemonSet: %s", err)
+	}
+
+	if err := c.syncStatus(instance, deployment, daemonSet); err != nil {
 		return fmt.Errorf("failed to sync status: %s", err)
 	}
+
 	return nil
 }
 

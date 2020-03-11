@@ -16,7 +16,10 @@ import (
 	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated"
 )
 
-var deployment = "controller_deployment.yaml"
+var (
+	deployment = "controller_deployment.yaml"
+	daemonSet  = "node_daemonset.yaml"
+)
 
 func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*appsv1.Deployment, error) {
 	deploy := c.getExpectedDeployment(instance)
@@ -51,6 +54,39 @@ func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*ap
 	return deploy, nil
 }
 
+func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.EBSCSIDriver) (*appsv1.DaemonSet, error) {
+	daemonSet := c.getExpectedDaemonSet(instance)
+
+	// Update the daemonSet when something updated EBSCSIDriver.Spec.LogLevel.
+	// The easiest check is for Generation update (i.e. redeploy on any EBSCSIDriver.Spec change).
+	// This may update the DaemonSet more than it is strictly necessary, but the overhead is not that big.
+	forceRollout := false
+	if instance.Generation != instance.Status.ObservedGeneration {
+		forceRollout = true
+	}
+
+	if c.versionChanged("operator", c.operatorVersion) {
+		// Operator version changed. The new one _may_ have updated DaemonSet -> we should deploy it.
+		forceRollout = true
+	}
+
+	if c.versionChanged("csi-ebs-driver-node", c.operandVersion) {
+		// Operand version changed. Update the deployment with a new image.
+		forceRollout = true
+	}
+
+	daemonSet, _, err := resourceapply.ApplyDaemonSet(
+		c.kubeClient.AppsV1(),
+		c.eventRecorder,
+		daemonSet,
+		resourcemerge.ExpectedDaemonSetGeneration(daemonSet, instance.Status.Generations),
+		forceRollout)
+	if err != nil {
+		return nil, err
+	}
+	return daemonSet, nil
+}
+
 func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDriver) *appsv1.Deployment {
 	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
 
@@ -65,6 +101,22 @@ func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDrive
 	}
 
 	return deployment
+}
+
+func (c *csiDriverOperator) getExpectedDaemonSet(instance *v1alpha1.EBSCSIDriver) *appsv1.DaemonSet {
+	daemonSet := resourceread.ReadDaemonSetV1OrDie(generated.MustAsset(daemonSet))
+
+	// FIXME
+	// daemonSet.Spec.Template.Spec.Containers[0].Image = c.csiDriverImage
+
+	logLevel := getLogLevel(instance.Spec.LogLevel)
+	for i, arg := range daemonSet.Spec.Template.Spec.Containers[0].Args {
+		if strings.HasPrefix(arg, "--v=") {
+			daemonSet.Spec.Template.Spec.Containers[0].Args[i] = fmt.Sprintf("--v=%d", logLevel)
+		}
+	}
+
+	return daemonSet
 }
 
 func getLogLevel(logLevel operatorv1.LogLevel) int {
@@ -82,22 +134,25 @@ func getLogLevel(logLevel operatorv1.LogLevel) int {
 	}
 }
 
-func (c *csiDriverOperator) syncStatus(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment) error {
-	c.syncConditions(instance, deployment)
+func (c *csiDriverOperator) syncStatus(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) error {
+	c.syncConditions(instance, deployment, daemonSet)
 
 	resourcemerge.SetDeploymentGeneration(&instance.Status.Generations, deployment)
+	resourcemerge.SetDaemonSetGeneration(&instance.Status.Generations, daemonSet)
+
 	instance.Status.ObservedGeneration = instance.Generation
 	if deployment != nil {
 		instance.Status.ReadyReplicas = deployment.Status.UpdatedReplicas
 	}
 
 	c.setVersion("operator", c.operatorVersion)
-	c.setVersion("csi-ebs-driver-controller", c.operandVersion)
+	c.setVersion("csi-ebs-driver", c.operandVersion)
+	c.setVersion("csi-ebs-driver-node", c.operandVersion)
 
 	return nil
 }
 
-func (c *csiDriverOperator) syncConditions(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment) {
+func (c *csiDriverOperator) syncConditions(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
 	// The operator does not have any prerequisites (at least now)
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{
@@ -110,13 +165,15 @@ func (c *csiDriverOperator) syncConditions(instance *v1alpha1.EBSCSIDriver, depl
 			Type:   operatorv1.OperatorStatusTypeUpgradeable,
 			Status: operatorv1.ConditionTrue,
 		})
-	c.syncProgressingCondition(instance, deployment)
-	c.syncAvailableCondition(deployment, instance)
+	c.syncProgressingCondition(instance, deployment, daemonSet)
+	c.syncAvailableCondition(instance, deployment, daemonSet)
 }
 
-func (c *csiDriverOperator) syncAvailableCondition(deployment *appsv1.Deployment, instance *v1alpha1.EBSCSIDriver) {
-	// Available: at least one deployment pod is available, regardless at which version
-	if deployment != nil && deployment.Status.AvailableReplicas > 0 {
+func (c *csiDriverOperator) syncAvailableCondition(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
+	// Available: deployment and daemonset are available, regardless at which version
+	isDeploymentAvailable := deployment != nil && deployment.Status.AvailableReplicas > 0
+	isDaemonSetAvailable := daemonSet != nil && daemonSet.Status.NumberAvailable > 0
+	if isDeploymentAvailable && isDaemonSetAvailable {
 		v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 			operatorv1.OperatorCondition{
 				Type:   operatorv1.OperatorStatusTypeAvailable,
@@ -127,40 +184,40 @@ func (c *csiDriverOperator) syncAvailableCondition(deployment *appsv1.Deployment
 			operatorv1.OperatorCondition{
 				Type:    operatorv1.OperatorStatusTypeAvailable,
 				Status:  operatorv1.ConditionFalse,
-				Message: "Waiting for Deployment to deploy csi-ebs-driver-controller pods",
+				Message: "Waiting for Deployment and DaemonSet to deploy aws-ebs-csi-driver pods",
 				Reason:  "AsExpected",
 			})
 	}
 }
 
-func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment) {
-	// Progressing: true when Deployment has some work to do
+func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
+	// Progressing: true when Deployment or DaemonSet have some work to do
 	// (false: when all replicas are updated to the latest release and available)/
 	var progressing operatorv1.ConditionStatus
 	var progressingMessage string
-	var expectedReplicas int32
+	var deploymentExpectedReplicas int32
 	if deployment != nil && deployment.Spec.Replicas != nil {
-		expectedReplicas = *deployment.Spec.Replicas
+		deploymentExpectedReplicas = *deployment.Spec.Replicas
 	}
 	switch {
-	case deployment == nil:
+	case deployment == nil || daemonSet == nil:
 		// Not reachable in theory, but better to be on the safe side...
 		progressing = operatorv1.ConditionTrue
-		progressingMessage = "Waiting for Deployment to be created"
+		progressingMessage = "Waiting for Deployment and DaemonSet to be created"
 
-	case deployment.Generation != deployment.Status.ObservedGeneration:
+	case (deployment.Generation != deployment.Status.ObservedGeneration) || (daemonSet.Generation != daemonSet.Status.ObservedGeneration):
 		progressing = operatorv1.ConditionTrue
-		progressingMessage = "Waiting for Deployment to act on changes"
+		progressingMessage = "Waiting for Deployment and DaemonSet to act on changes"
 
 	case deployment.Status.UnavailableReplicas > 0:
 		progressing = operatorv1.ConditionTrue
 		progressingMessage = "Waiting for Deployment to deploy csi-ebs-controller pods"
 
-	case deployment.Status.UpdatedReplicas < expectedReplicas:
+	case deployment.Status.UpdatedReplicas < deploymentExpectedReplicas:
 		progressing = operatorv1.ConditionTrue
 		progressingMessage = "Waiting for Deployment to update csi-ebs-driver-controller pods"
 
-	case deployment.Status.AvailableReplicas < expectedReplicas:
+	case deployment.Status.AvailableReplicas < deploymentExpectedReplicas:
 		progressing = operatorv1.ConditionTrue
 		progressingMessage = "Waiting for Deployment to deploy csi-ebs-driver-controller pods"
 

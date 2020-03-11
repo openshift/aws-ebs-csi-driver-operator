@@ -60,6 +60,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	operator := NewCSIDriverOperator(
 		*operatorClient,
 		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
+		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().DaemonSets(),
 		ctrlCtx.ClientBuilder.KubeClientOrDie(targetName),
 		versionGetter,
 		controllerConfig.EventRecorder,
