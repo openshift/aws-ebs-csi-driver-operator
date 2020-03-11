@@ -78,7 +78,7 @@ func NewCSIDriverOperator(
 		kubeClient:      kubeClient,
 		versionGetter:   versionGetter,
 		eventRecorder:   eventRecorder,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
 		operatorVersion: operatorVersion,
 		operandVersion:  operandVersion,
 		csiDriverImage:  csiDriverImage,
@@ -198,8 +198,8 @@ func (c *csiDriverOperator) enqueue(obj interface{}) {
 	if cm, ok := obj.(*corev1.ConfigMap); ok && cm.GetAnnotations() != nil && cm.GetAnnotations()[resourcelock.LeaderElectionRecordAnnotationKey] != "" {
 		return
 	}
-	// Sync corresponding CSISnapshotController instance. Since there is only one, sync that one.
-	// It will check all other objects (CRDs, Deployment) and update/overwrite them as needed.
+	// Sync corresponding EBSCSIDriver instance. Since there is only one, sync that one.
+	// It will check all other objects (Deployment, DaemonSet) and update/overwrite them as needed.
 	c.queue.Add(globalConfigName)
 }
 
@@ -226,7 +226,6 @@ func logInformerEvent(kind, obj interface{}, message string) {
 		if err != nil {
 			return
 		}
-		// "deployment csi-snapshot-controller updated"
 		klog.V(6).Infof("Received event: %s %s %s", kind, objMeta.GetName(), message)
 	}
 }
