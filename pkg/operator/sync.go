@@ -3,7 +3,6 @@ package operator
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 
@@ -18,12 +17,6 @@ import (
 )
 
 var deployment = "controller_deployment.yaml"
-
-var (
-	// Technically const, but modified by unit tests...
-	customResourceReadyInterval = time.Second
-	customResourceReadyTimeout  = 10 * time.Minute
-)
 
 func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*appsv1.Deployment, error) {
 	deploy := c.getExpectedDeployment(instance)

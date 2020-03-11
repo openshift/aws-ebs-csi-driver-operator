@@ -59,8 +59,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	operator := NewCSIDriverOperator(
 		*operatorClient,
-		ctrlCtx.APIExtInformerFactory.Apiextensions().V1beta1().CustomResourceDefinitions(),
-		ctrlCtx.ClientBuilder.APIExtClientOrDie(targetName),
 		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		ctrlCtx.ClientBuilder.KubeClientOrDie(targetName),
 		versionGetter,

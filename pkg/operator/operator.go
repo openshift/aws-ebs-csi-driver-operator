@@ -5,9 +5,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextinformersv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
-	apiextlistersv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -57,10 +54,6 @@ type csiDriverOperator struct {
 
 	syncHandler func() error
 
-	crdLister       apiextlistersv1beta1.CustomResourceDefinitionLister
-	crdListerSynced cache.InformerSynced
-	crdClient       apiextclient.Interface
-
 	queue workqueue.RateLimitingInterface
 
 	stopCh <-chan struct{}
@@ -72,8 +65,6 @@ type csiDriverOperator struct {
 
 func NewCSIDriverOperator(
 	client OperatorClient,
-	crdInformer apiextinformersv1beta1.CustomResourceDefinitionInformer,
-	crdClient apiextclient.Interface,
 	deployInformer appsinformersv1.DeploymentInformer,
 	kubeClient kubernetes.Interface,
 	versionGetter status.VersionGetter,
@@ -84,7 +75,6 @@ func NewCSIDriverOperator(
 ) *csiDriverOperator {
 	csiOperator := &csiDriverOperator{
 		client:          client,
-		crdClient:       crdClient,
 		kubeClient:      kubeClient,
 		versionGetter:   versionGetter,
 		eventRecorder:   eventRecorder,
@@ -94,14 +84,10 @@ func NewCSIDriverOperator(
 		csiDriverImage:  csiDriverImage,
 	}
 
-	crdInformer.Informer().AddEventHandler(csiOperator.eventHandler("crd"))
 	deployInformer.Informer().AddEventHandler(csiOperator.eventHandler("deployment"))
 	client.Informer().AddEventHandler(csiOperator.eventHandler("ebscsidriver"))
 
 	csiOperator.syncHandler = csiOperator.sync
-
-	csiOperator.crdLister = crdInformer.Lister()
-	csiOperator.crdListerSynced = crdInformer.Informer().HasSynced
 
 	return csiOperator
 }
@@ -111,10 +97,6 @@ func (c *csiDriverOperator) Run(workers int, stopCh <-chan struct{}) {
 	defer c.queue.ShutDown()
 
 	c.stopCh = stopCh
-
-	if !cache.WaitForCacheSync(stopCh, c.crdListerSynced, c.client.Informer().HasSynced) {
-		return
-	}
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(c.worker, time.Second, stopCh)
@@ -133,12 +115,6 @@ func (c *csiDriverOperator) sync() error {
 	}
 
 	instanceCopy := instance.DeepCopy()
-
-	// Watch CRs for:
-	// - CSISnapshots
-	// - Deployments
-	// - CRD
-	// - Status?
 
 	// Ensure the deployment exists and matches the default
 	// If it doesn't exist, create it.
@@ -196,10 +172,6 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 }
 
 func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
-	// if err := c.syncCustomResourceDefinitions(); err != nil {
-	// 	return fmt.Errorf("failed to sync CRDs: %s", err)
-	// }
-
 	deployment, err := c.syncDeployment(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync Deployments: %s", err)
