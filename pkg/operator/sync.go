@@ -126,6 +126,43 @@ func (c *csiDriverOperator) syncServiceAccount(instance *v1alpha1.EBSCSIDriver) 
 	return serviceAccount, nil
 }
 
+func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
+	roles := []string{
+		"rbac/provisioner_role.yaml",
+		"rbac/attacher_role.yaml",
+		"rbac/resizer_role.yaml",
+		"rbac/snapshotter_role.yaml",
+	}
+
+	for _, r := range roles {
+		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
+		role.Namespace = targetNamespace
+
+		_, _, err := resourceapply.ApplyClusterRole(c.kubeClient.RbacV1(), c.eventRecorder, role)
+		if err != nil {
+			return err
+		}
+	}
+
+	bindings := []string{
+		"rbac/provisioner_binding.yaml",
+		"rbac/attacher_binding.yaml",
+		"rbac/resizer_binding.yaml",
+		"rbac/snapshotter_binding.yaml",
+	}
+
+	for _, b := range bindings {
+		binding := resourceread.ReadClusterRoleBindingV1OrDie(generated.MustAsset(b))
+		binding.Namespace = targetNamespace
+
+		_, _, err := resourceapply.ApplyClusterRoleBinding(c.kubeClient.RbacV1(), c.eventRecorder, binding)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) (*storagev1.StorageClass, error) {
 	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
 

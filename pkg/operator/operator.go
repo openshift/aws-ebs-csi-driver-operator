@@ -184,6 +184,11 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 		return fmt.Errorf("failed to sync ServiceAccount: %s", err)
 	}
 
+	err = c.syncRBAC(instance)
+	if err != nil {
+		return fmt.Errorf("failed to sync RBAC: %s", err)
+	}
+
 	_, err = c.syncStorageClass(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync StorageClass: %s", err)
