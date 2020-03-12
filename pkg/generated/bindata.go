@@ -2,6 +2,7 @@
 // sources:
 // assets/controller_deployment.yaml
 // assets/node_daemonset.yaml
+// assets/serviceaccount.yaml
 // assets/storageclass.yaml
 // DO NOT EDIT!
 
@@ -282,6 +283,28 @@ func node_daemonsetYaml() (*asset, error) {
 	return a, nil
 }
 
+var _serviceaccountYaml = []byte(`apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ebs-csi-controller-sa
+  namespace: openshift-aws-ebs-csi-driver
+`)
+
+func serviceaccountYamlBytes() ([]byte, error) {
+	return _serviceaccountYaml, nil
+}
+
+func serviceaccountYaml() (*asset, error) {
+	bytes, err := serviceaccountYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "serviceaccount.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _storageclassYaml = []byte(`kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
@@ -359,6 +382,7 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"controller_deployment.yaml": controller_deploymentYaml,
 	"node_daemonset.yaml":        node_daemonsetYaml,
+	"serviceaccount.yaml":        serviceaccountYaml,
 	"storageclass.yaml":          storageclassYaml,
 }
 
@@ -405,6 +429,7 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"controller_deployment.yaml": {controller_deploymentYaml, map[string]*bintree{}},
 	"node_daemonset.yaml":        {node_daemonsetYaml, map[string]*bintree{}},
+	"serviceaccount.yaml":        {serviceaccountYaml, map[string]*bintree{}},
 	"storageclass.yaml":          {storageclassYaml, map[string]*bintree{}},
 }}
 

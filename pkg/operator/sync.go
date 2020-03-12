@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -18,9 +19,10 @@ import (
 )
 
 const (
-	deployment   = "controller_deployment.yaml"
-	daemonSet    = "node_daemonset.yaml"
-	storageClass = "storageclass.yaml"
+	deployment     = "controller_deployment.yaml"
+	daemonSet      = "node_daemonset.yaml"
+	storageClass   = "storageclass.yaml"
+	serviceAccount = "serviceaccount.yaml"
 )
 
 func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*appsv1.Deployment, error) {
@@ -87,6 +89,24 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.EBSCSIDriver) (*app
 		return nil, err
 	}
 	return daemonSet, nil
+}
+
+func (c *csiDriverOperator) syncServiceAccount(instance *v1alpha1.EBSCSIDriver) (*corev1.ServiceAccount, error) {
+	serviceAccount := resourceread.ReadServiceAccountV1OrDie(generated.MustAsset(serviceAccount))
+
+	// Make sure we're creating the SA in the supported namespace
+	serviceAccount.Namespace = targetNamespace
+
+	serviceAccount, _, err := resourceapply.ApplyServiceAccount(
+		c.kubeClient.CoreV1(),
+		c.eventRecorder,
+		serviceAccount)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return serviceAccount, nil
 }
 
 func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) (*storagev1.StorageClass, error) {
