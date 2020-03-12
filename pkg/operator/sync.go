@@ -7,6 +7,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -19,10 +20,11 @@ import (
 )
 
 const (
-	deployment     = "controller_deployment.yaml"
-	daemonSet      = "node_daemonset.yaml"
-	storageClass   = "storageclass.yaml"
+	csiDriver      = "csidriver.yaml"
 	serviceAccount = "serviceaccount.yaml"
+	storageClass   = "storageclass.yaml"
+	daemonSet      = "node_daemonset.yaml"
+	deployment     = "controller_deployment.yaml"
 )
 
 func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*appsv1.Deployment, error) {
@@ -89,6 +91,21 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.EBSCSIDriver) (*app
 		return nil, err
 	}
 	return daemonSet, nil
+}
+
+func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.EBSCSIDriver) (*storagev1beta1.CSIDriver, error) {
+	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
+
+	csiDriver, _, err := resourceapply.ApplyCSIDriverV1Beta1(
+		c.kubeClient.StorageV1beta1(),
+		c.eventRecorder,
+		csiDriver)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return csiDriver, nil
 }
 
 func (c *csiDriverOperator) syncServiceAccount(instance *v1alpha1.EBSCSIDriver) (*corev1.ServiceAccount, error) {
