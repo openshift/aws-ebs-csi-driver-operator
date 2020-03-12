@@ -189,11 +189,6 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 		return fmt.Errorf("failed to sync RBAC: %s", err)
 	}
 
-	_, err = c.syncStorageClass(instance)
-	if err != nil {
-		return fmt.Errorf("failed to sync StorageClass: %s", err)
-	}
-
 	deployment, err := c.syncDeployment(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync Deployment: %s", err)
@@ -202,6 +197,11 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 	daemonSet, err := c.syncDaemonSet(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync DaemonSet: %s", err)
+	}
+
+	_, err = c.syncStorageClass(instance)
+	if err != nil {
+		return fmt.Errorf("failed to sync StorageClass: %s", err)
 	}
 
 	// TODO: sync status with storageclass, sa, csidriver, etc.?
