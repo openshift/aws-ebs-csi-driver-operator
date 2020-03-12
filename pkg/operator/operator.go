@@ -184,6 +184,12 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 		return fmt.Errorf("failed to sync DaemonSet: %s", err)
 	}
 
+	// TODO: sync status
+	_, err = c.syncStorageClass(instance)
+	if err != nil {
+		return fmt.Errorf("failed to sync DaemonSet: %s", err)
+	}
+
 	if err := c.syncStatus(instance, deployment, daemonSet); err != nil {
 		return fmt.Errorf("failed to sync status: %s", err)
 	}

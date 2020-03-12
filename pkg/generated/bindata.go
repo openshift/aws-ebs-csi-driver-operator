@@ -2,6 +2,7 @@
 // sources:
 // assets/controller_deployment.yaml
 // assets/node_daemonset.yaml
+// assets/storageclass.yaml
 // DO NOT EDIT!
 
 package generated
@@ -281,6 +282,29 @@ func node_daemonsetYaml() (*asset, error) {
 	return a, nil
 }
 
+var _storageclassYaml = []byte(`kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: ebs-sc
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+`)
+
+func storageclassYamlBytes() ([]byte, error) {
+	return _storageclassYaml, nil
+}
+
+func storageclassYaml() (*asset, error) {
+	bytes, err := storageclassYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "storageclass.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -335,6 +359,7 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"controller_deployment.yaml": controller_deploymentYaml,
 	"node_daemonset.yaml":        node_daemonsetYaml,
+	"storageclass.yaml":          storageclassYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -380,6 +405,7 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"controller_deployment.yaml": {controller_deploymentYaml, map[string]*bintree{}},
 	"node_daemonset.yaml":        {node_daemonsetYaml, map[string]*bintree{}},
+	"storageclass.yaml":          {storageclassYaml, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	storagev1 "k8s.io/api/storage/v1"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -16,9 +17,10 @@ import (
 	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated"
 )
 
-var (
-	deployment = "controller_deployment.yaml"
-	daemonSet  = "node_daemonset.yaml"
+const (
+	deployment   = "controller_deployment.yaml"
+	daemonSet    = "node_daemonset.yaml"
+	storageClass = "storageclass.yaml"
 )
 
 func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*appsv1.Deployment, error) {
@@ -85,6 +87,21 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.EBSCSIDriver) (*app
 		return nil, err
 	}
 	return daemonSet, nil
+}
+
+func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) (*storagev1.StorageClass, error) {
+	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
+
+	storageClass, _, err := resourceapply.ApplyStorageClass(
+		c.kubeClient.StorageV1(),
+		c.eventRecorder,
+		storageClass)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return storageClass, nil
 }
 
 func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDriver) *appsv1.Deployment {
