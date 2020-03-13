@@ -167,7 +167,7 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 	err := c.syncCSIDriver(instance)
 	if err != nil {
-		return fmt.Errorf("failed to sync CSIDriver: %s", err)
+		return fmt.Errorf("failed to sync CSIDriver: %v", err)
 	}
 
 	err = c.syncNamespace(instance)
@@ -177,31 +177,31 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 
 	err = c.syncServiceAccounts(instance)
 	if err != nil {
-		return fmt.Errorf("failed to sync ServiceAccount: %s", err)
+		return fmt.Errorf("failed to sync ServiceAccount: %v", err)
 	}
 
 	err = c.syncRBAC(instance)
 	if err != nil {
-		return fmt.Errorf("failed to sync RBAC: %s", err)
+		return fmt.Errorf("failed to sync RBAC: %v", err)
 	}
 
 	deployment, err := c.syncDeployment(instance)
 	if err != nil {
-		return fmt.Errorf("failed to sync Deployment: %s", err)
+		return fmt.Errorf("failed to sync Deployment: %v", err)
 	}
 
 	daemonSet, err := c.syncDaemonSet(instance)
 	if err != nil {
-		return fmt.Errorf("failed to sync DaemonSet: %s", err)
+		return fmt.Errorf("failed to sync DaemonSet: %v", err)
 	}
 
 	err = c.syncStorageClass(instance)
 	if err != nil {
-		return fmt.Errorf("failed to sync StorageClass: %s", err)
+		return fmt.Errorf("failed to sync StorageClass: %v", err)
 	}
 
 	if err := c.syncStatus(instance, deployment, daemonSet); err != nil {
-		return fmt.Errorf("failed to sync status: %s", err)
+		return fmt.Errorf("failed to sync status: %v", err)
 	}
 
 	return nil

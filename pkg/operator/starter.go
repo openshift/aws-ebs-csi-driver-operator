@@ -79,8 +79,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}{
 		ctrlInformers,
 		apiInformers,
-		ctrlCtx.APIExtInformerFactory,         // CRDs
-		ctrlCtx.KubeNamespacedInformerFactory, // operand Deployment
+		ctrlCtx.APIExtInformerFactory,         // TODO: remove, CRDs
+		ctrlCtx.KubeNamespacedInformerFactory, // operand
 	} {
 		informer.Start(ctx.Done())
 	}
