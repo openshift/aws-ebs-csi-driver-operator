@@ -18,6 +18,7 @@ import (
 
 var (
 	csiDriver       = "csidriver.yaml"
+	namespace       = "namespace.yaml"
 	serviceAccount  = "serviceaccount.yaml"
 	storageClass    = "storageclass.yaml"
 	daemonSet       = "node_daemonset.yaml"
@@ -113,6 +114,21 @@ func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.EBSCSIDriver) error
 		c.kubeClient.StorageV1beta1(),
 		c.eventRecorder,
 		csiDriver)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.EBSCSIDriver) error {
+	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
+
+	_, _, err := resourceapply.ApplyNamespace(
+		c.kubeClient.CoreV1(),
+		c.eventRecorder,
+		namespace)
 
 	if err != nil {
 		return err

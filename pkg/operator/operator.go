@@ -170,6 +170,11 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 		return fmt.Errorf("failed to sync CSIDriver: %s", err)
 	}
 
+	err = c.syncNamespace(instance)
+	if err != nil {
+		return fmt.Errorf("failed to sync namespace: %v", err)
+	}
+
 	err = c.syncServiceAccounts(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync ServiceAccount: %s", err)

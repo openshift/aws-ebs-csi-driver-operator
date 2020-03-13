@@ -3,6 +3,7 @@
 // assets/controller_deployment.yaml
 // assets/controller_sa.yaml
 // assets/csidriver.yaml
+// assets/namespace.yaml
 // assets/node_daemonset.yaml
 // assets/node_sa.yaml
 // assets/rbac/attacher_binding.yaml
@@ -220,6 +221,27 @@ func csidriverYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "csidriver.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _namespaceYaml = []byte(`apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-aws-ebs-csi-driver
+`)
+
+func namespaceYamlBytes() ([]byte, error) {
+	return _namespaceYaml, nil
+}
+
+func namespaceYaml() (*asset, error) {
+	bytes, err := namespaceYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "namespace.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -722,6 +744,7 @@ var _bindata = map[string]func() (*asset, error){
 	"controller_deployment.yaml":    controller_deploymentYaml,
 	"controller_sa.yaml":            controller_saYaml,
 	"csidriver.yaml":                csidriverYaml,
+	"namespace.yaml":                namespaceYaml,
 	"node_daemonset.yaml":           node_daemonsetYaml,
 	"node_sa.yaml":                  node_saYaml,
 	"rbac/attacher_binding.yaml":    rbacAttacher_bindingYaml,
@@ -779,6 +802,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"controller_deployment.yaml": {controller_deploymentYaml, map[string]*bintree{}},
 	"controller_sa.yaml":         {controller_saYaml, map[string]*bintree{}},
 	"csidriver.yaml":             {csidriverYaml, map[string]*bintree{}},
+	"namespace.yaml":             {namespaceYaml, map[string]*bintree{}},
 	"node_daemonset.yaml":        {node_daemonsetYaml, map[string]*bintree{}},
 	"node_sa.yaml":               {node_saYaml, map[string]*bintree{}},
 	"rbac": {nil, map[string]*bintree{
