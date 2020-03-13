@@ -13,8 +13,8 @@ import (
 type EBSCSIDriverLister interface {
 	// List lists all EBSCSIDrivers in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.EBSCSIDriver, err error)
-	// EBSCSIDrivers returns an object that can list and get EBSCSIDrivers.
-	EBSCSIDrivers(namespace string) EBSCSIDriverNamespaceLister
+	// Get retrieves the EBSCSIDriver from the index for a given name.
+	Get(name string) (*v1alpha1.EBSCSIDriver, error)
 	EBSCSIDriverListerExpansion
 }
 
@@ -36,38 +36,9 @@ func (s *eBSCSIDriverLister) List(selector labels.Selector) (ret []*v1alpha1.EBS
 	return ret, err
 }
 
-// EBSCSIDrivers returns an object that can list and get EBSCSIDrivers.
-func (s *eBSCSIDriverLister) EBSCSIDrivers(namespace string) EBSCSIDriverNamespaceLister {
-	return eBSCSIDriverNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// EBSCSIDriverNamespaceLister helps list and get EBSCSIDrivers.
-type EBSCSIDriverNamespaceLister interface {
-	// List lists all EBSCSIDrivers in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*v1alpha1.EBSCSIDriver, err error)
-	// Get retrieves the EBSCSIDriver from the indexer for a given namespace and name.
-	Get(name string) (*v1alpha1.EBSCSIDriver, error)
-	EBSCSIDriverNamespaceListerExpansion
-}
-
-// eBSCSIDriverNamespaceLister implements the EBSCSIDriverNamespaceLister
-// interface.
-type eBSCSIDriverNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all EBSCSIDrivers in the indexer for a given namespace.
-func (s eBSCSIDriverNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.EBSCSIDriver, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.EBSCSIDriver))
-	})
-	return ret, err
-}
-
-// Get retrieves the EBSCSIDriver from the indexer for a given namespace and name.
-func (s eBSCSIDriverNamespaceLister) Get(name string) (*v1alpha1.EBSCSIDriver, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the EBSCSIDriver from the index for a given name.
+func (s *eBSCSIDriverLister) Get(name string) (*v1alpha1.EBSCSIDriver, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

@@ -15,7 +15,6 @@ import (
 // FakeEBSCSIDrivers implements EBSCSIDriverInterface
 type FakeEBSCSIDrivers struct {
 	Fake *FakeCsiV1alpha1
-	ns   string
 }
 
 var ebscsidriversResource = schema.GroupVersionResource{Group: "csi.ebs.aws.com", Version: "v1alpha1", Resource: "ebscsidrivers"}
@@ -25,8 +24,7 @@ var ebscsidriversKind = schema.GroupVersionKind{Group: "csi.ebs.aws.com", Versio
 // Get takes name of the eBSCSIDriver, and returns the corresponding eBSCSIDriver object, and an error if there is any.
 func (c *FakeEBSCSIDrivers) Get(name string, options v1.GetOptions) (result *v1alpha1.EBSCSIDriver, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(ebscsidriversResource, c.ns, name), &v1alpha1.EBSCSIDriver{})
-
+		Invokes(testing.NewRootGetAction(ebscsidriversResource, name), &v1alpha1.EBSCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
@@ -36,8 +34,7 @@ func (c *FakeEBSCSIDrivers) Get(name string, options v1.GetOptions) (result *v1a
 // List takes label and field selectors, and returns the list of EBSCSIDrivers that match those selectors.
 func (c *FakeEBSCSIDrivers) List(opts v1.ListOptions) (result *v1alpha1.EBSCSIDriverList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(ebscsidriversResource, ebscsidriversKind, c.ns, opts), &v1alpha1.EBSCSIDriverList{})
-
+		Invokes(testing.NewRootListAction(ebscsidriversResource, ebscsidriversKind, opts), &v1alpha1.EBSCSIDriverList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -58,15 +55,13 @@ func (c *FakeEBSCSIDrivers) List(opts v1.ListOptions) (result *v1alpha1.EBSCSIDr
 // Watch returns a watch.Interface that watches the requested eBSCSIDrivers.
 func (c *FakeEBSCSIDrivers) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(ebscsidriversResource, c.ns, opts))
-
+		InvokesWatch(testing.NewRootWatchAction(ebscsidriversResource, opts))
 }
 
 // Create takes the representation of a eBSCSIDriver and creates it.  Returns the server's representation of the eBSCSIDriver, and an error, if there is any.
 func (c *FakeEBSCSIDrivers) Create(eBSCSIDriver *v1alpha1.EBSCSIDriver) (result *v1alpha1.EBSCSIDriver, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(ebscsidriversResource, c.ns, eBSCSIDriver), &v1alpha1.EBSCSIDriver{})
-
+		Invokes(testing.NewRootCreateAction(ebscsidriversResource, eBSCSIDriver), &v1alpha1.EBSCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
@@ -76,8 +71,7 @@ func (c *FakeEBSCSIDrivers) Create(eBSCSIDriver *v1alpha1.EBSCSIDriver) (result 
 // Update takes the representation of a eBSCSIDriver and updates it. Returns the server's representation of the eBSCSIDriver, and an error, if there is any.
 func (c *FakeEBSCSIDrivers) Update(eBSCSIDriver *v1alpha1.EBSCSIDriver) (result *v1alpha1.EBSCSIDriver, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(ebscsidriversResource, c.ns, eBSCSIDriver), &v1alpha1.EBSCSIDriver{})
-
+		Invokes(testing.NewRootUpdateAction(ebscsidriversResource, eBSCSIDriver), &v1alpha1.EBSCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
@@ -88,8 +82,7 @@ func (c *FakeEBSCSIDrivers) Update(eBSCSIDriver *v1alpha1.EBSCSIDriver) (result 
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeEBSCSIDrivers) UpdateStatus(eBSCSIDriver *v1alpha1.EBSCSIDriver) (*v1alpha1.EBSCSIDriver, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(ebscsidriversResource, "status", c.ns, eBSCSIDriver), &v1alpha1.EBSCSIDriver{})
-
+		Invokes(testing.NewRootUpdateSubresourceAction(ebscsidriversResource, "status", eBSCSIDriver), &v1alpha1.EBSCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}
@@ -99,14 +92,13 @@ func (c *FakeEBSCSIDrivers) UpdateStatus(eBSCSIDriver *v1alpha1.EBSCSIDriver) (*
 // Delete takes name of the eBSCSIDriver and deletes it. Returns an error if one occurs.
 func (c *FakeEBSCSIDrivers) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(ebscsidriversResource, c.ns, name), &v1alpha1.EBSCSIDriver{})
-
+		Invokes(testing.NewRootDeleteAction(ebscsidriversResource, name), &v1alpha1.EBSCSIDriver{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeEBSCSIDrivers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(ebscsidriversResource, c.ns, listOptions)
+	action := testing.NewRootDeleteCollectionAction(ebscsidriversResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.EBSCSIDriverList{})
 	return err
@@ -115,8 +107,7 @@ func (c *FakeEBSCSIDrivers) DeleteCollection(options *v1.DeleteOptions, listOpti
 // Patch applies the patch and returns the patched eBSCSIDriver.
 func (c *FakeEBSCSIDrivers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.EBSCSIDriver, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ebscsidriversResource, c.ns, name, pt, data, subresources...), &v1alpha1.EBSCSIDriver{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(ebscsidriversResource, name, pt, data, subresources...), &v1alpha1.EBSCSIDriver{})
 	if obj == nil {
 		return nil, err
 	}

@@ -5,7 +5,3 @@ package v1alpha1
 // EBSCSIDriverListerExpansion allows custom methods to be added to
 // EBSCSIDriverLister.
 type EBSCSIDriverListerExpansion interface{}
-
-// EBSCSIDriverNamespaceListerExpansion allows custom methods to be added to
-// EBSCSIDriverNamespaceLister.
-type EBSCSIDriverNamespaceListerExpansion interface{}

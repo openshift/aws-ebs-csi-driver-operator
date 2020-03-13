@@ -6,6 +6,7 @@ import (
 )
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // EBSCSIDriver is a specification for a EBSCSIDriver resource

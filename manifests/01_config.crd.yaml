@@ -9,7 +9,7 @@ spec:
     plural: ebscsidrivers
     singular: ebscsidriver
   preserveUnknownFields: false
-  scope: Namespaced
+  scope: Cluster
   subresources:
     status: {}
   version: v1alpha1

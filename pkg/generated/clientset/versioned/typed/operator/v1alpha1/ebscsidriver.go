@@ -16,7 +16,7 @@ import (
 // EBSCSIDriversGetter has a method to return a EBSCSIDriverInterface.
 // A group's client should implement this interface.
 type EBSCSIDriversGetter interface {
-	EBSCSIDrivers(namespace string) EBSCSIDriverInterface
+	EBSCSIDrivers() EBSCSIDriverInterface
 }
 
 // EBSCSIDriverInterface has methods to work with EBSCSIDriver resources.
@@ -36,14 +36,12 @@ type EBSCSIDriverInterface interface {
 // eBSCSIDrivers implements EBSCSIDriverInterface
 type eBSCSIDrivers struct {
 	client rest.Interface
-	ns     string
 }
 
 // newEBSCSIDrivers returns a EBSCSIDrivers
-func newEBSCSIDrivers(c *CsiV1alpha1Client, namespace string) *eBSCSIDrivers {
+func newEBSCSIDrivers(c *CsiV1alpha1Client) *eBSCSIDrivers {
 	return &eBSCSIDrivers{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -51,7 +49,6 @@ func newEBSCSIDrivers(c *CsiV1alpha1Client, namespace string) *eBSCSIDrivers {
 func (c *eBSCSIDrivers) Get(name string, options v1.GetOptions) (result *v1alpha1.EBSCSIDriver, err error) {
 	result = &v1alpha1.EBSCSIDriver{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("ebscsidrivers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -68,7 +65,6 @@ func (c *eBSCSIDrivers) List(opts v1.ListOptions) (result *v1alpha1.EBSCSIDriver
 	}
 	result = &v1alpha1.EBSCSIDriverList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("ebscsidrivers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -85,7 +81,6 @@ func (c *eBSCSIDrivers) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("ebscsidrivers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -96,7 +91,6 @@ func (c *eBSCSIDrivers) Watch(opts v1.ListOptions) (watch.Interface, error) {
 func (c *eBSCSIDrivers) Create(eBSCSIDriver *v1alpha1.EBSCSIDriver) (result *v1alpha1.EBSCSIDriver, err error) {
 	result = &v1alpha1.EBSCSIDriver{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("ebscsidrivers").
 		Body(eBSCSIDriver).
 		Do().
@@ -108,7 +102,6 @@ func (c *eBSCSIDrivers) Create(eBSCSIDriver *v1alpha1.EBSCSIDriver) (result *v1a
 func (c *eBSCSIDrivers) Update(eBSCSIDriver *v1alpha1.EBSCSIDriver) (result *v1alpha1.EBSCSIDriver, err error) {
 	result = &v1alpha1.EBSCSIDriver{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("ebscsidrivers").
 		Name(eBSCSIDriver.Name).
 		Body(eBSCSIDriver).
@@ -123,7 +116,6 @@ func (c *eBSCSIDrivers) Update(eBSCSIDriver *v1alpha1.EBSCSIDriver) (result *v1a
 func (c *eBSCSIDrivers) UpdateStatus(eBSCSIDriver *v1alpha1.EBSCSIDriver) (result *v1alpha1.EBSCSIDriver, err error) {
 	result = &v1alpha1.EBSCSIDriver{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("ebscsidrivers").
 		Name(eBSCSIDriver.Name).
 		SubResource("status").
@@ -136,7 +128,6 @@ func (c *eBSCSIDrivers) UpdateStatus(eBSCSIDriver *v1alpha1.EBSCSIDriver) (resul
 // Delete takes name of the eBSCSIDriver and deletes it. Returns an error if one occurs.
 func (c *eBSCSIDrivers) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("ebscsidrivers").
 		Name(name).
 		Body(options).
@@ -151,7 +142,6 @@ func (c *eBSCSIDrivers) DeleteCollection(options *v1.DeleteOptions, listOptions 
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("ebscsidrivers").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -164,7 +154,6 @@ func (c *eBSCSIDrivers) DeleteCollection(options *v1.DeleteOptions, listOptions 
 func (c *eBSCSIDrivers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.EBSCSIDriver, err error) {
 	result = &v1alpha1.EBSCSIDriver{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("ebscsidrivers").
 		SubResource(subresources...).
 		Name(name).

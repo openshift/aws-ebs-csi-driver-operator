@@ -18,8 +18,8 @@ type CsiV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *CsiV1alpha1Client) EBSCSIDrivers(namespace string) EBSCSIDriverInterface {
-	return newEBSCSIDrivers(c, namespace)
+func (c *CsiV1alpha1Client) EBSCSIDrivers() EBSCSIDriverInterface {
+	return newEBSCSIDrivers(c)
 }
 
 // NewForConfig creates a new CsiV1alpha1Client for the given config.

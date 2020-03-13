@@ -12,8 +12,8 @@ type FakeCsiV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeCsiV1alpha1) EBSCSIDrivers(namespace string) v1alpha1.EBSCSIDriverInterface {
-	return &FakeEBSCSIDrivers{c, namespace}
+func (c *FakeCsiV1alpha1) EBSCSIDrivers() v1alpha1.EBSCSIDriverInterface {
+	return &FakeEBSCSIDrivers{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

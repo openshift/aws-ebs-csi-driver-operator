@@ -25,5 +25,5 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 
 // EBSCSIDrivers returns a EBSCSIDriverInformer.
 func (v *version) EBSCSIDrivers() EBSCSIDriverInformer {
-	return &eBSCSIDriverInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &eBSCSIDriverInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
