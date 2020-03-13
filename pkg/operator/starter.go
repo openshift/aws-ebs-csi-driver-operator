@@ -30,7 +30,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		klog.Fatalf("error creating clients: %v", err)
 	}
-	ctrlCtx := common.CreateControllerContext(cb, ctx.Done(), targetNamespace)
+	ctrlCtx := common.CreateControllerContext(cb, ctx.Done(), operandNamespace)
 
 	ctrlClientset, err := clientset.NewForConfig(controllerConfig.KubeConfig)
 	if err != nil {
@@ -61,7 +61,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		*operatorClient,
 		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().DaemonSets(),
-		ctrlCtx.ClientBuilder.KubeClientOrDie(targetName),
+		ctrlCtx.ClientBuilder.KubeClientOrDie(operandName),
 		versionGetter,
 		controllerConfig.EventRecorder,
 		os.Getenv(operatorVersionEnvName),
@@ -70,7 +70,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	)
 
 	// TODO remove this controller once we support Removed
-	managementStateController := management.NewOperatorManagementStateController(targetName, operatorClient, controllerConfig.EventRecorder)
+	managementStateController := management.NewOperatorManagementStateController(operandName, operatorClient, controllerConfig.EventRecorder)
 	management.SetOperatorNotRemovable()
 
 	klog.Info("Starting the Informers.")

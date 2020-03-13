@@ -26,25 +26,19 @@ import (
 
 var log = logf.Log.WithName("aws_ebs_csi_driver_operator")
 
-// var deploymentVersionHashKey = operatorv1.GroupName + "/rvs-hash"
-
 const (
-	targetName        = "aws-ebs-csi-driver"
-	targetNamespace   = "openshift-aws-ebs-csi-driver"
-	operatorNamespace = "openshift-aws-ebs-csi-driver-operator"
-	globalConfigName  = "cluster"
+	operandName      = "aws-ebs-csi-driver"
+	operandNamespace = "openshift-aws-ebs-csi-driver"
 
+	globalConfigName = "cluster"
+
+	operatorNamespace      = "openshift-aws-ebs-csi-driver-operator"
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
 	operandImageEnvName    = "OPERAND_IMAGE"
 
 	maxRetries = 15
 )
-
-// static environment variables from operator deployment
-// var (
-// crdNames = []string{"ebscsidrivers.csi.ebs.aws.com"}
-// )
 
 type csiDriverOperator struct {
 	client        OperatorClient
@@ -118,9 +112,6 @@ func (c *csiDriverOperator) sync() error {
 
 	instanceCopy := instance.DeepCopy()
 
-	// Ensure the deployment exists and matches the default
-	// If it doesn't exist, create it.
-	// If it does exist and doesn't match, overwrite it
 	startTime := time.Now()
 	klog.Info("Starting syncing operator at ", startTime)
 	defer func() {
@@ -174,7 +165,7 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 }
 
 func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
-	_, err := c.syncCSIDriver(instance)
+	err := c.syncCSIDriver(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync CSIDriver: %s", err)
 	}
@@ -199,12 +190,11 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 		return fmt.Errorf("failed to sync DaemonSet: %s", err)
 	}
 
-	_, err = c.syncStorageClass(instance)
+	err = c.syncStorageClass(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync StorageClass: %s", err)
 	}
 
-	// TODO: sync status with storageclass, sa, csidriver, etc.?
 	if err := c.syncStatus(instance, deployment, daemonSet); err != nil {
 		return fmt.Errorf("failed to sync status: %s", err)
 	}

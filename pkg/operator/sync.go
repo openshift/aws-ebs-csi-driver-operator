@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
-	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -108,71 +106,82 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.EBSCSIDriver) (*app
 	return daemonSet, nil
 }
 
-func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.EBSCSIDriver) (*storagev1beta1.CSIDriver, error) {
+func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.EBSCSIDriver) error {
 	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
 
-	csiDriver, _, err := resourceapply.ApplyCSIDriverV1Beta1(
+	_, _, err := resourceapply.ApplyCSIDriverV1Beta1(
 		c.kubeClient.StorageV1beta1(),
 		c.eventRecorder,
 		csiDriver)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return csiDriver, nil
+	return nil
 }
 
 func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.EBSCSIDriver) error {
 	for _, s := range serviceAccounts {
 		serviceAccount := resourceread.ReadServiceAccountV1OrDie(generated.MustAsset(s))
-		serviceAccount.Namespace = targetNamespace
+
+		// Make sure it's created in the correct namespace
+		serviceAccount.Namespace = operandNamespace
+
 		_, _, err := resourceapply.ApplyServiceAccount(
 			c.kubeClient.CoreV1(),
 			c.eventRecorder,
 			serviceAccount)
+
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
 func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
 	for _, r := range clusterRoles {
 		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
-		role.Namespace = targetNamespace
+
+		// Make sure it's created in the correct namespace
+		role.Namespace = operandNamespace
 
 		_, _, err := resourceapply.ApplyClusterRole(c.kubeClient.RbacV1(), c.eventRecorder, role)
 		if err != nil {
 			return err
 		}
 	}
+
 	for _, b := range clusterRoleBindings {
 		binding := resourceread.ReadClusterRoleBindingV1OrDie(generated.MustAsset(b))
-		binding.Namespace = targetNamespace
+
+		// Make sure it's created in the correct namespace
+		binding.Namespace = operandNamespace
 
 		_, _, err := resourceapply.ApplyClusterRoleBinding(c.kubeClient.RbacV1(), c.eventRecorder, binding)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) (*storagev1.StorageClass, error) {
+func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) error {
 	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
 
-	storageClass, _, err := resourceapply.ApplyStorageClass(
+	_, _, err := resourceapply.ApplyStorageClass(
 		c.kubeClient.StorageV1(),
 		c.eventRecorder,
 		storageClass)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return storageClass, nil
+	return nil
 }
 
 func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDriver) *appsv1.Deployment {
