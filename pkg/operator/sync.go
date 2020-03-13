@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 
@@ -19,12 +18,28 @@ import (
 	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated"
 )
 
-const (
-	csiDriver      = "csidriver.yaml"
-	serviceAccount = "serviceaccount.yaml"
-	storageClass   = "storageclass.yaml"
-	daemonSet      = "node_daemonset.yaml"
-	deployment     = "controller_deployment.yaml"
+var (
+	csiDriver       = "csidriver.yaml"
+	serviceAccount  = "serviceaccount.yaml"
+	storageClass    = "storageclass.yaml"
+	daemonSet       = "node_daemonset.yaml"
+	deployment      = "controller_deployment.yaml"
+	serviceAccounts = []string{
+		"node_sa.yaml",
+		"controller_sa.yaml",
+	}
+	clusterRoles = []string{
+		"rbac/provisioner_role.yaml",
+		"rbac/attacher_role.yaml",
+		"rbac/resizer_role.yaml",
+		"rbac/snapshotter_role.yaml",
+	}
+	clusterRoleBindings = []string{
+		"rbac/provisioner_binding.yaml",
+		"rbac/attacher_binding.yaml",
+		"rbac/resizer_binding.yaml",
+		"rbac/snapshotter_binding.yaml",
+	}
 )
 
 func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*appsv1.Deployment, error) {
@@ -108,33 +123,23 @@ func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.EBSCSIDriver) (*sto
 	return csiDriver, nil
 }
 
-func (c *csiDriverOperator) syncServiceAccount(instance *v1alpha1.EBSCSIDriver) (*corev1.ServiceAccount, error) {
-	serviceAccount := resourceread.ReadServiceAccountV1OrDie(generated.MustAsset(serviceAccount))
-
-	// Make sure we're creating the SA in the supported namespace
-	serviceAccount.Namespace = targetNamespace
-
-	serviceAccount, _, err := resourceapply.ApplyServiceAccount(
-		c.kubeClient.CoreV1(),
-		c.eventRecorder,
-		serviceAccount)
-
-	if err != nil {
-		return nil, err
+func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.EBSCSIDriver) error {
+	for _, s := range serviceAccounts {
+		serviceAccount := resourceread.ReadServiceAccountV1OrDie(generated.MustAsset(s))
+		serviceAccount.Namespace = targetNamespace
+		_, _, err := resourceapply.ApplyServiceAccount(
+			c.kubeClient.CoreV1(),
+			c.eventRecorder,
+			serviceAccount)
+		if err != nil {
+			return err
+		}
 	}
-
-	return serviceAccount, nil
+	return nil
 }
 
 func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
-	roles := []string{
-		"rbac/provisioner_role.yaml",
-		"rbac/attacher_role.yaml",
-		"rbac/resizer_role.yaml",
-		"rbac/snapshotter_role.yaml",
-	}
-
-	for _, r := range roles {
+	for _, r := range clusterRoles {
 		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
 		role.Namespace = targetNamespace
 
@@ -143,15 +148,7 @@ func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
 			return err
 		}
 	}
-
-	bindings := []string{
-		"rbac/provisioner_binding.yaml",
-		"rbac/attacher_binding.yaml",
-		"rbac/resizer_binding.yaml",
-		"rbac/snapshotter_binding.yaml",
-	}
-
-	for _, b := range bindings {
+	for _, b := range clusterRoleBindings {
 		binding := resourceread.ReadClusterRoleBindingV1OrDie(generated.MustAsset(b))
 		binding.Namespace = targetNamespace
 

@@ -14,7 +14,7 @@ spec:
       labels:
         app: ebs-csi-controller
     spec:
-      # hostNetwork: true
+      hostNetwork: true
       serviceAccount: ebs-csi-controller-sa
       priorityClassName: system-cluster-critical
       tolerations:

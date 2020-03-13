@@ -12,7 +12,8 @@ spec:
       labels:
         app: ebs-csi-node
     spec:
-      #hostNetwork: true
+      hostNetwork: true
+      serviceAccount: ebs-csi-node-sa
       priorityClassName: system-node-critical
       tolerations:
         - key: CriticalAddonsOnly
