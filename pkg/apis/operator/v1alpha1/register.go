@@ -5,7 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis/operator"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator"
 )
 
 // SchemeGroupVersion is group version used to register these objects

@@ -16,9 +16,9 @@ import (
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/status"
 
-	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/common"
-	clientset "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned"
-	informers "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/common"
+	clientset "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned"
+	informers "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions"
 )
 
 const (

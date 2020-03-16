@@ -5,10 +5,10 @@ package v1alpha1
 import (
 	time "time"
 
-	operatorv1alpha1 "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
-	versioned "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned"
-	internalinterfaces "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/listers/operator/v1alpha1"
+	operatorv1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
+	versioned "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned"
+	internalinterfaces "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	v1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/listers/operator/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"

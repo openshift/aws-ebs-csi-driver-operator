@@ -3,7 +3,7 @@
 package fake
 
 import (
-	csiv1alpha1 "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
+	csiv1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

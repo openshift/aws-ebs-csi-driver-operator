@@ -21,7 +21,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
-	v1alpha1 "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
+	v1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
 )
 
 var log = logf.Log.WithName("aws_ebs_csi_driver_operator")

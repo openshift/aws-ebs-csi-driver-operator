@@ -5,8 +5,8 @@ package v1alpha1
 import (
 	"time"
 
-	v1alpha1 "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
-	scheme "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/scheme"
+	v1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
+	scheme "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"

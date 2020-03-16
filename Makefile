@@ -13,8 +13,8 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 # Codegen module needs setting these required variables
-CODEGEN_OUTPUT_PACKAGE :=github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated
-CODEGEN_API_PACKAGE :=github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis
+CODEGEN_OUTPUT_PACKAGE :=github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated
+CODEGEN_API_PACKAGE :=github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis
 CODEGEN_GROUPS_VERSION :=operator:v1alpha1
 
 define run-codegen

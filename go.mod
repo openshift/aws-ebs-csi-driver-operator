@@ -1,4 +1,4 @@
-module github.com/bertinatto/aws-ebs-csi-driver-operator
+module github.com/openshift/aws-ebs-csi-driver-operator
 
 go 1.13
 

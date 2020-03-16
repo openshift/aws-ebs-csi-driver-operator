@@ -3,8 +3,8 @@
 package operator
 
 import (
-	internalinterfaces "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions/operator/v1alpha1"
+	internalinterfaces "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	v1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions/operator/v1alpha1"
 )
 
 // Interface provides access to each of this group's versions.

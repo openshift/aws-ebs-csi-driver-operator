@@ -12,8 +12,8 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
-	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
-	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated"
 )
 
 var (

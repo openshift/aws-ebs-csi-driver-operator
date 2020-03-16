@@ -15,8 +15,8 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
-	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/operator"
-	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/version"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/operator"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/version"
 )
 
 func main() {

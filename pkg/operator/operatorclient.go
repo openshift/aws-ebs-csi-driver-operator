@@ -5,9 +5,9 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
-	configset "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/typed/operator/v1alpha1"
-	informers "github.com/bertinatto/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
+	configset "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/typed/operator/v1alpha1"
+	informers "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions"
 )
 
 type OperatorClient struct {
