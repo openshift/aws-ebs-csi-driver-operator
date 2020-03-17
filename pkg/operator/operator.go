@@ -9,6 +9,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
+	coreinformersv1 "k8s.io/client-go/informers/core/v1"
+	rbacinformersv1 "k8s.io/client-go/informers/rbac/v1"
+	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
+	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -59,8 +63,14 @@ type csiDriverOperator struct {
 
 func NewCSIDriverOperator(
 	client OperatorClient,
+	namespaceInformer coreinformersv1.NamespaceInformer,
+	csiDriverInformer storageinformersv1beta1.CSIDriverInformer,
+	serviceAccountInformer coreinformersv1.ServiceAccountInformer,
+	clusterRoleInformer rbacinformersv1.ClusterRoleInformer,
+	clusterRoleBindingInformer rbacinformersv1.ClusterRoleBindingInformer,
 	deployInformer appsinformersv1.DeploymentInformer,
 	dsInformer appsinformersv1.DaemonSetInformer,
+	storageClassInformer storageinformersv1.StorageClassInformer,
 	kubeClient kubernetes.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
@@ -79,8 +89,14 @@ func NewCSIDriverOperator(
 		csiDriverImage:  csiDriverImage,
 	}
 
+	namespaceInformer.Informer().AddEventHandler(csiOperator.eventHandler("namespace"))
+	csiDriverInformer.Informer().AddEventHandler(csiOperator.eventHandler("csidriver"))
+	serviceAccountInformer.Informer().AddEventHandler(csiOperator.eventHandler("serviceaccount"))
+	clusterRoleInformer.Informer().AddEventHandler(csiOperator.eventHandler("clusterrole"))
+	clusterRoleBindingInformer.Informer().AddEventHandler(csiOperator.eventHandler("clusterrolebinding"))
 	deployInformer.Informer().AddEventHandler(csiOperator.eventHandler("deployment"))
-	dsInformer.Informer().AddEventHandler(csiOperator.eventHandler("daemonSet"))
+	dsInformer.Informer().AddEventHandler(csiOperator.eventHandler("daemonset"))
+	storageClassInformer.Informer().AddEventHandler(csiOperator.eventHandler("storageclass"))
 	client.Informer().AddEventHandler(csiOperator.eventHandler("ebscsidriver"))
 
 	csiOperator.syncHandler = csiOperator.sync
