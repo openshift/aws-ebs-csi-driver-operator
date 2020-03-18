@@ -5,9 +5,11 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -71,6 +73,7 @@ func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*ap
 	if err != nil {
 		return nil, err
 	}
+
 	return deploy, nil
 }
 
@@ -104,6 +107,7 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.EBSCSIDriver) (*app
 	if err != nil {
 		return nil, err
 	}
+
 	return daemonSet, nil
 }
 
@@ -114,7 +118,6 @@ func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.EBSCSIDriver) error
 		c.kubeClient.StorageV1beta1(),
 		c.eventRecorder,
 		csiDriver)
-
 	if err != nil {
 		return err
 	}
@@ -125,11 +128,14 @@ func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.EBSCSIDriver) error
 func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.EBSCSIDriver) error {
 	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
 
+	if namespace.Name != operandNamespace {
+		return fmt.Errorf("namespace names mismatch: %q and %q", namespace.Name, operandNamespace)
+	}
+
 	_, _, err := resourceapply.ApplyNamespace(
 		c.kubeClient.CoreV1(),
 		c.eventRecorder,
 		namespace)
-
 	if err != nil {
 		return err
 	}
@@ -148,7 +154,6 @@ func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.EBSCSIDriver)
 			c.kubeClient.CoreV1(),
 			c.eventRecorder,
 			serviceAccount)
-
 		if err != nil {
 			return err
 		}
@@ -192,7 +197,6 @@ func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) er
 		c.kubeClient.StorageV1(),
 		c.eventRecorder,
 		storageClass)
-
 	if err != nil {
 		return err
 	}
@@ -343,4 +347,18 @@ func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDr
 			Message: progressingMessage,
 			Reason:  "AsExpected",
 		})
+}
+
+func (c *csiDriverOperator) deleteAll() error {
+	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
+	err := c.kubeClient.CoreV1().Namespaces().Delete(namespace.Name, nil)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		c.eventRecorder.Warningf(fmt.Sprintf("%sDeleteFailed", namespace.Kind), "Failed to delete %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(namespace), err)
+		return err
+	}
+	c.eventRecorder.Eventf(fmt.Sprintf("%sDeleted", namespace.Kind), "Deleted %s", resourcehelper.FormatResourceForCLIWithNamespace(namespace))
+	return nil
 }

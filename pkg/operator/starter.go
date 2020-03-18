@@ -87,7 +87,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}{
 		ctrlInformers,
 		apiInformers,
-		ctrlCtx.KubeNamespacedInformerFactory, // operand
+		ctrlCtx.KubeNamespacedInformerFactory,
 	} {
 		informer.Start(ctx.Done())
 	}

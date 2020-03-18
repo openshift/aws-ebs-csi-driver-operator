@@ -5,6 +5,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -119,11 +120,16 @@ func (c *csiDriverOperator) Run(workers int, stopCh <-chan struct{}) {
 func (c *csiDriverOperator) sync() error {
 	instance, err := c.client.GetOperatorInstance()
 	if err != nil {
+		if errors.IsNotFound(err) {
+			klog.Warningf("Operator instance not found: %v", err)
+			return c.deleteAll()
+		}
 		return err
 	}
 
+	// We only support Managed for now
 	if instance.Spec.ManagementState != operatorv1.Managed {
-		return nil // TODO do something better for all states
+		return nil
 	}
 
 	instanceCopy := instance.DeepCopy()
