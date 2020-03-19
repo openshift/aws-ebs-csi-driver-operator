@@ -94,13 +94,13 @@ spec:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: aws-creds
+                  name: aws-cloud-credentials
                   key: aws_access_key_id
                   optional: true
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: aws-creds
+                  name: aws-cloud-credentials
                   key: aws_secret_access_key
                   optional: true
           ports:

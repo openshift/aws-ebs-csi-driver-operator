@@ -69,3 +69,20 @@ func (c OperatorClient) GetOperatorInstance() (*v1alpha1.EBSCSIDriver, error) {
 	}
 	return instance, nil
 }
+
+func (c OperatorClient) UpdateFinalizers(instance *v1alpha1.EBSCSIDriver) (*v1alpha1.EBSCSIDriver, string, error) {
+	original, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().Get(globalConfigName)
+	if err != nil {
+		return nil, "", err
+	}
+	copy := original.DeepCopy()
+	copy.ResourceVersion = instance.ResourceVersion
+	copy.ObjectMeta.Finalizers = instance.ObjectMeta.Finalizers
+
+	ret, err := c.Client.EBSCSIDrivers().Update(copy)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return ret, ret.ResourceVersion, nil
+}

@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
@@ -15,6 +16,7 @@ import (
 	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
 	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/kubernetes"
+	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/workqueue"
@@ -23,10 +25,12 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	v1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated"
 )
 
 var log = logf.Log.WithName("aws_ebs_csi_driver_operator")
@@ -48,6 +52,7 @@ const (
 type csiDriverOperator struct {
 	client        OperatorClient
 	kubeClient    kubernetes.Interface
+	pvLister      corelistersv1.PersistentVolumeLister
 	versionGetter status.VersionGetter
 	eventRecorder events.Recorder
 
@@ -64,6 +69,7 @@ type csiDriverOperator struct {
 
 func NewCSIDriverOperator(
 	client OperatorClient,
+	pvLister corelistersv1.PersistentVolumeLister,
 	namespaceInformer coreinformersv1.NamespaceInformer,
 	csiDriverInformer storageinformersv1beta1.CSIDriverInformer,
 	serviceAccountInformer coreinformersv1.ServiceAccountInformer,
@@ -82,6 +88,7 @@ func NewCSIDriverOperator(
 	csiOperator := &csiDriverOperator{
 		client:          client,
 		kubeClient:      kubeClient,
+		pvLister:        pvLister,
 		versionGetter:   versionGetter,
 		eventRecorder:   eventRecorder,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
@@ -117,6 +124,49 @@ func (c *csiDriverOperator) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
+// Helper functions to check and remove string from a slice of strings.
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
+}
+
+var myStorageClass = "csi.ebs.aws.com"
+
+func (c *csiDriverOperator) isCSIDriverInUse() (bool, error) {
+	pvcs, err := c.pvLister.List(labels.Everything())
+	if err != nil {
+		return false, fmt.Errorf("could not get list of pvs: %v", err)
+	}
+
+	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
+
+	for i := range pvcs {
+		if pvcs[i].Spec.CSI != nil {
+			if pvcs[i].Spec.CSI.Driver == csiDriver.Name {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+var myFinalizer = "csi.ebs.aws.com"
+
 func (c *csiDriverOperator) sync() error {
 	instance, err := c.client.GetOperatorInstance()
 	if err != nil {
@@ -125,6 +175,34 @@ func (c *csiDriverOperator) sync() error {
 			return c.deleteAll()
 		}
 		return err
+	}
+
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// CR is NOT being deleted, so make sure it has the finalizer
+		if !containsString(instance.ObjectMeta.Finalizers, myFinalizer) {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, myFinalizer)
+		}
+		c.client.UpdateFinalizers(instance)
+	} else {
+		// User tried to delete the CR, let's evaluate whether we can remove the finalizer and delete the operand
+		inUse, err := c.isCSIDriverInUse()
+		if err != nil {
+			return err
+		}
+
+		if !inUse {
+			// There are no PVs in use, we can go ahead and remove finalizer and delete the operand
+			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, myFinalizer)
+			c.client.UpdateFinalizers(instance)
+			c.deleteAll()
+		} else {
+			// CR has been marked for deletion, but there are PVs in use.
+			// As a result, we can't remove the finalizer nor delete the operand.
+			klog.Warningf("CR is being deleted, but there are PVs in use")
+		}
+
+		// TODO: do we want to sync the resources even though the CR has been marked for deletion?
+		return nil
 	}
 
 	// We only support Managed for now
