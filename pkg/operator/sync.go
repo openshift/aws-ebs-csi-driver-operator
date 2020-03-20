@@ -5,9 +5,10 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
@@ -350,15 +351,53 @@ func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDr
 }
 
 func (c *csiDriverOperator) deleteAll() error {
+	// Delete all namespaced resources
 	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
-	err := c.kubeClient.CoreV1().Namespaces().Delete(namespace.Name, nil)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		c.eventRecorder.Warningf(fmt.Sprintf("%sDeleteFailed", namespace.Kind), "Failed to delete %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(namespace), err)
+	if err := c.kubeClient.CoreV1().Namespaces().Delete(namespace.Name, nil); err != nil {
+		reportDeleteEvent(c.eventRecorder, namespace, err)
 		return err
 	}
-	c.eventRecorder.Eventf(fmt.Sprintf("%sDeleted", namespace.Kind), "Deleted %s", resourcehelper.FormatResourceForCLIWithNamespace(namespace))
+
+	// Then delete all non-namespaced ones
+	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
+	if err := c.kubeClient.StorageV1().StorageClasses().Delete(storageClass.Name, nil); err != nil {
+		reportDeleteEvent(c.eventRecorder, storageClass, err)
+		return err
+	}
+
+	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
+	if err := c.kubeClient.StorageV1beta1().CSIDrivers().Delete(csiDriver.Name, nil); err != nil {
+		reportDeleteEvent(c.eventRecorder, csiDriver, err)
+		return err
+	}
+
+	for _, r := range clusterRoles {
+		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
+		if err := c.kubeClient.RbacV1().ClusterRoles().Delete(role.Name, nil); err != nil {
+			reportDeleteEvent(c.eventRecorder, role, err)
+			return err
+		}
+	}
+
+	for _, b := range clusterRoleBindings {
+		binding := resourceread.ReadClusterRoleBindingV1OrDie(generated.MustAsset(b))
+		if err := c.kubeClient.RbacV1().ClusterRoleBindings().Delete(binding.Name, nil); err != nil {
+			reportDeleteEvent(c.eventRecorder, binding, err)
+			return err
+		}
+	}
+
 	return nil
+}
+
+func reportDeleteEvent(recorder events.Recorder, obj runtime.Object, originalErr error, details ...string) {
+	gvk := resourcehelper.GuessObjectGroupVersionKind(obj)
+	switch {
+	case originalErr != nil:
+		recorder.Warningf(fmt.Sprintf("%sDeleteFailed", gvk.Kind), "Failed to delete %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(obj), originalErr)
+	case len(details) == 0:
+		recorder.Eventf(fmt.Sprintf("%sDeleted", gvk.Kind), "Deleted %s", resourcehelper.FormatResourceForCLIWithNamespace(obj))
+	default:
+		recorder.Eventf(fmt.Sprintf("%sDeleted", gvk.Kind), "Deleted %s:\n%s", resourcehelper.FormatResourceForCLIWithNamespace(obj), strings.Join(details, "\n"))
+	}
 }
