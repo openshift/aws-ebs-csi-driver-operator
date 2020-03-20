@@ -397,7 +397,7 @@ func (c *csiDriverOperator) deleteAll() error {
 func reportDeleteEvent(recorder events.Recorder, obj runtime.Object, originalErr error, details ...string) {
 	gvk := resourcehelper.GuessObjectGroupVersionKind(obj)
 	switch {
-	case originalErr != nil:
+	case originalErr != nil && !apierrors.IsNotFound(originalErr):
 		recorder.Warningf(fmt.Sprintf("%sDeleteFailed", gvk.Kind), "Failed to delete %s: %v", resourcehelper.FormatResourceForCLIWithNamespace(obj), originalErr)
 	case len(details) == 0:
 		recorder.Eventf(fmt.Sprintf("%sDeleted", gvk.Kind), "Deleted %s", resourcehelper.FormatResourceForCLIWithNamespace(obj))
