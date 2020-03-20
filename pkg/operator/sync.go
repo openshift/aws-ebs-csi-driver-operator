@@ -348,13 +348,13 @@ func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDr
 		})
 }
 
-// TODO: move this to resourceapply package and delete recordDeleteEvent()
+// TODO: move this to resourceapply package and delete reportDeleteEvent()
 func (c *csiDriverOperator) deleteAll() error {
 	// Delete all namespaced resources at once by deleting the namespace
 	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
 	err := c.kubeClient.CoreV1().Namespaces().Delete(namespace.Name, nil)
+	reportDeleteEvent(c.eventRecorder, namespace, err)
 	if err != nil && !apierrors.IsNotFound(err) {
-		reportDeleteEvent(c.eventRecorder, namespace, err)
 		return err
 	}
 
