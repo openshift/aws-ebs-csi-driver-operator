@@ -39,13 +39,14 @@ const (
 	operandName      = "aws-ebs-csi-driver"
 	operandNamespace = "openshift-aws-ebs-csi-driver"
 
-	globalConfigName = "cluster"
+	operatorFinalizer = "csi.storage.operator.openshift.io"
+	operatorNamespace = "openshift-aws-ebs-csi-driver-operator"
 
-	operatorFinalizer      = "csi.storage.operator.openshift.io"
-	operatorNamespace      = "openshift-aws-ebs-csi-driver-operator"
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
 	operandImageEnvName    = "OPERAND_IMAGE"
+
+	globalConfigName = "cluster"
 
 	maxRetries = 15
 )
