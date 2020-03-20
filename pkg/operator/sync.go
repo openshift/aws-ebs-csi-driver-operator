@@ -201,7 +201,9 @@ func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) er
 func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDriver) *appsv1.Deployment {
 	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
 
-	deployment.Spec.Template.Spec.Containers[0].Image = c.csiDriverImage
+	if c.csiDriverImage != "" {
+		deployment.Spec.Template.Spec.Containers[0].Image = c.csiDriverImage
+	}
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)
 	for i, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
@@ -216,7 +218,9 @@ func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDrive
 func (c *csiDriverOperator) getExpectedDaemonSet(instance *v1alpha1.EBSCSIDriver) *appsv1.DaemonSet {
 	daemonSet := resourceread.ReadDaemonSetV1OrDie(generated.MustAsset(daemonSet))
 
-	daemonSet.Spec.Template.Spec.Containers[0].Image = c.csiDriverImage
+	if c.csiDriverImage != "" {
+		daemonSet.Spec.Template.Spec.Containers[0].Image = c.csiDriverImage
+	}
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)
 	for i, arg := range daemonSet.Spec.Template.Spec.Containers[0].Args {
