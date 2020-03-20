@@ -166,10 +166,6 @@ func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.EBSCSIDriver)
 func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
 	for _, r := range clusterRoles {
 		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
-
-		// Make sure it's created in the correct namespace
-		role.Namespace = operandNamespace
-
 		_, _, err := resourceapply.ApplyClusterRole(c.kubeClient.RbacV1(), c.eventRecorder, role)
 		if err != nil {
 			return err
@@ -178,10 +174,6 @@ func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
 
 	for _, b := range clusterRoleBindings {
 		binding := resourceread.ReadClusterRoleBindingV1OrDie(generated.MustAsset(b))
-
-		// Make sure it's created in the correct namespace
-		binding.Namespace = operandNamespace
-
 		_, _, err := resourceapply.ApplyClusterRoleBinding(c.kubeClient.RbacV1(), c.eventRecorder, binding)
 		if err != nil {
 			return err
@@ -350,8 +342,9 @@ func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDr
 		})
 }
 
+// TODO: move this to resourceapply package
 func (c *csiDriverOperator) deleteAll() error {
-	// Delete all namespaced resources
+	// Delete all namespaced resources at once by deleting the namespace
 	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
 	if err := c.kubeClient.CoreV1().Namespaces().Delete(namespace.Name, nil); err != nil {
 		reportDeleteEvent(c.eventRecorder, namespace, err)
