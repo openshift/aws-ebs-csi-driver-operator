@@ -41,6 +41,7 @@ const (
 
 	globalConfigName = "cluster"
 
+	operatorFinalizer      = "csi.storage.operator.openshift.io"
 	operatorNamespace      = "openshift-aws-ebs-csi-driver-operator"
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
@@ -124,28 +125,6 @@ func (c *csiDriverOperator) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-// Helper functions to check and remove string from a slice of strings.
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-func removeString(slice []string, s string) (result []string) {
-	for _, item := range slice {
-		if item == s {
-			continue
-		}
-		result = append(result, item)
-	}
-	return
-}
-
-var myStorageClass = "csi.ebs.aws.com"
-
 func (c *csiDriverOperator) isCSIDriverInUse() (bool, error) {
 	pvcs, err := c.pvLister.List(labels.Everything())
 	if err != nil {
@@ -165,8 +144,6 @@ func (c *csiDriverOperator) isCSIDriverInUse() (bool, error) {
 	return false, nil
 }
 
-var myFinalizer = "csi.ebs.aws.com"
-
 func (c *csiDriverOperator) sync() error {
 	instance, err := c.client.GetOperatorInstance()
 	if err != nil {
@@ -179,30 +156,28 @@ func (c *csiDriverOperator) sync() error {
 
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// CR is NOT being deleted, so make sure it has the finalizer
-		if !containsString(instance.ObjectMeta.Finalizers, myFinalizer) {
-			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, myFinalizer)
+		if addFinalizer(instance, operatorFinalizer) {
+			c.client.UpdateFinalizers(instance)
 		}
-		c.client.UpdateFinalizers(instance)
 	} else {
-		// User tried to delete the CR, let's evaluate whether we can remove the finalizer and delete the operand
-		inUse, err := c.isCSIDriverInUse()
+		// User tried to delete the CR, let's evaluate if we can
+		// delete the operand and remove the finalizer from the CR
+		ok, err := c.isCSIDriverInUse()
 		if err != nil {
 			return err
 		}
 
-		if !inUse {
-			// There are no PVs in use, we can go ahead and remove finalizer and delete the operand
-			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, myFinalizer)
-			c.client.UpdateFinalizers(instance)
-			c.deleteAll()
+		if ok {
+			// CSI driver is being used but CR has been marked for deletion,
+			// so we can't delete or sync the operand nor remove the finalizer
+			klog.Warningf("CR is being deleted but there are resources using the CSI driver")
+			return nil
 		} else {
-			// CR has been marked for deletion, but there are PVs in use.
-			// As a result, we can't remove the finalizer nor delete the operand.
-			klog.Warningf("CR is being deleted, but there are PVs in use")
+			// CSI driver is not being used, we can go ahead and remove finalizer and delete the operand
+			removeFinalizer(instance, operatorFinalizer)
+			c.client.UpdateFinalizers(instance)
+			return c.deleteAll()
 		}
-
-		// TODO: do we want to sync the resources even though the CR has been marked for deletion?
-		return nil
 	}
 
 	// We only support Managed for now
@@ -345,16 +320,6 @@ func (c *csiDriverOperator) eventHandler(kind string) cache.ResourceEventHandler
 	}
 }
 
-func logInformerEvent(kind, obj interface{}, message string) {
-	if klog.V(6) {
-		objMeta, err := meta.Accessor(obj)
-		if err != nil {
-			return
-		}
-		klog.V(6).Infof("Received event: %s %s %s", kind, objMeta.GetName(), message)
-	}
-}
-
 func (c *csiDriverOperator) worker() {
 	for c.processNextWorkItem() {
 	}
@@ -389,4 +354,35 @@ func (c *csiDriverOperator) handleErr(err error, key interface{}) {
 	klog.V(2).Infof("Dropping operator %q out of the queue: %v", key, err)
 	c.queue.Forget(key)
 	c.queue.AddAfter(key, 1*time.Minute)
+}
+
+func logInformerEvent(kind, obj interface{}, message string) {
+	if klog.V(6) {
+		objMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return
+		}
+		klog.V(6).Infof("Received event: %s %s %s", kind, objMeta.GetName(), message)
+	}
+}
+
+func addFinalizer(instance *v1alpha1.EBSCSIDriver, f string) bool {
+	for _, item := range instance.ObjectMeta.Finalizers {
+		if item == f {
+			return false
+		}
+	}
+	instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, f)
+	return true
+}
+
+func removeFinalizer(instance *v1alpha1.EBSCSIDriver, f string) {
+	var result []string
+	for _, item := range instance.ObjectMeta.Finalizers {
+		if item == f {
+			continue
+		}
+		result = append(result, item)
+	}
+	instance.ObjectMeta.Finalizers = result
 }
