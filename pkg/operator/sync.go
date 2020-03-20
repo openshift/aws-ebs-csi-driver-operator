@@ -36,12 +36,15 @@ var (
 		"rbac/attacher_role.yaml",
 		"rbac/resizer_role.yaml",
 		"rbac/snapshotter_role.yaml",
+		"rbac/privileged_role.yaml",
 	}
 	clusterRoleBindings = []string{
 		"rbac/provisioner_binding.yaml",
 		"rbac/attacher_binding.yaml",
 		"rbac/resizer_binding.yaml",
 		"rbac/snapshotter_binding.yaml",
+		"rbac/controller_privileged_binding.yaml",
+		"rbac/node_privileged_binding.yaml",
 	}
 )
 

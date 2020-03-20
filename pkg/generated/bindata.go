@@ -8,6 +8,9 @@
 // assets/node_sa.yaml
 // assets/rbac/attacher_binding.yaml
 // assets/rbac/attacher_role.yaml
+// assets/rbac/controller_privileged_binding.yaml
+// assets/rbac/node_privileged_binding.yaml
+// assets/rbac/privileged_role.yaml
 // assets/rbac/provisioner_binding.yaml
 // assets/rbac/provisioner_role.yaml
 // assets/rbac/resizer_binding.yaml
@@ -447,6 +450,92 @@ func rbacAttacher_roleYaml() (*asset, error) {
 	return a, nil
 }
 
+var _rbacController_privileged_bindingYaml = []byte(`kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ebs-controller-privileged-binding
+subjects:
+  - kind: ServiceAccount
+    name: ebs-csi-controller-sa
+    namespace: openshift-aws-ebs-csi-driver
+roleRef:
+  kind: ClusterRole
+  name: ebs-privileged-role
+  apiGroup: rbac.authorization.k8s.io
+`)
+
+func rbacController_privileged_bindingYamlBytes() ([]byte, error) {
+	return _rbacController_privileged_bindingYaml, nil
+}
+
+func rbacController_privileged_bindingYaml() (*asset, error) {
+	bytes, err := rbacController_privileged_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "rbac/controller_privileged_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _rbacNode_privileged_bindingYaml = []byte(`kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ebs-node-privileged-binding
+subjects:
+  - kind: ServiceAccount
+    name: ebs-csi-node-sa
+    namespace: openshift-aws-ebs-csi-driver
+roleRef:
+  kind: ClusterRole
+  name: ebs-privileged-role
+  apiGroup: rbac.authorization.k8s.io
+`)
+
+func rbacNode_privileged_bindingYamlBytes() ([]byte, error) {
+	return _rbacNode_privileged_bindingYaml, nil
+}
+
+func rbacNode_privileged_bindingYaml() (*asset, error) {
+	bytes, err := rbacNode_privileged_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "rbac/node_privileged_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _rbacPrivileged_roleYaml = []byte(`# TODO: create custom SCC with things that the AWS CSI driver needs
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ebs-privileged-role
+rules:
+  - apiGroups: ["security.openshift.io"]
+    resourceNames: ["privileged"]
+    resources: ["securitycontextconstraints"]
+    verbs: ["use"]
+`)
+
+func rbacPrivileged_roleYamlBytes() ([]byte, error) {
+	return _rbacPrivileged_roleYaml, nil
+}
+
+func rbacPrivileged_roleYaml() (*asset, error) {
+	bytes, err := rbacPrivileged_roleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "rbac/privileged_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _rbacProvisioner_bindingYaml = []byte(`kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -741,21 +830,24 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"controller_deployment.yaml":    controller_deploymentYaml,
-	"controller_sa.yaml":            controller_saYaml,
-	"csidriver.yaml":                csidriverYaml,
-	"namespace.yaml":                namespaceYaml,
-	"node_daemonset.yaml":           node_daemonsetYaml,
-	"node_sa.yaml":                  node_saYaml,
-	"rbac/attacher_binding.yaml":    rbacAttacher_bindingYaml,
-	"rbac/attacher_role.yaml":       rbacAttacher_roleYaml,
-	"rbac/provisioner_binding.yaml": rbacProvisioner_bindingYaml,
-	"rbac/provisioner_role.yaml":    rbacProvisioner_roleYaml,
-	"rbac/resizer_binding.yaml":     rbacResizer_bindingYaml,
-	"rbac/resizer_role.yaml":        rbacResizer_roleYaml,
-	"rbac/snapshotter_binding.yaml": rbacSnapshotter_bindingYaml,
-	"rbac/snapshotter_role.yaml":    rbacSnapshotter_roleYaml,
-	"storageclass.yaml":             storageclassYaml,
+	"controller_deployment.yaml":              controller_deploymentYaml,
+	"controller_sa.yaml":                      controller_saYaml,
+	"csidriver.yaml":                          csidriverYaml,
+	"namespace.yaml":                          namespaceYaml,
+	"node_daemonset.yaml":                     node_daemonsetYaml,
+	"node_sa.yaml":                            node_saYaml,
+	"rbac/attacher_binding.yaml":              rbacAttacher_bindingYaml,
+	"rbac/attacher_role.yaml":                 rbacAttacher_roleYaml,
+	"rbac/controller_privileged_binding.yaml": rbacController_privileged_bindingYaml,
+	"rbac/node_privileged_binding.yaml":       rbacNode_privileged_bindingYaml,
+	"rbac/privileged_role.yaml":               rbacPrivileged_roleYaml,
+	"rbac/provisioner_binding.yaml":           rbacProvisioner_bindingYaml,
+	"rbac/provisioner_role.yaml":              rbacProvisioner_roleYaml,
+	"rbac/resizer_binding.yaml":               rbacResizer_bindingYaml,
+	"rbac/resizer_role.yaml":                  rbacResizer_roleYaml,
+	"rbac/snapshotter_binding.yaml":           rbacSnapshotter_bindingYaml,
+	"rbac/snapshotter_role.yaml":              rbacSnapshotter_roleYaml,
+	"storageclass.yaml":                       storageclassYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -806,14 +898,17 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"node_daemonset.yaml":        {node_daemonsetYaml, map[string]*bintree{}},
 	"node_sa.yaml":               {node_saYaml, map[string]*bintree{}},
 	"rbac": {nil, map[string]*bintree{
-		"attacher_binding.yaml":    {rbacAttacher_bindingYaml, map[string]*bintree{}},
-		"attacher_role.yaml":       {rbacAttacher_roleYaml, map[string]*bintree{}},
-		"provisioner_binding.yaml": {rbacProvisioner_bindingYaml, map[string]*bintree{}},
-		"provisioner_role.yaml":    {rbacProvisioner_roleYaml, map[string]*bintree{}},
-		"resizer_binding.yaml":     {rbacResizer_bindingYaml, map[string]*bintree{}},
-		"resizer_role.yaml":        {rbacResizer_roleYaml, map[string]*bintree{}},
-		"snapshotter_binding.yaml": {rbacSnapshotter_bindingYaml, map[string]*bintree{}},
-		"snapshotter_role.yaml":    {rbacSnapshotter_roleYaml, map[string]*bintree{}},
+		"attacher_binding.yaml":              {rbacAttacher_bindingYaml, map[string]*bintree{}},
+		"attacher_role.yaml":                 {rbacAttacher_roleYaml, map[string]*bintree{}},
+		"controller_privileged_binding.yaml": {rbacController_privileged_bindingYaml, map[string]*bintree{}},
+		"node_privileged_binding.yaml":       {rbacNode_privileged_bindingYaml, map[string]*bintree{}},
+		"privileged_role.yaml":               {rbacPrivileged_roleYaml, map[string]*bintree{}},
+		"provisioner_binding.yaml":           {rbacProvisioner_bindingYaml, map[string]*bintree{}},
+		"provisioner_role.yaml":              {rbacProvisioner_roleYaml, map[string]*bintree{}},
+		"resizer_binding.yaml":               {rbacResizer_bindingYaml, map[string]*bintree{}},
+		"resizer_role.yaml":                  {rbacResizer_roleYaml, map[string]*bintree{}},
+		"snapshotter_binding.yaml":           {rbacSnapshotter_bindingYaml, map[string]*bintree{}},
+		"snapshotter_role.yaml":              {rbacSnapshotter_roleYaml, map[string]*bintree{}},
 	}},
 	"storageclass.yaml": {storageclassYaml, map[string]*bintree{}},
 }}
