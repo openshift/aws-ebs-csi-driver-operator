@@ -45,3 +45,4 @@ $ ./aws-ebs-csi-driver-operator start --kubeconfig $MY_KUBECONFIG --namespace op
 - Then revert commit fbd5b60d166dbb3727f2c8c05dc28760a9047328 here and update `openshift/library-go`
 - [ ] Convert commit c8cd1a9 to a PR against to openshift/library-go
 - Need to add tests as well because the whole ApplyStorageclass() function isn't tested
+- [ ] Create function to replace `deleteAll()` from this operator
