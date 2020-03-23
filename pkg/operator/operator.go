@@ -57,6 +57,7 @@ type csiDriverOperator struct {
 	pvLister      corelistersv1.PersistentVolumeLister
 	versionGetter status.VersionGetter
 	eventRecorder events.Recorder
+	informersSynced []cache.InformerSynced
 
 	syncHandler func() error
 
@@ -100,14 +101,31 @@ func NewCSIDriverOperator(
 	}
 
 	namespaceInformer.Informer().AddEventHandler(csiOperator.eventHandler("namespace"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, namespaceInformer.Informer().HasSynced)
+
 	csiDriverInformer.Informer().AddEventHandler(csiOperator.eventHandler("csidriver"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, csiDriverInformer.Informer().HasSynced)
+
 	serviceAccountInformer.Informer().AddEventHandler(csiOperator.eventHandler("serviceaccount"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, csiDriverInformer.Informer().HasSynced)
+
 	clusterRoleInformer.Informer().AddEventHandler(csiOperator.eventHandler("clusterrole"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, clusterRoleInformer.Informer().HasSynced)
+
 	clusterRoleBindingInformer.Informer().AddEventHandler(csiOperator.eventHandler("clusterrolebinding"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, clusterRoleBindingInformer.Informer().HasSynced)
+
 	deployInformer.Informer().AddEventHandler(csiOperator.eventHandler("deployment"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, deployInformer.Informer().HasSynced)
+
 	dsInformer.Informer().AddEventHandler(csiOperator.eventHandler("daemonset"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, dsInformer.Informer().HasSynced)
+
 	storageClassInformer.Informer().AddEventHandler(csiOperator.eventHandler("storageclass"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, storageClassInformer.Informer().HasSynced)
+
 	client.Informer().AddEventHandler(csiOperator.eventHandler("ebscsidriver"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, client.Informer().HasSynced)
 
 	csiOperator.syncHandler = csiOperator.sync
 
@@ -119,6 +137,11 @@ func (c *csiDriverOperator) Run(workers int, stopCh <-chan struct{}) {
 	defer c.queue.ShutDown()
 
 	c.stopCh = stopCh
+
+	if !cache.WaitForCacheSync(stopCh, c.informersSynced...) {
+		return
+	}
+	klog.Infof("Caches synced, running the controller")
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(c.worker, time.Second, stopCh)
