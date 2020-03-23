@@ -32,6 +32,15 @@ func ApplyStorageClass(client storageclientv1.StorageClassesGetter, recorder eve
 	existingCopy := existing.DeepCopy()
 
 	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
+
+	// Now that we copied everything that matters from required.ObjectMeta, we
+	// should reset required.ObjectMeta so a DeepEqual() comparison is possible
+	required.ObjectMeta = *existingCopy.ObjectMeta.DeepCopy()
+
+	// We also need to reset required.TypeMeta because existingCopy.TypeMeta,
+	// that's comming from the apiserver, isn't set (see https://issues.k8s.io/3030)
+	required.TypeMeta = existingCopy.TypeMeta
+
 	contentSame := equality.Semantic.DeepEqual(existingCopy, required)
 	if contentSame && !*modified {
 		return existingCopy, false, nil
