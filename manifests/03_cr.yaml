@@ -2,7 +2,5 @@ apiVersion: csi.ebs.aws.com/v1alpha1
 kind: EBSCSIDriver
 metadata:
   name: cluster
-  annotations:
-    release.openshift.io/create-only: "true"
 spec:
   managementState: Managed
