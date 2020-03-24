@@ -52,11 +52,11 @@ const (
 )
 
 type csiDriverOperator struct {
-	client        OperatorClient
-	kubeClient    kubernetes.Interface
-	pvLister      corelistersv1.PersistentVolumeLister
-	versionGetter status.VersionGetter
-	eventRecorder events.Recorder
+	client          OperatorClient
+	kubeClient      kubernetes.Interface
+	pvLister        corelistersv1.PersistentVolumeLister
+	versionGetter   status.VersionGetter
+	eventRecorder   events.Recorder
 	informersSynced []cache.InformerSynced
 
 	syncHandler func() error
@@ -147,25 +147,6 @@ func (c *csiDriverOperator) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(c.worker, time.Second, stopCh)
 	}
 	<-stopCh
-}
-
-func (c *csiDriverOperator) isCSIDriverInUse() (bool, error) {
-	pvcs, err := c.pvLister.List(labels.Everything())
-	if err != nil {
-		return false, fmt.Errorf("could not get list of pvs: %v", err)
-	}
-
-	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
-
-	for i := range pvcs {
-		if pvcs[i].Spec.CSI != nil {
-			if pvcs[i].Spec.CSI.Driver == csiDriver.Name {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
 }
 
 func (c *csiDriverOperator) sync() error {
@@ -378,6 +359,25 @@ func (c *csiDriverOperator) handleErr(err error, key interface{}) {
 	klog.V(2).Infof("Dropping operator %q out of the queue: %v", key, err)
 	c.queue.Forget(key)
 	c.queue.AddAfter(key, 1*time.Minute)
+}
+
+func (c *csiDriverOperator) isCSIDriverInUse() (bool, error) {
+	pvcs, err := c.pvLister.List(labels.Everything())
+	if err != nil {
+		return false, fmt.Errorf("could not get list of pvs: %v", err)
+	}
+
+	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
+
+	for i := range pvcs {
+		if pvcs[i].Spec.CSI != nil {
+			if pvcs[i].Spec.CSI.Driver == csiDriver.Name {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func logInformerEvent(kind, obj interface{}, message string) {

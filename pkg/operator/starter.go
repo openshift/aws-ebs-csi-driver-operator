@@ -27,12 +27,6 @@ const (
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
-	cb, err := common.NewBuilder("")
-	if err != nil {
-		klog.Fatalf("error creating clients: %v", err)
-	}
-	ctrlCtx := common.CreateControllerContext(cb, ctx.Done(), operandNamespace)
-
 	ctrlClientset, err := clientset.NewForConfig(controllerConfig.KubeConfig)
 	if err != nil {
 		return err
@@ -56,6 +50,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlClientset.CsiV1alpha1(),
 	}
 
+	cb, err := common.NewBuilder("")
+	if err != nil {
+		klog.Fatalf("error creating clients: %v", err)
+	}
+
+	ctrlCtx := common.CreateControllerContext(cb, ctx.Done(), operandNamespace)
 	versionGetter := status.NewVersionGetter()
 
 	operator := NewCSIDriverOperator(
@@ -77,10 +77,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		os.Getenv(operandImageEnvName),
 	)
 
-	logLevelController := loglevel.NewClusterOperatorLoggingController(operatorClient, controllerConfig.EventRecorder)
-	// TODO remove this controller once we support Removed
+	// This controller syncs CR.Status.Conditions with the value in the field CR.Spec.ManagementStatus. It only supports Managed state
 	managementStateController := management.NewOperatorManagementStateController(operandName, operatorClient, controllerConfig.EventRecorder)
 	management.SetOperatorNotRemovable()
+
+	// This controller syncs the operator log level with the value set in the CR.Spec.OperatorLogLevel
+	logLevelController := loglevel.NewClusterOperatorLoggingController(operatorClient, controllerConfig.EventRecorder)
 
 	klog.Info("Starting the Informers.")
 	for _, informer := range []interface {

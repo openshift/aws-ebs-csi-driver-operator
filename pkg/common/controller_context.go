@@ -33,13 +33,13 @@ type ControllerContext struct {
 }
 
 // CreateControllerContext creates the ControllerContext with the ClientBuilder.
-func CreateControllerContext(cb *Builder, stop <-chan struct{}, targetNamespace string) *ControllerContext {
+func CreateControllerContext(cb *Builder, stop <-chan struct{}, operandNamespace string) *ControllerContext {
 	apiExtClient := cb.APIExtClientOrDie("apiext-shared-informer")
 	apiExtSharedInformer := apiextinformers.NewSharedInformerFactoryWithOptions(apiExtClient, resyncPeriod()(),
-		apiextinformers.WithNamespace(targetNamespace))
+		apiextinformers.WithNamespace(operandNamespace))
 
 	kubeClient := cb.KubeClientOrDie("kube-shared-informer")
-	kubeNamespacedSharedInformer := informers.NewFilteredSharedInformerFactory(kubeClient, resyncPeriod()(), targetNamespace, nil)
+	kubeNamespacedSharedInformer := informers.NewFilteredSharedInformerFactory(kubeClient, resyncPeriod()(), operandNamespace, nil)
 
 	return &ControllerContext{
 		ClientBuilder:                 cb,
