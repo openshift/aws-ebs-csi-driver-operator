@@ -16,7 +16,6 @@ import (
 	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
 	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/kubernetes"
-	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/workqueue"
@@ -54,7 +53,7 @@ const (
 type csiDriverOperator struct {
 	client          OperatorClient
 	kubeClient      kubernetes.Interface
-	pvLister        corelistersv1.PersistentVolumeLister
+	pvInformer      coreinformersv1.PersistentVolumeInformer
 	versionGetter   status.VersionGetter
 	eventRecorder   events.Recorder
 	informersSynced []cache.InformerSynced
@@ -72,7 +71,7 @@ type csiDriverOperator struct {
 
 func NewCSIDriverOperator(
 	client OperatorClient,
-	pvLister corelistersv1.PersistentVolumeLister,
+	pvInformer coreinformersv1.PersistentVolumeInformer,
 	namespaceInformer coreinformersv1.NamespaceInformer,
 	csiDriverInformer storageinformersv1beta1.CSIDriverInformer,
 	serviceAccountInformer coreinformersv1.ServiceAccountInformer,
@@ -91,7 +90,7 @@ func NewCSIDriverOperator(
 	csiOperator := &csiDriverOperator{
 		client:          client,
 		kubeClient:      kubeClient,
-		pvLister:        pvLister,
+		pvInformer:      pvInformer,
 		versionGetter:   versionGetter,
 		eventRecorder:   eventRecorder,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
@@ -99,6 +98,8 @@ func NewCSIDriverOperator(
 		operandVersion:  operandVersion,
 		csiDriverImage:  csiDriverImage,
 	}
+
+	csiOperator.informersSynced = append(csiOperator.informersSynced, pvInformer.Informer().HasSynced)
 
 	namespaceInformer.Informer().AddEventHandler(csiOperator.eventHandler("namespace"))
 	csiOperator.informersSynced = append(csiOperator.informersSynced, namespaceInformer.Informer().HasSynced)
@@ -362,7 +363,7 @@ func (c *csiDriverOperator) handleErr(err error, key interface{}) {
 }
 
 func (c *csiDriverOperator) isCSIDriverInUse() (bool, error) {
-	pvcs, err := c.pvLister.List(labels.Everything())
+	pvcs, err := c.pvInformer.Lister().List(labels.Everything())
 	if err != nil {
 		return false, fmt.Errorf("could not get list of pvs: %v", err)
 	}
