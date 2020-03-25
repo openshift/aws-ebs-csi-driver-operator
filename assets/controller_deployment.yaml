@@ -1,21 +1,21 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: ebs-csi-controller
+  name: aws-ebs-csi-driver
   namespace: openshift-aws-ebs-csi-driver
 spec:
   selector:
     matchLabels:
-      app: ebs-csi-controller
-  serviceName: ebs-csi-controller
+      app: aws-ebs-csi-driver
+  serviceName: aws-ebs-csi-driver
   replicas: 1
   template:
     metadata:
       labels:
-        app: ebs-csi-controller
+        app: aws-ebs-csi-driver
     spec:
       hostNetwork: true
-      serviceAccount: ebs-csi-controller-sa
+      serviceAccount: aws-ebs-csi-driver-sa
       priorityClassName: system-cluster-critical
       tolerations:
         - key: CriticalAddonsOnly

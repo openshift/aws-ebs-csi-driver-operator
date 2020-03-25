@@ -4,7 +4,7 @@ metadata:
   name: ebs-node-privileged-binding
 subjects:
   - kind: ServiceAccount
-    name: ebs-csi-node-sa
+    name: aws-ebs-csi-driver-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole

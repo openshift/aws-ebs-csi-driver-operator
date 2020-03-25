@@ -65,21 +65,21 @@ func (fi bindataFileInfo) Sys() interface{} {
 var _controller_deploymentYaml = []byte(`kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: ebs-csi-controller
+  name: aws-ebs-csi-driver
   namespace: openshift-aws-ebs-csi-driver
 spec:
   selector:
     matchLabels:
-      app: ebs-csi-controller
-  serviceName: ebs-csi-controller
+      app: aws-ebs-csi-driver
+  serviceName: aws-ebs-csi-driver
   replicas: 1
   template:
     metadata:
       labels:
-        app: ebs-csi-controller
+        app: aws-ebs-csi-driver
     spec:
       hostNetwork: true
-      serviceAccount: ebs-csi-controller-sa
+      serviceAccount: aws-ebs-csi-driver-sa
       priorityClassName: system-cluster-critical
       tolerations:
         - key: CriticalAddonsOnly
@@ -185,7 +185,7 @@ func controller_deploymentYaml() (*asset, error) {
 var _controller_saYaml = []byte(`apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: ebs-csi-controller-sa
+  name: aws-ebs-csi-driver-sa
   namespace: openshift-aws-ebs-csi-driver
 `)
 
@@ -252,19 +252,19 @@ func namespaceYaml() (*asset, error) {
 var _node_daemonsetYaml = []byte(`kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: ebs-csi-node
+  name: aws-ebs-csi-driver
   namespace: openshift-aws-ebs-csi-driver
 spec:
   selector:
     matchLabels:
-      app: ebs-csi-node
+      app: aws-ebs-csi-driver
   template:
     metadata:
       labels:
-        app: ebs-csi-node
+        app: aws-ebs-csi-driver
     spec:
       hostNetwork: true
-      serviceAccount: ebs-csi-node-sa
+      serviceAccount: aws-ebs-csi-driver-sa
       priorityClassName: system-node-critical
       tolerations:
         - key: CriticalAddonsOnly
@@ -368,7 +368,7 @@ func node_daemonsetYaml() (*asset, error) {
 var _node_saYaml = []byte(`apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: ebs-csi-node-sa
+  name: aws-ebs-csi-driver-sa
   namespace: openshift-aws-ebs-csi-driver
 `)
 
@@ -393,7 +393,7 @@ metadata:
   name: ebs-csi-attacher-binding
 subjects:
   - kind: ServiceAccount
-    name: ebs-csi-controller-sa
+    name: aws-ebs-csi-driver-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -456,7 +456,7 @@ metadata:
   name: ebs-controller-privileged-binding
 subjects:
   - kind: ServiceAccount
-    name: ebs-csi-controller-sa
+    name: aws-ebs-csi-driver-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -485,7 +485,7 @@ metadata:
   name: ebs-node-privileged-binding
 subjects:
   - kind: ServiceAccount
-    name: ebs-csi-node-sa
+    name: aws-ebs-csi-driver-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -542,7 +542,7 @@ metadata:
   name: ebs-csi-provisioner-binding
 subjects:
   - kind: ServiceAccount
-    name: ebs-csi-controller-sa
+    name: aws-ebs-csi-driver-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -611,7 +611,7 @@ metadata:
   name: ebs-csi-resizer-binding
 subjects:
   - kind: ServiceAccount
-    name: ebs-csi-controller-sa
+    name: aws-ebs-csi-driver-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -677,7 +677,7 @@ metadata:
   name: ebs-csi-snapshotter-binding
 subjects:
   - kind: ServiceAccount
-    name: ebs-csi-controller-sa
+    name: aws-ebs-csi-driver-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole

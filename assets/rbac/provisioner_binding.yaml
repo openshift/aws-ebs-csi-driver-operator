@@ -4,7 +4,7 @@ metadata:
   name: ebs-csi-provisioner-binding
 subjects:
   - kind: ServiceAccount
-    name: ebs-csi-controller-sa
+    name: aws-ebs-csi-driver-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole

@@ -1,19 +1,19 @@
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: ebs-csi-node
+  name: aws-ebs-csi-driver
   namespace: openshift-aws-ebs-csi-driver
 spec:
   selector:
     matchLabels:
-      app: ebs-csi-node
+      app: aws-ebs-csi-driver
   template:
     metadata:
       labels:
-        app: ebs-csi-node
+        app: aws-ebs-csi-driver
     spec:
       hostNetwork: true
-      serviceAccount: ebs-csi-node-sa
+      serviceAccount: aws-ebs-csi-driver-sa
       priorityClassName: system-node-critical
       tolerations:
         - key: CriticalAddonsOnly
