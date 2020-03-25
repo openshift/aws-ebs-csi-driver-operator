@@ -3,6 +3,7 @@ module github.com/openshift/aws-ebs-csi-driver-operator
 go 1.13
 
 require (
+	github.com/google/go-cmp v0.4.0
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/jteeuwen/go-bindata v3.0.8-0.20151023091102-a0ff2567cfb7+incompatible
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
@@ -17,12 +18,12 @@ require (
 	golang.org/x/sys v0.0.0-20200124204421-9fbb57f87de9 // indirect
 	google.golang.org/genproto v0.0.0-20191220175831-5c49e3ecc1c1 // indirect
 	google.golang.org/grpc v1.26.0 // indirect
-	k8s.io/api v0.17.3
-	k8s.io/apiextensions-apiserver v0.17.1
-	k8s.io/apimachinery v0.17.3
-	k8s.io/client-go v0.17.3
-	k8s.io/code-generator v0.17.1
-	k8s.io/component-base v0.17.3
+	k8s.io/api v0.17.4
+	k8s.io/apiextensions-apiserver v0.17.4
+	k8s.io/apimachinery v0.17.4
+	k8s.io/client-go v0.17.4
+	k8s.io/code-generator v0.17.4
+	k8s.io/component-base v0.17.4
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/controller-runtime v0.4.0
 )
