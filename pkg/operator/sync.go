@@ -257,8 +257,12 @@ func (c *csiDriverOperator) syncStatus(instance *v1alpha1.EBSCSIDriver, deployme
 	resourcemerge.SetDaemonSetGeneration(&instance.Status.Generations, daemonSet)
 
 	instance.Status.ObservedGeneration = instance.Generation
-	if deployment != nil {
-		instance.Status.ReadyReplicas = deployment.Status.UpdatedReplicas
+
+	// TODO: what should be the number of replicas? Right now the formula is:
+	if deployment != nil && daemonSet != nil {
+		if deployment.Status.UnavailableReplicas == 0 && daemonSet.Status.NumberUnavailable == 0 {
+			instance.Status.ReadyReplicas = deployment.Status.UpdatedReplicas + daemonSet.Status.UpdatedNumberScheduled
+		}
 	}
 
 	c.setVersion("operator", c.operatorVersion)
