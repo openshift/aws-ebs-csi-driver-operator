@@ -289,7 +289,7 @@ func (c *csiDriverOperator) syncConditions(instance *v1alpha1.EBSCSIDriver, depl
 }
 
 func (c *csiDriverOperator) syncAvailableCondition(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
-	// Available: deployment and daemonset are available, regardless at which version
+	// TODO: is it enough to check if these values are >0? Or should be more strict and check against the exact desired value?
 	isDeploymentAvailable := deployment != nil && deployment.Status.AvailableReplicas > 0
 	isDaemonSetAvailable := daemonSet != nil && daemonSet.Status.NumberAvailable > 0
 	if isDeploymentAvailable && isDaemonSetAvailable {
@@ -319,18 +319,19 @@ func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDr
 		deploymentExpectedReplicas = *deployment.Spec.Replicas
 	}
 	switch {
-	case deployment == nil || daemonSet == nil:
+	// Controller
+	case deployment == nil:
 		// Not reachable in theory, but better to be on the safe side...
 		progressing = operatorv1.ConditionTrue
-		progressingMessage = "Waiting for Deployment and DaemonSet to be created"
+		progressingMessage = "Waiting for Deployment to be created"
 
-	case (deployment.Generation != deployment.Status.ObservedGeneration) || (daemonSet.Generation != daemonSet.Status.ObservedGeneration):
+	case deployment.Generation != deployment.Status.ObservedGeneration:
 		progressing = operatorv1.ConditionTrue
-		progressingMessage = "Waiting for Deployment and DaemonSet to act on changes"
+		progressingMessage = "Waiting for Deployment to act on changes"
 
 	case deployment.Status.UnavailableReplicas > 0:
 		progressing = operatorv1.ConditionTrue
-		progressingMessage = "Waiting for Deployment to deploy csi-ebs-controller pods"
+		progressingMessage = "Waiting for Deployment to deploy controller pods"
 
 	case deployment.Status.UpdatedReplicas < deploymentExpectedReplicas:
 		progressing = operatorv1.ConditionTrue
@@ -339,6 +340,28 @@ func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDr
 	case deployment.Status.AvailableReplicas < deploymentExpectedReplicas:
 		progressing = operatorv1.ConditionTrue
 		progressingMessage = "Waiting for Deployment to deploy pods"
+	// Node
+	case daemonSet == nil:
+		progressing = operatorv1.ConditionTrue
+		progressingMessage = "Waiting for DaemonSet to be created"
+
+	case daemonSet.Generation != daemonSet.Status.ObservedGeneration:
+		progressing = operatorv1.ConditionTrue
+		progressingMessage = "Waiting for DaemonSet to act on changes"
+
+	case daemonSet.Status.NumberUnavailable > 0:
+		progressing = operatorv1.ConditionTrue
+		progressingMessage = "Waiting for DaemonSet to deploy node pods"
+
+	// TODO: the following seems redundant. Remove if that's not the case.
+
+	// case daemonSet.Status.UpdatedNumberScheduled < daemonSet.Status.DesiredNumberScheduled:
+	// 	progressing = operatorv1.ConditionTrue
+	// 	progressingMessage = "Waiting for DaemonSet to update pods"
+
+	// case daemonSet.Status.NumberAvailable < 1:
+	// 	progressing = operatorv1.ConditionTrue
+	// 	progressingMessage = "Waiting for DaemonSet to deploy pods"
 
 	default:
 		progressing = operatorv1.ConditionFalse
