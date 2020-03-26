@@ -13,7 +13,7 @@ spec:
         app: aws-ebs-csi-driver
     spec:
       hostNetwork: true
-      serviceAccount: aws-ebs-csi-driver-sa
+      serviceAccount: aws-ebs-csi-driver-node-sa
       priorityClassName: system-node-critical
       tolerations:
         - key: CriticalAddonsOnly
