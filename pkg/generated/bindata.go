@@ -65,27 +65,27 @@ func (fi bindataFileInfo) Sys() interface{} {
 var _controller_deploymentYaml = []byte(`kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: aws-ebs-csi-driver
+  name: aws-ebs-csi-driver-controller
   namespace: openshift-aws-ebs-csi-driver
 spec:
   selector:
     matchLabels:
-      app: aws-ebs-csi-driver
-  serviceName: aws-ebs-csi-driver
+      app: aws-ebs-csi-driver-controller
+  serviceName: aws-ebs-csi-driver-controller
   replicas: 1
   template:
     metadata:
       labels:
-        app: aws-ebs-csi-driver
+        app: aws-ebs-csi-driver-controller
     spec:
       hostNetwork: true
-      serviceAccount: aws-ebs-csi-driver-sa
+      serviceAccount: aws-ebs-csi-driver-controller-sa
       priorityClassName: system-cluster-critical
       tolerations:
         - key: CriticalAddonsOnly
           operator: Exists
       containers:
-        - name: ebs-plugin
+        - name: csi-driver
           image: amazon/aws-ebs-csi-driver:latest
           args:
             - --endpoint=$(CSI_ENDPOINT)
@@ -118,8 +118,8 @@ spec:
           args:
             - --provisioner=ebs.csi.aws.com
             - --csi-address=$(ADDRESS)
-            - --v=5
             - --feature-gates=Topology=true
+            - --v=5
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -130,9 +130,6 @@ spec:
           image: quay.io/k8scsi/csi-attacher:canary
           args:
             - --csi-address=$(ADDRESS)
-            # Attaching a volume might take a long time
-            # if the volume if still being expanded
-            - --timeout=300s
             - --v=5
           env:
             - name: ADDRESS
@@ -185,7 +182,7 @@ func controller_deploymentYaml() (*asset, error) {
 var _controller_saYaml = []byte(`apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: aws-ebs-csi-driver-sa
+  name: aws-ebs-csi-driver-controller-sa
   namespace: openshift-aws-ebs-csi-driver
 `)
 
@@ -252,25 +249,25 @@ func namespaceYaml() (*asset, error) {
 var _node_daemonsetYaml = []byte(`kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: aws-ebs-csi-driver
+  name: aws-ebs-csi-driver-node
   namespace: openshift-aws-ebs-csi-driver
 spec:
   selector:
     matchLabels:
-      app: aws-ebs-csi-driver
+      app: aws-ebs-csi-driver-node
   template:
     metadata:
       labels:
-        app: aws-ebs-csi-driver
+        app: aws-ebs-csi-driver-node
     spec:
       hostNetwork: true
-      serviceAccount: aws-ebs-csi-driver-sa
+      serviceAccount: aws-ebs-csi-driver-node-sa
       priorityClassName: system-node-critical
       tolerations:
         - key: CriticalAddonsOnly
           operator: Exists
       containers:
-        - name: ebs-plugin
+        - name: csi-driver
           securityContext:
             privileged: true
           image: amazon/aws-ebs-csi-driver:latest
@@ -368,7 +365,7 @@ func node_daemonsetYaml() (*asset, error) {
 var _node_saYaml = []byte(`apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: aws-ebs-csi-driver-sa
+  name: aws-ebs-csi-driver-node-sa
   namespace: openshift-aws-ebs-csi-driver
 `)
 
@@ -393,7 +390,7 @@ metadata:
   name: ebs-csi-attacher-binding
 subjects:
   - kind: ServiceAccount
-    name: aws-ebs-csi-driver-sa
+    name: aws-ebs-csi-driver-controller-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -456,7 +453,7 @@ metadata:
   name: ebs-controller-privileged-binding
 subjects:
   - kind: ServiceAccount
-    name: aws-ebs-csi-driver-sa
+    name: aws-ebs-csi-driver-controller-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -485,7 +482,7 @@ metadata:
   name: ebs-node-privileged-binding
 subjects:
   - kind: ServiceAccount
-    name: aws-ebs-csi-driver-sa
+    name: aws-ebs-csi-driver-node-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -542,7 +539,7 @@ metadata:
   name: ebs-csi-provisioner-binding
 subjects:
   - kind: ServiceAccount
-    name: aws-ebs-csi-driver-sa
+    name: aws-ebs-csi-driver-controller-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -611,7 +608,7 @@ metadata:
   name: ebs-csi-resizer-binding
 subjects:
   - kind: ServiceAccount
-    name: aws-ebs-csi-driver-sa
+    name: aws-ebs-csi-driver-controller-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -677,7 +674,7 @@ metadata:
   name: ebs-csi-snapshotter-binding
 subjects:
   - kind: ServiceAccount
-    name: aws-ebs-csi-driver-sa
+    name: aws-ebs-csi-driver-controller-sa
     namespace: openshift-aws-ebs-csi-driver
 roleRef:
   kind: ClusterRole
@@ -758,10 +755,14 @@ func rbacSnapshotter_roleYaml() (*asset, error) {
 var _storageclassYaml = []byte(`apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: ebs-sc
+  name: gp2-csi
+parameters:
+  type: gp2
+  encrypted: "true"
 provisioner: ebs.csi.aws.com
 reclaimPolicy: "Delete"
 volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
 `)
 
 func storageclassYamlBytes() ([]byte, error) {
