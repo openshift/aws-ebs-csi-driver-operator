@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"context"
 	"sort"
 	"testing"
 
@@ -585,7 +586,7 @@ func TestSync(t *testing.T) {
 			// Check expectedObjects.deployment
 			if test.expectedObjects.deployment != nil {
 				deployName := test.expectedObjects.deployment.Name
-				actualDeployment, err := ctx.coreClient.AppsV1().Deployments(operandNamespace).Get(deployName, metav1.GetOptions{})
+				actualDeployment, err := ctx.coreClient.AppsV1().Deployments(operandNamespace).Get(context.TODO(), deployName, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Failed to get Deployment %s: %v", operandName, err)
 				}
@@ -599,7 +600,7 @@ func TestSync(t *testing.T) {
 			// Check expectedObjects.daemonSet
 			if test.expectedObjects.daemonSet != nil {
 				dsName := test.expectedObjects.daemonSet.Name
-				actualDaemonSet, err := ctx.coreClient.AppsV1().DaemonSets(operandNamespace).Get(dsName, metav1.GetOptions{})
+				actualDaemonSet, err := ctx.coreClient.AppsV1().DaemonSets(operandNamespace).Get(context.TODO(), dsName, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Failed to get DaemonSet %s: %v", operandName, err)
 				}
@@ -612,7 +613,7 @@ func TestSync(t *testing.T) {
 
 			// Check expectedObjects.ebsCSIDriver
 			if test.expectedObjects.ebsCSIDriver != nil {
-				actualEBSCSIDriver, err := ctx.operatorClient.CsiV1alpha1().EBSCSIDrivers().Get(globalConfigName, metav1.GetOptions{})
+				actualEBSCSIDriver, err := ctx.operatorClient.CsiV1alpha1().EBSCSIDrivers().Get(context.TODO(), globalConfigName, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Failed to get EBSCSIDriver %s: %v", globalConfigName, err)
 				}
