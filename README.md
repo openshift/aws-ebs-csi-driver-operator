@@ -31,24 +31,21 @@ $ OPERAND_IMAGE_VERSION=0.1 OPERAND_IMAGE=quay.io/bertinatto/my-custom-aws-ebs-c
 ```
 
 # TODO
+
+## openshift/aws-ebs-csi-driver-operator
+
 - [ ] Check why deployment and daemonset are updated when there're no changes
 - [ ] Single CR through API validation of metadata.name
 - [ ] Make sure there are no snapshots using the driver before removing the it
 	- Right now it only checks for PVs
 - [ ] Create CSV to make operator work with OLM
-- [ ] Add fine-grained AWS permissions (in `./assets/credentials.yaml`)
-	- Right now it allows everything (*ec2:\**)
 - [ ] Sync status when error happens while syncing resources other than Deployment and DaemonSet?
 - [ ] 20 min for resyncing is OK in OLM-managed operators? Check other operators
-- [ ] Use better defaults in resources in `./assets`
-    - And better/consistent resource names
-- [ ] Move code to openshift org
 - [ ] Add tests: unit and e2e
 
 ## openshift/library-go
 
-- [ ] Get https://github.com/openshift/library-go/pull/750 merged
-    - Then revert commit fbd5b60d166dbb3727f2c8c05dc28760a9047328 here and update `openshift/library-go`
-- [ ] Convert commit c8cd1a9 to a PR against to openshift/library-go
+- [ ] Convert commit dd2dd1f2aec380f211403e2b09c921e62637a689 to a PR to to openshift/library-go
     - Need to add tests as well because the whole ApplyStorageclass() function isn't tested
+	- Once that's merged, update openshift/library-go dependency
 - [ ] Create function to replace `deleteAll()` from this operator
