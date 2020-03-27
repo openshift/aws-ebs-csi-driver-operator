@@ -65,18 +65,18 @@ func (fi bindataFileInfo) Sys() interface{} {
 var _controller_deploymentYaml = []byte(`kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: aws-ebs-csi-driver
+  name: aws-ebs-csi-driver-controller
   namespace: openshift-aws-ebs-csi-driver
 spec:
   selector:
     matchLabels:
-      app: aws-ebs-csi-driver
-  serviceName: aws-ebs-csi-driver
+      app: aws-ebs-csi-driver-controller
+  serviceName: aws-ebs-csi-driver-controller
   replicas: 1
   template:
     metadata:
       labels:
-        app: aws-ebs-csi-driver
+        app: aws-ebs-csi-driver-controller
     spec:
       hostNetwork: true
       serviceAccount: aws-ebs-csi-driver-controller-sa
@@ -249,16 +249,16 @@ func namespaceYaml() (*asset, error) {
 var _node_daemonsetYaml = []byte(`kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: aws-ebs-csi-driver
+  name: aws-ebs-csi-driver-node
   namespace: openshift-aws-ebs-csi-driver
 spec:
   selector:
     matchLabels:
-      app: aws-ebs-csi-driver
+      app: aws-ebs-csi-driver-node
   template:
     metadata:
       labels:
-        app: aws-ebs-csi-driver
+        app: aws-ebs-csi-driver-node
     spec:
       hostNetwork: true
       serviceAccount: aws-ebs-csi-driver-node-sa
