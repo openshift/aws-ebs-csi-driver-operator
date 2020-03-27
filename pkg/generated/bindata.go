@@ -85,7 +85,7 @@ spec:
         - key: CriticalAddonsOnly
           operator: Exists
       containers:
-        - name: ebs-plugin
+        - name: csi-driver
           image: amazon/aws-ebs-csi-driver:latest
           args:
             - --endpoint=$(CSI_ENDPOINT)
@@ -118,8 +118,8 @@ spec:
           args:
             - --provisioner=ebs.csi.aws.com
             - --csi-address=$(ADDRESS)
-            - --v=5
             - --feature-gates=Topology=true
+            - --v=5
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -267,7 +267,7 @@ spec:
         - key: CriticalAddonsOnly
           operator: Exists
       containers:
-        - name: ebs-plugin
+        - name: csi-driver
           securityContext:
             privileged: true
           image: amazon/aws-ebs-csi-driver:latest

@@ -202,14 +202,14 @@ func withGenerations(generation int64) ebsCSIDriverModifier {
 			{
 				Group:          appsv1.GroupName,
 				LastGeneration: generation,
-				Name:           operandName,
+				Name:           "aws-ebs-csi-driver-controller",
 				Namespace:      operandNamespace,
 				Resource:       "deployments",
 			},
 			{
 				Group:          appsv1.GroupName,
 				LastGeneration: generation,
-				Name:           operandName,
+				Name:           "aws-ebs-csi-driver-node",
 				Namespace:      operandNamespace,
 				Resource:       "daemonsets",
 			},
@@ -407,7 +407,7 @@ func TestSync(t *testing.T) {
 					withGenerations(1),
 					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeAvailable)),
-			}, // FIXME
+			},
 		},
 		{
 			// Deployment is fully deployed and its status is synced to EBSCSIDriver

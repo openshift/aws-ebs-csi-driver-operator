@@ -19,7 +19,7 @@ spec:
         - key: CriticalAddonsOnly
           operator: Exists
       containers:
-        - name: ebs-plugin
+        - name: csi-driver
           securityContext:
             privileged: true
           image: amazon/aws-ebs-csi-driver:latest
