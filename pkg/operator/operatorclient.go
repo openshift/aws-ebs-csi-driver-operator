@@ -1,6 +1,9 @@
 package operator
 
 import (
+	"context"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -37,7 +40,7 @@ func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operato
 	copy.ResourceVersion = resourceVersion
 	copy.Spec.OperatorSpec = *spec
 
-	ret, err := c.Client.EBSCSIDrivers().Update(copy)
+	ret, err := c.Client.EBSCSIDrivers().Update(context.TODO(), copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -54,7 +57,7 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 	copy.ResourceVersion = resourceVersion
 	copy.Status.OperatorStatus = *status
 
-	ret, err := c.Client.EBSCSIDrivers().UpdateStatus(copy)
+	ret, err := c.Client.EBSCSIDrivers().UpdateStatus(context.TODO(), copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +82,7 @@ func (c OperatorClient) UpdateFinalizers(instance *v1alpha1.EBSCSIDriver) (*v1al
 	copy.ResourceVersion = instance.ResourceVersion
 	copy.ObjectMeta.Finalizers = instance.ObjectMeta.Finalizers
 
-	ret, err := c.Client.EBSCSIDrivers().Update(copy)
+	ret, err := c.Client.EBSCSIDrivers().Update(context.TODO(), copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
