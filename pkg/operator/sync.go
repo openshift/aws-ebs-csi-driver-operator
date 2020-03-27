@@ -1,11 +1,13 @@
 package operator
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -379,7 +381,7 @@ func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDr
 func (c *csiDriverOperator) deleteAll() error {
 	// Delete all namespaced resources at once by deleting the namespace
 	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
-	err := c.kubeClient.CoreV1().Namespaces().Delete(namespace.Name, nil)
+	err := c.kubeClient.CoreV1().Namespaces().Delete(context.TODO(), namespace.Name, metav1.DeleteOptions{})
 	reportDeleteEvent(c.eventRecorder, namespace, err)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -387,14 +389,14 @@ func (c *csiDriverOperator) deleteAll() error {
 
 	// Then delete all non-namespaced ones
 	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
-	err = c.kubeClient.StorageV1().StorageClasses().Delete(storageClass.Name, nil)
+	err = c.kubeClient.StorageV1().StorageClasses().Delete(context.TODO(), storageClass.Name, metav1.DeleteOptions{})
 	reportDeleteEvent(c.eventRecorder, storageClass, err)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
 	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
-	err = c.kubeClient.StorageV1beta1().CSIDrivers().Delete(csiDriver.Name, nil)
+	err = c.kubeClient.StorageV1beta1().CSIDrivers().Delete(context.TODO(), csiDriver.Name, metav1.DeleteOptions{})
 	reportDeleteEvent(c.eventRecorder, csiDriver, err)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -402,7 +404,7 @@ func (c *csiDriverOperator) deleteAll() error {
 
 	for _, r := range clusterRoles {
 		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
-		err := c.kubeClient.RbacV1().ClusterRoles().Delete(role.Name, nil)
+		err := c.kubeClient.RbacV1().ClusterRoles().Delete(context.TODO(), role.Name, metav1.DeleteOptions{})
 		reportDeleteEvent(c.eventRecorder, role, err)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
@@ -411,7 +413,7 @@ func (c *csiDriverOperator) deleteAll() error {
 
 	for _, b := range clusterRoleBindings {
 		binding := resourceread.ReadClusterRoleBindingV1OrDie(generated.MustAsset(b))
-		err := c.kubeClient.RbacV1().ClusterRoleBindings().Delete(binding.Name, nil)
+		err := c.kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), binding.Name, metav1.DeleteOptions{})
 		reportDeleteEvent(c.eventRecorder, binding, err)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err

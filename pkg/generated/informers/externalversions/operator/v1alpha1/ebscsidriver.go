@@ -3,6 +3,7 @@
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
 	operatorv1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
@@ -44,13 +45,13 @@ func NewFilteredEBSCSIDriverInformer(client versioned.Interface, resyncPeriod ti
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CsiV1alpha1().EBSCSIDrivers().List(options)
+				return client.CsiV1alpha1().EBSCSIDrivers().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CsiV1alpha1().EBSCSIDrivers().Watch(options)
+				return client.CsiV1alpha1().EBSCSIDrivers().Watch(context.TODO(), options)
 			},
 		},
 		&operatorv1alpha1.EBSCSIDriver{},
