@@ -45,7 +45,8 @@ $ OPERAND_IMAGE_VERSION=0.1 OPERAND_IMAGE=quay.io/bertinatto/my-custom-aws-ebs-c
 
 ## openshift/library-go
 
-- [ ] Convert commit dd2dd1f2aec380f211403e2b09c921e62637a689 to a PR to to openshift/library-go
-    - Need to add tests as well because the whole ApplyStorageclass() function isn't tested
+- [ ] In ApplyStorageClass(), recreate Storage class if the new one changes an immutable field.
+    - Currently, if we release a new version of the operator with a different StorageClass (with a different immutable field), ApplyStorageClass() will fail indefinitely
+- [ ] Get https://github.com/openshift/library-go/pull/759/ merged
 	- Once that's merged, update openshift/library-go dependency
 - [ ] Create function to replace `deleteAll()` from this operator
