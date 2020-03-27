@@ -755,10 +755,14 @@ func rbacSnapshotter_roleYaml() (*asset, error) {
 var _storageclassYaml = []byte(`apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: ebs-sc
+  name: gp2-csi
+parameters:
+  type: gp2
+  encrypted: "true"
 provisioner: ebs.csi.aws.com
 reclaimPolicy: "Delete"
 volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
 `)
 
 func storageclassYamlBytes() ([]byte, error) {
