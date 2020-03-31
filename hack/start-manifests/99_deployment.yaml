@@ -1,0 +1,26 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: aws-ebs-csi-driver-operator
+  namespace: openshift-aws-ebs-csi-driver-operator
+spec:
+  selector:
+    matchLabels:
+      app: aws-ebs-csi-driver-operator
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: aws-ebs-csi-driver-operator
+    spec:
+      serviceAccount: aws-ebs-csi-driver-operator
+      priorityClassName: system-cluster-critical
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+      containers:
+        - name: operator
+          image: {{.ImageBasePrefix}}aws-ebs-csi-driver-operator{{.ImageBaseSuffix}}
+          args:
+            - start
+            - --v=5
