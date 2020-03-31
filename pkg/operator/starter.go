@@ -74,7 +74,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controllerConfig.EventRecorder,
 		os.Getenv(operatorVersionEnvName),
 		os.Getenv(operandVersionEnvName),
-		os.Getenv(operandImageEnvName),
+		imagesFromEnv(),
 	)
 
 	// This controller syncs CR.Status.Conditions with the value in the field CR.Spec.ManagementStatus. It only supports Managed state
@@ -115,5 +115,17 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 func singleNameListOptions(name string) func(opts *metav1.ListOptions) {
 	return func(opts *metav1.ListOptions) {
 		opts.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+	}
+}
+
+func imagesFromEnv() images {
+	return images{
+		csiDriver:           os.Getenv(driverImageEnvName),
+		provisioner:         os.Getenv(provisionerImageEnvName),
+		attacher:            os.Getenv(attacherImageEnvName),
+		resizer:             os.Getenv(resizerImageEnvName),
+		snapshotter:         os.Getenv(snapshotterImageEnvName),
+		nodeDriverRegistrar: os.Getenv(nodeDriverRegistrarImageEnvName),
+		livenessProbe:       os.Getenv(livenessProbeImageEnvName),
 	}
 }

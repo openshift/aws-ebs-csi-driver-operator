@@ -43,7 +43,23 @@ const (
 
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
-	operandImageEnvName    = "OPERAND_IMAGE"
+
+	driverImageEnvName              = "DRIVER_IMAGE"
+	provisionerImageEnvName         = "PROVISIONER_IMAGE"
+	attacherImageEnvName            = "ATTACHER_IMAGE"
+	resizerImageEnvName             = "RESIZER_IMAGE"
+	snapshotterImageEnvName         = "SNAPSHOTTER_IMAGE"
+	nodeDriverRegistrarImageEnvName = "NODE_DRIVER_REGISTRAR_IMAGE"
+	livenessProbeImageEnvName       = "LIVENESS_PROBE_IMAGE"
+
+	// Index of a container in assets/controller_deployment.yaml and assets/node_daemonset.yaml
+	csiDriverContainerIndex           = 0 // Both Deployment and DaemonSet
+	provisionerContainerIndex         = 1
+	attacherContainerIndex            = 2
+	resizerContainerIndex             = 3
+	snapshottterContainerIndex        = 4
+	nodeDriverRegistrarContainerIndex = 1
+	livenessProbeContainerIndex       = 2 // Only in DaemonSet
 
 	globalConfigName = "cluster"
 
@@ -66,7 +82,17 @@ type csiDriverOperator struct {
 
 	operatorVersion string
 	operandVersion  string
-	csiDriverImage  string
+	images          images
+}
+
+type images struct {
+	csiDriver           string
+	attacher            string
+	provisioner         string
+	resizer             string
+	snapshotter         string
+	nodeDriverRegistrar string
+	livenessProbe       string
 }
 
 func NewCSIDriverOperator(
@@ -85,7 +111,7 @@ func NewCSIDriverOperator(
 	eventRecorder events.Recorder,
 	operatorVersion string,
 	operandVersion string,
-	csiDriverImage string,
+	images images,
 ) *csiDriverOperator {
 	csiOperator := &csiDriverOperator{
 		client:          client,
@@ -96,7 +122,7 @@ func NewCSIDriverOperator(
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
 		operatorVersion: operatorVersion,
 		operandVersion:  operandVersion,
-		csiDriverImage:  csiDriverImage,
+		images:          images,
 	}
 
 	csiOperator.informersSynced = append(csiOperator.informersSynced, pvInformer.Informer().HasSynced)

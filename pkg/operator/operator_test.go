@@ -30,7 +30,7 @@ import (
 
 type operatorTest struct {
 	name            string
-	image           string
+	images          images
 	initialObjects  testObjects
 	expectedObjects testObjects
 	reactors        testReactors
@@ -134,7 +134,7 @@ func newOperator(test operatorTest) *testContext {
 		recorder,
 		testVersion,
 		testVersion,
-		test.image,
+		test.images,
 	)
 
 	return &testContext{
@@ -255,9 +255,14 @@ func withFalseConditions(conditions ...string) ebsCSIDriverModifier {
 
 type deploymentModifier func(*appsv1.Deployment) *appsv1.Deployment
 
-func getDeployment(logLevel int, image string, modifiers ...deploymentModifier) *appsv1.Deployment {
+func getDeployment(logLevel int, images images, modifiers ...deploymentModifier) *appsv1.Deployment {
 	dep := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
-	dep.Spec.Template.Spec.Containers[0].Image = image
+	dep.Spec.Template.Spec.Containers[csiDriverContainerIndex].Image = images.csiDriver
+	dep.Spec.Template.Spec.Containers[provisionerContainerIndex].Image = images.provisioner
+	dep.Spec.Template.Spec.Containers[attacherContainerIndex].Image = images.attacher
+	dep.Spec.Template.Spec.Containers[resizerContainerIndex].Image = images.resizer
+	dep.Spec.Template.Spec.Containers[snapshottterContainerIndex].Image = images.snapshotter
+
 	var one int32 = 1
 	dep.Spec.Replicas = &one
 
@@ -273,7 +278,7 @@ func getDeployment(logLevel int, image string, modifiers ...deploymentModifier) 
 	if dep.Annotations == nil {
 		dep.Annotations = map[string]string{}
 	}
-	dep.Annotations["operator.openshift.io/pull-spec"] = image
+	dep.Annotations["operator.openshift.io/pull-spec"] = images.csiDriver
 
 	for _, modifier := range modifiers {
 		dep = modifier(dep)
@@ -312,9 +317,11 @@ func withDeploymentGeneration(generations ...int64) deploymentModifier {
 
 type daemonSetModifier func(*appsv1.DaemonSet) *appsv1.DaemonSet
 
-func getDaemonSet(logLevel int, image string, modifiers ...daemonSetModifier) *appsv1.DaemonSet {
+func getDaemonSet(logLevel int, images images, modifiers ...daemonSetModifier) *appsv1.DaemonSet {
 	ds := resourceread.ReadDaemonSetV1OrDie(generated.MustAsset(daemonSet))
-	ds.Spec.Template.Spec.Containers[0].Image = image
+	ds.Spec.Template.Spec.Containers[csiDriverContainerIndex].Image = images.csiDriver
+	ds.Spec.Template.Spec.Containers[nodeDriverRegistrarContainerIndex].Image = images.nodeDriverRegistrar
+	ds.Spec.Template.Spec.Containers[livenessProbeContainerIndex].Image = images.livenessProbe
 
 	for i, container := range ds.Spec.Template.Spec.Containers {
 		for j, arg := range container.Args {
@@ -328,7 +335,7 @@ func getDaemonSet(logLevel int, image string, modifiers ...daemonSetModifier) *a
 	if ds.Annotations == nil {
 		ds.Annotations = map[string]string{}
 	}
-	ds.Annotations["operator.openshift.io/pull-spec"] = image
+	ds.Annotations["operator.openshift.io/pull-spec"] = images.csiDriver
 
 	for _, modifier := range modifiers {
 		ds = modifier(ds)
@@ -402,22 +409,21 @@ func TestSync(t *testing.T) {
 	const replica0 = 0
 	const replica1 = 1
 	const replica2 = 2
-	const defaultImage = "aws-ebs-csi-driver-image"
 	var argsLevel2 = 2
 	var argsLevel6 = 6
 
 	tests := []operatorTest{
 		{
 			// Only EBSCSIDriver exists, everything else is created
-			name:  "initial sync",
-			image: defaultImage,
+			name:   "initial sync",
+			images: defaultImages(),
 			initialObjects: testObjects{
 				ebsCSIDriver: ebsCSIDriver(),
 			},
 			expectedObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 0)),
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(1, 0)),
 				ebsCSIDriver: ebsCSIDriver(
 					withStatus(replica0),
@@ -428,22 +434,22 @@ func TestSync(t *testing.T) {
 		},
 		{
 			// Deployment is fully deployed and its status is synced to EBSCSIDriver
-			name:  "deployment fully deployed",
-			image: defaultImage,
+			name:   "deployment fully deployed",
+			images: defaultImages(),
 			initialObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(1, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver: ebsCSIDriver(withGenerations(1)),
 			},
 			expectedObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(1, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver: ebsCSIDriver(
@@ -455,24 +461,24 @@ func TestSync(t *testing.T) {
 		},
 		{
 			// Deployment has wrong nr. of replicas, modified by user, and gets replaced by the operator.
-			name:  "deployment modified by user",
-			image: defaultImage,
+			name:   "deployment modified by user",
+			images: defaultImages(),
 			initialObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentReplicas(2),      // User changed replicas
 					withDeploymentGeneration(2, 1), // ... which changed Generation
 					withDeploymentStatus(replica1, replica1, replica1)),
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(2, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver: ebsCSIDriver(withGenerations(1)), // the operator knows the old generation of the Deployment
 			},
 			expectedObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentReplicas(1),      // The operator fixed replica count
 					withDeploymentGeneration(3, 1), // ... which bumps generation again
 					withDeploymentStatus(replica1, replica1, replica1)),
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(3, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver: ebsCSIDriver(
@@ -484,13 +490,13 @@ func TestSync(t *testing.T) {
 		},
 		{
 			// Deployment gets degraded for some reason
-			name:  "deployment degraded",
-			image: defaultImage,
+			name:   "deployment degraded",
+			images: defaultImages(),
 			initialObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // the Deployment has no pods
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(1, 1),
 					withDaemonSetStatus(1, 1, 1)), // the DaemonSet has 1 pod
 				ebsCSIDriver: ebsCSIDriver(
@@ -501,10 +507,10 @@ func TestSync(t *testing.T) {
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
 			},
 			expectedObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // no change to the Deployment
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(1, 1),
 					withDaemonSetStatus(1, 1, 1)),
 				ebsCSIDriver: ebsCSIDriver(
@@ -517,13 +523,13 @@ func TestSync(t *testing.T) {
 		},
 		{
 			// Deployment is updating pods
-			name:  "update",
-			image: defaultImage,
+			name:   "update",
+			images: defaultImages(),
 			initialObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1 /*ready*/, 1 /*available*/, 0 /*updated*/)), // the Deployment is updating 1 pod
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(1, 1),
 					withDaemonSetStatus(1, 1, 1)), // the DaemonSet has 1 pod
 				ebsCSIDriver: ebsCSIDriver(
@@ -534,10 +540,10 @@ func TestSync(t *testing.T) {
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
 			},
 			expectedObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1, 1, 0)), // no change to the Deployment
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(1, 1),
 					withDaemonSetStatus(1, 1, 1)), // no change to the DaemonSet
 				ebsCSIDriver: ebsCSIDriver(
@@ -550,13 +556,13 @@ func TestSync(t *testing.T) {
 		},
 		{
 			// User changes log level and it's projected into the Deployment and DaemonSet
-			name:  "log level change",
-			image: defaultImage,
+			name:   "log level change",
+			images: defaultImages(),
 			initialObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage,
+				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
-				daemonSet: getDaemonSet(argsLevel2, defaultImage,
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(1, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver: ebsCSIDriver(
@@ -565,10 +571,10 @@ func TestSync(t *testing.T) {
 					withGeneration(2, 1)),    //... which caused the Generation to increase
 			},
 			expectedObjects: testObjects{
-				deployment: getDeployment(argsLevel6, defaultImage, // The operator changed cmdline arguments with a new log level
+				deployment: getDeployment(argsLevel6, defaultImages(), // The operator changed cmdline arguments with a new log level
 					withDeploymentGeneration(2, 1), // ... which caused the Generation to increase
 					withDeploymentStatus(replica1, replica1, replica1)),
-				daemonSet: getDaemonSet(argsLevel6, defaultImage, // And the same goes for the DaemonSet
+				daemonSet: getDaemonSet(argsLevel6, defaultImages(), // And the same goes for the DaemonSet
 					withDaemonSetGeneration(2, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver: ebsCSIDriver(
@@ -680,4 +686,17 @@ func sanitizeEBSCSIDriver(instance *v1alpha1.EBSCSIDriver) {
 	sort.Slice(instance.Status.Conditions, func(i, j int) bool {
 		return instance.Status.Conditions[i].Type < instance.Status.Conditions[j].Type
 	})
+}
+
+func defaultImages() images {
+	return images{
+		// TODO: replace with quay.io when it's mirrored there
+		csiDriver:           "registry.svc.ci.openshift.org/ocp/4.5:aws-ebs-csi-driver",
+		provisioner:         "quay.io/openshift/origin-csi-external-provisioner:latest",
+		attacher:            "quay.io/openshift/origin-csi-external-attacher:latest",
+		resizer:             "quay.io/openshift/origin-csi-external-resizer:latest",
+		snapshotter:         "quay.io/openshift/origin-csi-external-snapshotter:latest",
+		nodeDriverRegistrar: "quay.io/openshift/origin-csi-node-driver-registrar:latest",
+		livenessProbe:       "quay.io/openshift/origin-csi-livenessprobe:latest",
+	}
 }

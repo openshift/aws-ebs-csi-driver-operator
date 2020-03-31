@@ -22,13 +22,16 @@ import (
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated"
 )
 
+const (
+	csiDriver      = "csidriver.yaml"
+	namespace      = "namespace.yaml"
+	serviceAccount = "serviceaccount.yaml"
+	storageClass   = "storageclass.yaml"
+	daemonSet      = "node_daemonset.yaml"
+	deployment     = "controller_deployment.yaml"
+)
+
 var (
-	csiDriver       = "csidriver.yaml"
-	namespace       = "namespace.yaml"
-	serviceAccount  = "serviceaccount.yaml"
-	storageClass    = "storageclass.yaml"
-	daemonSet       = "node_daemonset.yaml"
-	deployment      = "controller_deployment.yaml"
 	serviceAccounts = []string{
 		"node_sa.yaml",
 		"controller_sa.yaml",
@@ -206,9 +209,23 @@ func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) er
 func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDriver) *appsv1.Deployment {
 	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
 
-	if c.csiDriverImage != "" {
-		deployment.Spec.Template.Spec.Containers[0].Image = c.csiDriverImage
+	if c.images.csiDriver != "" {
+		deployment.Spec.Template.Spec.Containers[0].Image = c.images.csiDriver
 	}
+	if c.images.provisioner != "" {
+		deployment.Spec.Template.Spec.Containers[provisionerContainerIndex].Image = c.images.provisioner
+	}
+	if c.images.attacher != "" {
+		deployment.Spec.Template.Spec.Containers[attacherContainerIndex].Image = c.images.attacher
+	}
+	if c.images.resizer != "" {
+		deployment.Spec.Template.Spec.Containers[resizerContainerIndex].Image = c.images.resizer
+	}
+	if c.images.snapshotter != "" {
+		deployment.Spec.Template.Spec.Containers[snapshottterContainerIndex].Image = c.images.snapshotter
+	}
+
+	// TODO: add LivenessProbe when
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)
 	for i, container := range deployment.Spec.Template.Spec.Containers {
@@ -225,8 +242,14 @@ func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDrive
 func (c *csiDriverOperator) getExpectedDaemonSet(instance *v1alpha1.EBSCSIDriver) *appsv1.DaemonSet {
 	daemonSet := resourceread.ReadDaemonSetV1OrDie(generated.MustAsset(daemonSet))
 
-	if c.csiDriverImage != "" {
-		daemonSet.Spec.Template.Spec.Containers[0].Image = c.csiDriverImage
+	if c.images.csiDriver != "" {
+		daemonSet.Spec.Template.Spec.Containers[csiDriverContainerIndex].Image = c.images.csiDriver
+	}
+	if c.images.nodeDriverRegistrar != "" {
+		daemonSet.Spec.Template.Spec.Containers[nodeDriverRegistrarContainerIndex].Image = c.images.nodeDriverRegistrar
+	}
+	if c.images.livenessProbe != "" {
+		daemonSet.Spec.Template.Spec.Containers[livenessProbeContainerIndex].Image = c.images.livenessProbe
 	}
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)
