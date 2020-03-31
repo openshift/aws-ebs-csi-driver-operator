@@ -211,9 +211,11 @@ func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDrive
 	}
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)
-	for i, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
-		if strings.HasPrefix(arg, "--v=") {
-			deployment.Spec.Template.Spec.Containers[0].Args[i] = fmt.Sprintf("--v=%d", logLevel)
+	for i, container := range deployment.Spec.Template.Spec.Containers {
+		for j, arg := range container.Args {
+			if strings.HasPrefix(arg, "--v=") {
+				deployment.Spec.Template.Spec.Containers[i].Args[j] = fmt.Sprintf("--v=%d", logLevel)
+			}
 		}
 	}
 
@@ -228,9 +230,11 @@ func (c *csiDriverOperator) getExpectedDaemonSet(instance *v1alpha1.EBSCSIDriver
 	}
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)
-	for i, arg := range daemonSet.Spec.Template.Spec.Containers[0].Args {
-		if strings.HasPrefix(arg, "--v=") {
-			daemonSet.Spec.Template.Spec.Containers[0].Args[i] = fmt.Sprintf("--v=%d", logLevel)
+	for i, container := range daemonSet.Spec.Template.Spec.Containers {
+		for j, arg := range container.Args {
+			if strings.HasPrefix(arg, "--v=") {
+				daemonSet.Spec.Template.Spec.Containers[i].Args[j] = fmt.Sprintf("--v=%d", logLevel)
+			}
 		}
 	}
 
