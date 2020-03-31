@@ -2,7 +2,9 @@ package operator
 
 import (
 	"context"
+	"fmt"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -253,12 +255,19 @@ func withFalseConditions(conditions ...string) ebsCSIDriverModifier {
 
 type deploymentModifier func(*appsv1.Deployment) *appsv1.Deployment
 
-func getDeployment(args []string, image string, modifiers ...deploymentModifier) *appsv1.Deployment {
+func getDeployment(logLevel int, image string, modifiers ...deploymentModifier) *appsv1.Deployment {
 	dep := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
-	dep.Spec.Template.Spec.Containers[0].Args = args
 	dep.Spec.Template.Spec.Containers[0].Image = image
 	var one int32 = 1
 	dep.Spec.Replicas = &one
+
+	for i, container := range dep.Spec.Template.Spec.Containers {
+		for j, arg := range container.Args {
+			if strings.HasPrefix(arg, "--v=") {
+				dep.Spec.Template.Spec.Containers[i].Args[j] = fmt.Sprintf("--v=%d", logLevel)
+			}
+		}
+	}
 
 	// Set by ApplyDeployment()
 	if dep.Annotations == nil {
@@ -303,10 +312,17 @@ func withDeploymentGeneration(generations ...int64) deploymentModifier {
 
 type daemonSetModifier func(*appsv1.DaemonSet) *appsv1.DaemonSet
 
-func getDaemonSet(args []string, image string, modifiers ...daemonSetModifier) *appsv1.DaemonSet {
+func getDaemonSet(logLevel int, image string, modifiers ...daemonSetModifier) *appsv1.DaemonSet {
 	ds := resourceread.ReadDaemonSetV1OrDie(generated.MustAsset(daemonSet))
-	ds.Spec.Template.Spec.Containers[0].Args = args
 	ds.Spec.Template.Spec.Containers[0].Image = image
+
+	for i, container := range ds.Spec.Template.Spec.Containers {
+		for j, arg := range container.Args {
+			if strings.HasPrefix(arg, "--v=") {
+				ds.Spec.Template.Spec.Containers[i].Args[j] = fmt.Sprintf("--v=%d", logLevel)
+			}
+		}
+	}
 
 	// Set by ApplyDaemonSet()
 	if ds.Annotations == nil {
@@ -387,8 +403,8 @@ func TestSync(t *testing.T) {
 	const replica1 = 1
 	const replica2 = 2
 	const defaultImage = "aws-ebs-csi-driver-image"
-	var argsLevel2 = []string{"--endpoint=$(CSI_ENDPOINT)", "--logtostderr", "--v=2"}
-	var argsLevel6 = []string{"--endpoint=$(CSI_ENDPOINT)", "--logtostderr", "--v=6"}
+	var argsLevel2 = 2
+	var argsLevel6 = 6
 
 	tests := []operatorTest{
 		{
