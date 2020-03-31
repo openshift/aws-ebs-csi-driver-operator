@@ -85,6 +85,7 @@ spec:
         - key: CriticalAddonsOnly
           operator: Exists
       containers:
+        # Warning: the operator expects the first container to be the CSI driver
         - name: csi-driver
           image: amazon/aws-ebs-csi-driver:latest
           args:
@@ -267,6 +268,7 @@ spec:
         - key: CriticalAddonsOnly
           operator: Exists
       containers:
+        # Warning: the operator expects the first container to be the CSI driver
         - name: csi-driver
           securityContext:
             privileged: true
