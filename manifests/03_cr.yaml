@@ -4,3 +4,6 @@ metadata:
   name: cluster
 spec:
   managementState: Managed
+  # For debugging
+  OperatorLogLevel: Trace
+  LogLevel: Trace

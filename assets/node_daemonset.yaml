@@ -23,7 +23,8 @@ spec:
         - name: csi-driver
           securityContext:
             privileged: true
-          image: amazon/aws-ebs-csi-driver:latest
+          # TODO: replace with quay.io image
+          image: registry.svc.ci.openshift.org/ocp/4.5:aws-ebs-csi-driver
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr
@@ -54,7 +55,7 @@ spec:
         - name: node-driver-registrar
           securityContext:
             privileged: true
-          image: quay.io/k8scsi/csi-node-driver-registrar:canary
+          image: quay.io/openshift/origin-csi-node-driver-registrar:latest
           args:
             - --csi-address=$(ADDRESS)
             - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
@@ -74,7 +75,7 @@ spec:
             - name: registration-dir
               mountPath: /registration
         - name: liveness-probe
-          image: quay.io/k8scsi/livenessprobe:canary
+          image: quay.io/openshift/origin-csi-livenessprobe:latest
           args:
             - --csi-address=/csi/csi.sock
             - --probe-timeout=3s
