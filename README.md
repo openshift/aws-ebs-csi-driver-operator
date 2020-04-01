@@ -47,6 +47,4 @@ $ OPERAND_IMAGE_VERSION=0.1 OPERAND_IMAGE=quay.io/bertinatto/my-custom-aws-ebs-c
 
 - [ ] In ApplyStorageClass(), recreate Storage class if the new one changes an immutable field.
     - Currently, if we release a new version of the operator with a different StorageClass (with a different immutable field), ApplyStorageClass() will fail indefinitely
-- [ ] Get https://github.com/openshift/library-go/pull/759/ merged
-	- Once that's merged, update openshift/library-go dependency
 - [ ] Create function to replace `deleteAll()` from this operator
