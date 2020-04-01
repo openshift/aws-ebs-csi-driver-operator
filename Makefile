@@ -1,4 +1,5 @@
 SHELL :=/bin/bash
+ARTIFACT_DIR ?= "_output/e2e"
 
 all: build
 .PHONY: all
@@ -62,11 +63,13 @@ clean:
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
 
-# Run e2e tests.
+# Run e2e tests. Requires openshift-tests in $PATH.
 #
 # Example:
 #   make test-e2e
-test-e2e: GO_TEST_PACKAGES :=./test/e2e/...
-test-e2e: GO_TEST_FLAGS += -v
-test-e2e: test-unit
+test-e2e:
+	hack/start.sh
+	mkdir -p $(ARTIFACT_DIR)
+	TEST_CSI_DRIVER_FILES=test/e2e/manifest.yaml openshift-tests run openshift/csi -o $(ARTIFACT_DIR)/e2e.log --junit-dir $(ARTIFACT_DIR)/junit
+
 .PHONY: test-e2e
