@@ -15,15 +15,15 @@ import (
 
 type OperatorClient struct {
 	Informers informers.SharedInformerFactory
-	Client    configset.EBSCSIDriversGetter
+	Client    configset.DriversGetter
 }
 
 func (c OperatorClient) Informer() cache.SharedIndexInformer {
-	return c.Informers.Csi().V1alpha1().EBSCSIDrivers().Informer()
+	return c.Informers.Ebs().V1alpha1().Drivers().Informer()
 }
 
 func (c OperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	instance, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().Get(globalConfigName)
+	instance, err := c.Informers.Ebs().V1alpha1().Drivers().Lister().Get(globalConfigName)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -32,7 +32,7 @@ func (c OperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv
 }
 
 func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
-	original, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().Get(globalConfigName)
+	original, err := c.Informers.Ebs().V1alpha1().Drivers().Lister().Get(globalConfigName)
 	if err != nil {
 		return nil, "", err
 	}
@@ -40,7 +40,7 @@ func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operato
 	copy.ResourceVersion = resourceVersion
 	copy.Spec.OperatorSpec = *spec
 
-	ret, err := c.Client.EBSCSIDrivers().Update(context.TODO(), copy, metav1.UpdateOptions{})
+	ret, err := c.Client.Drivers().Update(context.TODO(), copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -49,7 +49,7 @@ func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operato
 }
 
 func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
-	original, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().Get(globalConfigName)
+	original, err := c.Informers.Ebs().V1alpha1().Drivers().Lister().Get(globalConfigName)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 	copy.ResourceVersion = resourceVersion
 	copy.Status.OperatorStatus = *status
 
-	ret, err := c.Client.EBSCSIDrivers().UpdateStatus(context.TODO(), copy, metav1.UpdateOptions{})
+	ret, err := c.Client.Drivers().UpdateStatus(context.TODO(), copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -65,16 +65,16 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 	return &ret.Status.OperatorStatus, nil
 }
 
-func (c OperatorClient) GetOperatorInstance() (*v1alpha1.EBSCSIDriver, error) {
-	instance, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().Get(globalConfigName)
+func (c OperatorClient) GetOperatorInstance() (*v1alpha1.Driver, error) {
+	instance, err := c.Informers.Ebs().V1alpha1().Drivers().Lister().Get(globalConfigName)
 	if err != nil {
 		return nil, err
 	}
 	return instance, nil
 }
 
-func (c OperatorClient) UpdateFinalizers(instance *v1alpha1.EBSCSIDriver) (*v1alpha1.EBSCSIDriver, string, error) {
-	original, err := c.Informers.Csi().V1alpha1().EBSCSIDrivers().Lister().Get(globalConfigName)
+func (c OperatorClient) UpdateFinalizers(instance *v1alpha1.Driver) (*v1alpha1.Driver, string, error) {
+	original, err := c.Informers.Ebs().V1alpha1().Drivers().Lister().Get(globalConfigName)
 	if err != nil {
 		return nil, "", err
 	}
@@ -82,7 +82,7 @@ func (c OperatorClient) UpdateFinalizers(instance *v1alpha1.EBSCSIDriver) (*v1al
 	copy.ResourceVersion = instance.ResourceVersion
 	copy.ObjectMeta.Finalizers = instance.ObjectMeta.Finalizers
 
-	ret, err := c.Client.EBSCSIDrivers().Update(context.TODO(), copy, metav1.UpdateOptions{})
+	ret, err := c.Client.Drivers().Update(context.TODO(), copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, "", err
 	}

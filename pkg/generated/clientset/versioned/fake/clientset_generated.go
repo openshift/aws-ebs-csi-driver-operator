@@ -4,8 +4,8 @@ package fake
 
 import (
 	clientset "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned"
-	csiv1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/typed/operator/v1alpha1"
-	fakecsiv1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/typed/operator/v1alpha1/fake"
+	ebsv1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/typed/operator/v1alpha1"
+	fakeebsv1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/typed/operator/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -60,7 +60,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 
 var _ clientset.Interface = &Clientset{}
 
-// CsiV1alpha1 retrieves the CsiV1alpha1Client
-func (c *Clientset) CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface {
-	return &fakecsiv1alpha1.FakeCsiV1alpha1{Fake: &c.Fake}
+// EbsV1alpha1 retrieves the EbsV1alpha1Client
+func (c *Clientset) EbsV1alpha1() ebsv1alpha1.EbsV1alpha1Interface {
+	return &fakeebsv1alpha1.FakeEbsV1alpha1{Fake: &c.Fake}
 }

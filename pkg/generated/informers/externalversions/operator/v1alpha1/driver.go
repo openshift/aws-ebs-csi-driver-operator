@@ -16,58 +16,58 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// EBSCSIDriverInformer provides access to a shared informer and lister for
-// EBSCSIDrivers.
-type EBSCSIDriverInformer interface {
+// DriverInformer provides access to a shared informer and lister for
+// Drivers.
+type DriverInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.EBSCSIDriverLister
+	Lister() v1alpha1.DriverLister
 }
 
-type eBSCSIDriverInformer struct {
+type driverInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-// NewEBSCSIDriverInformer constructs a new informer for EBSCSIDriver type.
+// NewDriverInformer constructs a new informer for Driver type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewEBSCSIDriverInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredEBSCSIDriverInformer(client, resyncPeriod, indexers, nil)
+func NewDriverInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredDriverInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredEBSCSIDriverInformer constructs a new informer for EBSCSIDriver type.
+// NewFilteredDriverInformer constructs a new informer for Driver type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredEBSCSIDriverInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredDriverInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CsiV1alpha1().EBSCSIDrivers().List(context.TODO(), options)
+				return client.EbsV1alpha1().Drivers().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CsiV1alpha1().EBSCSIDrivers().Watch(context.TODO(), options)
+				return client.EbsV1alpha1().Drivers().Watch(context.TODO(), options)
 			},
 		},
-		&operatorv1alpha1.EBSCSIDriver{},
+		&operatorv1alpha1.Driver{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *eBSCSIDriverInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredEBSCSIDriverInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *driverInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredDriverInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *eBSCSIDriverInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&operatorv1alpha1.EBSCSIDriver{}, f.defaultInformer)
+func (f *driverInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&operatorv1alpha1.Driver{}, f.defaultInformer)
 }
 
-func (f *eBSCSIDriverInformer) Lister() v1alpha1.EBSCSIDriverLister {
-	return v1alpha1.NewEBSCSIDriverLister(f.Informer().GetIndexer())
+func (f *driverInformer) Lister() v1alpha1.DriverLister {
+	return v1alpha1.NewDriverLister(f.Informer().GetIndexer())
 }

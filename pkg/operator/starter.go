@@ -54,7 +54,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	operatorClient := &OperatorClient{
 		ctrlInformers,
-		ctrlClientset.CsiV1alpha1(),
+		ctrlClientset.EbsV1alpha1(),
 	}
 
 	cb, err := common.NewBuilder("")
