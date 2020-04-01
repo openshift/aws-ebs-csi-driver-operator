@@ -81,11 +81,11 @@ EOF
 
 repo_dir="$(dirname $0)/.."
 
-cp -v ${repo_dir}/manifests/*.yaml ${manifest}/
+cp ${repo_dir}/manifests/*.yaml ${manifest}/
 
 for infile in $( ls ${repo_dir}/hack/start-manifests/*.yaml ); do
     outfile=${manifest}/$( basename ${infile} )
-    cp -v ${infile} ${outfile}
+    cp ${infile} ${outfile}
     sed -i -f ${manifest}/.sedscript ${outfile}
 done
 

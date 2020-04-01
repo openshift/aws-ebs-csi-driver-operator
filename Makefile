@@ -1,5 +1,4 @@
 SHELL :=/bin/bash
-ARTIFACT_DIR ?= "_output/e2e"
 
 all: build
 .PHONY: all
@@ -68,8 +67,6 @@ GO_TEST_PACKAGES :=./pkg/... ./cmd/...
 # Example:
 #   make test-e2e
 test-e2e:
-	hack/start.sh
-	mkdir -p $(ARTIFACT_DIR)
-	TEST_CSI_DRIVER_FILES=test/e2e/manifest.yaml openshift-tests run openshift/csi -o $(ARTIFACT_DIR)/e2e.log --junit-dir $(ARTIFACT_DIR)/junit
+	hack/e2e.sh
 
 .PHONY: test-e2e
