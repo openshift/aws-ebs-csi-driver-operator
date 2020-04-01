@@ -5,5 +5,5 @@ metadata:
 spec:
   managementState: Managed
   # For debugging
-  OperatorLogLevel: Trace
-  LogLevel: Trace
+  operatorLogLevel: Trace
+  logLevel: Trace
