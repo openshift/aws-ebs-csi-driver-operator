@@ -36,6 +36,13 @@ while getopts ":hd" opt; do
   esac
 done
 
+# Our e2e has only /bin/oc, no kubectl. At the same time, allow users to use kubectl.
+if which oc &>/dev/null; then
+    CLIENT=oc
+else
+    CLIENT=kubectl
+fi
+
 manifest=$(mktemp -d)
 
 cleanup(){
@@ -91,6 +98,6 @@ done
 
 if ! ${dry_run}; then
     # CRD must be applied as a separate transaction to be able to apply CR below
-    kubectl apply -f ${manifest}/00_crd.yaml
-    kubectl apply -f ${manifest}/
+    $CLIENT apply -f ${manifest}/00_crd.yaml
+    $CLIENT apply -f ${manifest}/
 fi
