@@ -197,7 +197,12 @@ func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
 
 func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.EBSCSIDriver) (*unstructured.Unstructured, error) {
 	cr := readCredentialRequestsOrDie(generated.MustAsset(credentialsRequest))
-	// TODO: set spec.secretRef.namespace
+
+	// Set spec.secretRef.namespace
+	err := unstructured.SetNestedField(cr.Object, operandNamespace, "spec", "secretRef", "namespace")
+	if err != nil {
+		return nil, err
+	}
 
 	forceRollout := false
 	if c.versionChanged("operator", c.operatorVersion) {
@@ -215,7 +220,7 @@ func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.EBSCSIDriv
 		expectedGeneration = generation.LastGeneration
 	}
 
-	cr, _, err := applyCredentialsRequest(c.dynamicClient, c.eventRecorder, cr, expectedGeneration, forceRollout)
+	cr, _, err = applyCredentialsRequest(c.dynamicClient, c.eventRecorder, cr, expectedGeneration, forceRollout)
 	return cr, err
 }
 
