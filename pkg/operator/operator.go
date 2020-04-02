@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	rbacinformersv1 "k8s.io/client-go/informers/rbac/v1"
@@ -69,6 +70,7 @@ const (
 type csiDriverOperator struct {
 	client          OperatorClient
 	kubeClient      kubernetes.Interface
+	dynamicClient   dynamic.Interface
 	pvInformer      coreinformersv1.PersistentVolumeInformer
 	versionGetter   status.VersionGetter
 	eventRecorder   events.Recorder
@@ -107,6 +109,7 @@ func NewCSIDriverOperator(
 	dsInformer appsinformersv1.DaemonSetInformer,
 	storageClassInformer storageinformersv1.StorageClassInformer,
 	kubeClient kubernetes.Interface,
+	dynamicClient dynamic.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
 	operatorVersion string,
@@ -116,6 +119,7 @@ func NewCSIDriverOperator(
 	csiOperator := &csiDriverOperator{
 		client:          client,
 		kubeClient:      kubeClient,
+		dynamicClient:   dynamicClient,
 		pvInformer:      pvInformer,
 		versionGetter:   versionGetter,
 		eventRecorder:   eventRecorder,
@@ -302,12 +306,17 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 		return fmt.Errorf("failed to sync DaemonSet: %v", err)
 	}
 
+	credentialsRequest, err := c.syncCredentialsRequest(instance)
+	if err != nil {
+		return fmt.Errorf("failed to sync CredentialsRequest: %v", err)
+	}
+
 	err = c.syncStorageClass(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync StorageClass: %v", err)
 	}
 
-	if err := c.syncStatus(instance, deployment, daemonSet); err != nil {
+	if err := c.syncStatus(instance, deployment, daemonSet, credentialsRequest); err != nil {
 		return fmt.Errorf("failed to sync status: %v", err)
 	}
 

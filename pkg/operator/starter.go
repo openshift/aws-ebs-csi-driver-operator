@@ -8,6 +8,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
 
 	apiclientset "github.com/openshift/client-go/config/clientset/versioned"
@@ -43,6 +44,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
+	dynamicConfig := dynamic.ConfigFor(controllerConfig.KubeConfig)
+	dynamicClient, err := dynamic.NewForConfig(dynamicConfig)
+	if err != nil {
+		return err
+	}
+
 	apiInformers := apiinformers.NewSharedInformerFactoryWithOptions(apiClientset, resync)
 
 	operatorClient := &OperatorClient{
@@ -70,6 +77,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().DaemonSets(),
 		ctrlCtx.KubeNamespacedInformerFactory.Storage().V1().StorageClasses(),
 		ctrlCtx.ClientBuilder.KubeClientOrDie(operandName),
+		dynamicClient,
 		versionGetter,
 		controllerConfig.EventRecorder,
 		os.Getenv(operatorVersionEnvName),
