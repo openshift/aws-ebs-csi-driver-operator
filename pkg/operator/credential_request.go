@@ -23,6 +23,14 @@ const (
 	credentialsRequestResource = "credentialsrequests"
 )
 
+var (
+	credentialsRequestResourceGVR schema.GroupVersionResource = schema.GroupVersionResource{
+		Group:    credentialsRequestGroup,
+		Version:  credentialsRequestVersion,
+		Resource: credentialsRequestResource,
+	}
+)
+
 func readCredentialRequestsOrDie(objBytes []byte) *unstructured.Unstructured {
 	udi, _, err := scheme.Codecs.UniversalDecoder().Decode(objBytes, nil, &unstructured.Unstructured{})
 	if err != nil {
@@ -36,12 +44,7 @@ func applyCredentialsRequest(client dynamic.Interface, recorder events.Recorder,
 		return nil, false, fmt.Errorf("invalid object: name cannot be empty")
 	}
 
-	crGVR := schema.GroupVersionResource{
-		Group:    credentialsRequestGroup,
-		Version:  credentialsRequestVersion,
-		Resource: credentialsRequestResource,
-	}
-	crClient := client.Resource(crGVR).Namespace(required.GetNamespace())
+	crClient := client.Resource(credentialsRequestResourceGVR).Namespace(required.GetNamespace())
 
 	existing, err := crClient.Get(context.TODO(), required.GetName(), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {

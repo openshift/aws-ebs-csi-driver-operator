@@ -483,6 +483,13 @@ func (c *csiDriverOperator) deleteAll() error {
 		}
 	}
 
+	cr := readCredentialRequestsOrDie(generated.MustAsset(credentialsRequest))
+	err = c.dynamicClient.Resource(credentialsRequestResourceGVR).Namespace(cr.GetNamespace()).Delete(context.TODO(), cr.GetName(), metav1.DeleteOptions{})
+	reportDeleteEvent(c.eventRecorder, cr, err)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
 	return nil
 }
 
