@@ -4,16 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
-
-	"github.com/openshift/library-go/pkg/operator/events"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"github.com/openshift/client-go/config/clientset/versioned/scheme"
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -21,6 +18,8 @@ const (
 	credentialsRequestGroup    = "cloudcredential.openshift.io"
 	credentialsRequestVersion  = "v1"
 	credentialsRequestResource = "credentialsrequests"
+	credentialsRequestKind     = "CredentialsRequest"
+	credentialRequestNamespace = "openshift-cloud-credential-operator"
 )
 
 var (
