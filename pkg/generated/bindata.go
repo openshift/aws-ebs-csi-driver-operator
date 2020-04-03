@@ -101,13 +101,11 @@ spec:
                 secretKeyRef:
                   name: aws-cloud-credentials
                   key: aws_access_key_id
-                  optional: true
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: aws-cloud-credentials
                   key: aws_secret_access_key
-                  optional: true
           ports:
             - name: healthz
               containerPort: 19808
