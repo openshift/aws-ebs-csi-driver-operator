@@ -1,5 +1,5 @@
-apiVersion: csi.ebs.aws.com/v1alpha1
-kind: EBSCSIDriver
+apiVersion: ebs.aws.csi.openshift.io/v1alpha1
+kind: Driver
 metadata:
   name: cluster
 spec:

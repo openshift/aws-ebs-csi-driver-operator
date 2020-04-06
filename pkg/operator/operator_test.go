@@ -44,7 +44,7 @@ type testObjects struct {
 	deployment         *appsv1.Deployment
 	daemonSet          *appsv1.DaemonSet
 	credentialsRequest *unstructured.Unstructured
-	ebsCSIDriver       *v1alpha1.EBSCSIDriver
+	ebsCSIDriver       *v1alpha1.Driver
 	credentialsSecret  *v1.Secret
 }
 
@@ -104,16 +104,16 @@ func newOperator(test operatorTest) *testContext {
 	}
 
 	// Convert to []runtime.Object
-	var initialEBSCSIDrivers []runtime.Object
+	var initialDrivers []runtime.Object
 	if test.initialObjects.ebsCSIDriver != nil {
-		initialEBSCSIDrivers = []runtime.Object{test.initialObjects.ebsCSIDriver}
+		initialDrivers = []runtime.Object{test.initialObjects.ebsCSIDriver}
 	}
-	operatorClient := fakeop.NewSimpleClientset(initialEBSCSIDrivers...)
+	operatorClient := fakeop.NewSimpleClientset(initialDrivers...)
 	operatorInformerFactory := opinformers.NewSharedInformerFactory(operatorClient, 0)
 
 	// Fill the informer
 	if test.initialObjects.ebsCSIDriver != nil {
-		operatorInformerFactory.Csi().V1alpha1().EBSCSIDrivers().Informer().GetIndexer().Add(test.initialObjects.ebsCSIDriver)
+		operatorInformerFactory.Ebs().V1alpha1().Drivers().Informer().GetIndexer().Add(test.initialObjects.ebsCSIDriver)
 	}
 	if test.reactors.ebsCSIDrivers != nil {
 		test.reactors.ebsCSIDrivers(operatorClient, operatorInformerFactory)
@@ -123,7 +123,7 @@ func newOperator(test operatorTest) *testContext {
 	addGenerationReactor(coreClient)
 
 	client := OperatorClient{
-		Client:    operatorClient.CsiV1alpha1(),
+		Client:    operatorClient.EbsV1alpha1(),
 		Informers: operatorInformerFactory,
 	}
 
@@ -167,24 +167,24 @@ func newOperator(test operatorTest) *testContext {
 	}
 }
 
-// EBSCSIDrivers
+// Drivers
 
-type ebsCSIDriverModifier func(*v1alpha1.EBSCSIDriver) *v1alpha1.EBSCSIDriver
+type ebsCSIDriverModifier func(*v1alpha1.Driver) *v1alpha1.Driver
 
-func ebsCSIDriver(modifiers ...ebsCSIDriverModifier) *v1alpha1.EBSCSIDriver {
-	instance := &v1alpha1.EBSCSIDriver{
+func ebsCSIDriver(modifiers ...ebsCSIDriverModifier) *v1alpha1.Driver {
+	instance := &v1alpha1.Driver{
 		TypeMeta: metav1.TypeMeta{APIVersion: v1alpha1.SchemeGroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "cluster",
 			Generation: 0,
 			Finalizers: []string{operatorFinalizer},
 		},
-		Spec: v1alpha1.EBSCSIDriverSpec{
+		Spec: v1alpha1.DriverSpec{
 			OperatorSpec: opv1.OperatorSpec{
 				ManagementState: opv1.Managed,
 			},
 		},
-		Status: v1alpha1.EBSCSIDriverStatus{},
+		Status: v1alpha1.DriverStatus{},
 	}
 	for _, modifier := range modifiers {
 		instance = modifier(instance)
@@ -193,8 +193,8 @@ func ebsCSIDriver(modifiers ...ebsCSIDriverModifier) *v1alpha1.EBSCSIDriver {
 }
 
 func withStatus(readyReplicas int32) ebsCSIDriverModifier {
-	return func(i *v1alpha1.EBSCSIDriver) *v1alpha1.EBSCSIDriver {
-		i.Status = v1alpha1.EBSCSIDriverStatus{
+	return func(i *v1alpha1.Driver) *v1alpha1.Driver {
+		i.Status = v1alpha1.DriverStatus{
 			OperatorStatus: opv1.OperatorStatus{
 				ReadyReplicas: readyReplicas,
 			},
@@ -204,14 +204,14 @@ func withStatus(readyReplicas int32) ebsCSIDriverModifier {
 }
 
 func withLogLevel(logLevel opv1.LogLevel) ebsCSIDriverModifier {
-	return func(i *v1alpha1.EBSCSIDriver) *v1alpha1.EBSCSIDriver {
+	return func(i *v1alpha1.Driver) *v1alpha1.Driver {
 		i.Spec.LogLevel = logLevel
 		return i
 	}
 }
 
 func withGeneration(generations ...int64) ebsCSIDriverModifier {
-	return func(i *v1alpha1.EBSCSIDriver) *v1alpha1.EBSCSIDriver {
+	return func(i *v1alpha1.Driver) *v1alpha1.Driver {
 		i.Generation = generations[0]
 		if len(generations) > 1 {
 			i.Status.ObservedGeneration = generations[1]
@@ -221,7 +221,7 @@ func withGeneration(generations ...int64) ebsCSIDriverModifier {
 }
 
 func withGenerations(deployment, daemonset, credentialsRequest int64) ebsCSIDriverModifier {
-	return func(i *v1alpha1.EBSCSIDriver) *v1alpha1.EBSCSIDriver {
+	return func(i *v1alpha1.Driver) *v1alpha1.Driver {
 		i.Status.Generations = []opv1.GenerationStatus{
 			{
 				Group:          appsv1.GroupName,
@@ -250,7 +250,7 @@ func withGenerations(deployment, daemonset, credentialsRequest int64) ebsCSIDriv
 }
 
 func withTrueConditions(conditions ...string) ebsCSIDriverModifier {
-	return func(i *v1alpha1.EBSCSIDriver) *v1alpha1.EBSCSIDriver {
+	return func(i *v1alpha1.Driver) *v1alpha1.Driver {
 		if i.Status.Conditions == nil {
 			i.Status.Conditions = []opv1.OperatorCondition{}
 		}
@@ -265,7 +265,7 @@ func withTrueConditions(conditions ...string) ebsCSIDriverModifier {
 }
 
 func withFalseConditions(conditions ...string) ebsCSIDriverModifier {
-	return func(i *v1alpha1.EBSCSIDriver) *v1alpha1.EBSCSIDriver {
+	return func(i *v1alpha1.Driver) *v1alpha1.Driver {
 		if i.Status.Conditions == nil {
 			i.Status.Conditions = []opv1.OperatorCondition{}
 		}
@@ -475,7 +475,7 @@ func TestSync(t *testing.T) {
 
 	tests := []operatorTest{
 		{
-			// Only EBSCSIDriver exists, everything else is created
+			// Only Driver exists, everything else is created
 			name:   "initial sync without cloud Secret",
 			images: defaultImages(),
 			initialObjects: testObjects{
@@ -487,7 +487,7 @@ func TestSync(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			// Only EBSCSIDriver exists, everything else is created
+			// Only Driver exists, everything else is created
 			name:   "initial sync with cloud Secret",
 			images: defaultImages(),
 			initialObjects: testObjects{
@@ -510,7 +510,7 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			// Deployment is fully deployed and its status is synced to EBSCSIDriver
+			// Deployment is fully deployed and its status is synced to Driver
 			name:   "deployment fully deployed",
 			images: defaultImages(),
 			initialObjects: testObjects{
@@ -765,14 +765,14 @@ func TestSync(t *testing.T) {
 
 			// Check expectedObjects.ebsCSIDriver
 			if test.expectedObjects.ebsCSIDriver != nil {
-				actualEBSCSIDriver, err := ctx.operatorClient.CsiV1alpha1().EBSCSIDrivers().Get(context.TODO(), globalConfigName, metav1.GetOptions{})
+				actualEBSCSIDriver, err := ctx.operatorClient.EbsV1alpha1().Drivers().Get(context.TODO(), globalConfigName, metav1.GetOptions{})
 				if err != nil {
-					t.Errorf("Failed to get EBSCSIDriver %s: %v", globalConfigName, err)
+					t.Errorf("Failed to get Driver %s: %v", globalConfigName, err)
 				}
 				sanitizeEBSCSIDriver(actualEBSCSIDriver)
 				sanitizeEBSCSIDriver(test.expectedObjects.ebsCSIDriver)
 				if !equality.Semantic.DeepEqual(test.expectedObjects.ebsCSIDriver, actualEBSCSIDriver) {
-					t.Errorf("Unexpected EBSCSIDriver %+v content:\n%s", operandName, cmp.Diff(test.expectedObjects.ebsCSIDriver, actualEBSCSIDriver))
+					t.Errorf("Unexpected Driver %+v content:\n%s", operandName, cmp.Diff(test.expectedObjects.ebsCSIDriver, actualEBSCSIDriver))
 				}
 			}
 
@@ -815,7 +815,7 @@ func sanitizeDaemonSet(daemonSet *appsv1.DaemonSet) {
 	delete(daemonSet.Spec.Template.Annotations, "operator.openshift.io/force")
 }
 
-func sanitizeEBSCSIDriver(instance *v1alpha1.EBSCSIDriver) {
+func sanitizeEBSCSIDriver(instance *v1alpha1.Driver) {
 	// Remove condition texts
 	for i := range instance.Status.Conditions {
 		instance.Status.Conditions[i].LastTransitionTime = metav1.Time{}

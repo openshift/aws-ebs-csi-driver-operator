@@ -57,11 +57,11 @@ var (
 	credentialsRequest = "credentials.yaml"
 )
 
-func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*appsv1.Deployment, error) {
+func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.Driver) (*appsv1.Deployment, error) {
 	deploy := c.getExpectedDeployment(instance)
 
-	// Update the deployment when something updated EBSCSIDriver.Spec.LogLevel.
-	// The easiest check is for Generation update (i.e. redeploy on any EBSCSIDriver.Spec change).
+	// Update the deployment when something updated Driver.Spec.LogLevel.
+	// The easiest check is for Generation update (i.e. redeploy on any Driver.Spec change).
 	// This may update the Deployment more than it is strictly necessary, but the overhead is not that big.
 	forceRollout := false
 	if instance.Generation != instance.Status.ObservedGeneration {
@@ -91,11 +91,11 @@ func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*ap
 	return deploy, nil
 }
 
-func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.EBSCSIDriver) (*appsv1.DaemonSet, error) {
+func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.Driver) (*appsv1.DaemonSet, error) {
 	daemonSet := c.getExpectedDaemonSet(instance)
 
-	// Update the daemonSet when something updated EBSCSIDriver.Spec.LogLevel.
-	// The easiest check is for Generation update (i.e. redeploy on any EBSCSIDriver.Spec change).
+	// Update the daemonSet when something updated Driver.Spec.LogLevel.
+	// The easiest check is for Generation update (i.e. redeploy on any Driver.Spec change).
 	// This may update the DaemonSet more than it is strictly necessary, but the overhead is not that big.
 	forceRollout := false
 	if instance.Generation != instance.Status.ObservedGeneration {
@@ -125,7 +125,7 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.EBSCSIDriver) (*app
 	return daemonSet, nil
 }
 
-func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.EBSCSIDriver) error {
+func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.Driver) error {
 	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
 
 	_, _, err := resourceapply.ApplyCSIDriverV1Beta1(
@@ -139,7 +139,7 @@ func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.EBSCSIDriver) error
 	return nil
 }
 
-func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.EBSCSIDriver) error {
+func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.Driver) error {
 	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
 
 	if namespace.Name != operandNamespace {
@@ -157,7 +157,7 @@ func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.EBSCSIDriver) error
 	return nil
 }
 
-func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.EBSCSIDriver) error {
+func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.Driver) error {
 	for _, s := range serviceAccounts {
 		serviceAccount := resourceread.ReadServiceAccountV1OrDie(generated.MustAsset(s))
 
@@ -176,7 +176,7 @@ func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.EBSCSIDriver)
 	return nil
 }
 
-func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
+func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.Driver) error {
 	for _, r := range clusterRoles {
 		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
 		_, _, err := resourceapply.ApplyClusterRole(c.kubeClient.RbacV1(), c.eventRecorder, role)
@@ -196,7 +196,7 @@ func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
 	return nil
 }
 
-func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.EBSCSIDriver) (*unstructured.Unstructured, error) {
+func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.Driver) (*unstructured.Unstructured, error) {
 	cr := readCredentialRequestsOrDie(generated.MustAsset(credentialsRequest))
 
 	// Set spec.secretRef.namespace
@@ -225,12 +225,12 @@ func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.EBSCSIDriv
 	return cr, err
 }
 
-func (c *csiDriverOperator) tryCredentialsSecret(instance *v1alpha1.EBSCSIDriver) error {
+func (c *csiDriverOperator) tryCredentialsSecret(instance *v1alpha1.Driver) error {
 	_, err := c.secretInformer.Lister().Secrets(operandNamespace).Get(credentialsSecret)
 	return err
 }
 
-func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) error {
+func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.Driver) error {
 	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
 
 	_, _, err := resourceapply.ApplyStorageClass(
@@ -244,7 +244,7 @@ func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) er
 	return nil
 }
 
-func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDriver) *appsv1.Deployment {
+func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.Driver) *appsv1.Deployment {
 	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
 
 	if c.images.csiDriver != "" {
@@ -277,7 +277,7 @@ func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.EBSCSIDrive
 	return deployment
 }
 
-func (c *csiDriverOperator) getExpectedDaemonSet(instance *v1alpha1.EBSCSIDriver) *appsv1.DaemonSet {
+func (c *csiDriverOperator) getExpectedDaemonSet(instance *v1alpha1.Driver) *appsv1.DaemonSet {
 	daemonSet := resourceread.ReadDaemonSetV1OrDie(generated.MustAsset(daemonSet))
 
 	if c.images.csiDriver != "" {
@@ -317,7 +317,7 @@ func getLogLevel(logLevel operatorv1.LogLevel) int {
 	}
 }
 
-func (c *csiDriverOperator) syncStatus(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet, credentialsRequest *unstructured.Unstructured) error {
+func (c *csiDriverOperator) syncStatus(instance *v1alpha1.Driver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet, credentialsRequest *unstructured.Unstructured) error {
 	c.syncConditions(instance, deployment, daemonSet)
 
 	resourcemerge.SetDeploymentGeneration(&instance.Status.Generations, deployment)
@@ -347,7 +347,7 @@ func (c *csiDriverOperator) syncStatus(instance *v1alpha1.EBSCSIDriver, deployme
 	return nil
 }
 
-func (c *csiDriverOperator) syncConditions(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
+func (c *csiDriverOperator) syncConditions(instance *v1alpha1.Driver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
 	// The operator does not have any prerequisites (at least now)
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{
@@ -364,7 +364,7 @@ func (c *csiDriverOperator) syncConditions(instance *v1alpha1.EBSCSIDriver, depl
 	c.syncAvailableCondition(instance, deployment, daemonSet)
 }
 
-func (c *csiDriverOperator) syncAvailableCondition(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
+func (c *csiDriverOperator) syncAvailableCondition(instance *v1alpha1.Driver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
 	// TODO: is it enough to check if these values are >0? Or should be more strict and check against the exact desired value?
 	isDeploymentAvailable := deployment != nil && deployment.Status.AvailableReplicas > 0
 	isDaemonSetAvailable := daemonSet != nil && daemonSet.Status.NumberAvailable > 0
@@ -385,7 +385,7 @@ func (c *csiDriverOperator) syncAvailableCondition(instance *v1alpha1.EBSCSIDriv
 	}
 }
 
-func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
+func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.Driver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
 	// Progressing: true when Deployment or DaemonSet have some work to do
 	// (false: when all replicas are updated to the latest release and available)/
 	var progressing operatorv1.ConditionStatus

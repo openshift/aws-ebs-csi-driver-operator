@@ -8,17 +8,17 @@ import (
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeCsiV1alpha1 struct {
+type FakeEbsV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeCsiV1alpha1) EBSCSIDrivers() v1alpha1.EBSCSIDriverInterface {
-	return &FakeEBSCSIDrivers{c}
+func (c *FakeEbsV1alpha1) Drivers() v1alpha1.DriverInterface {
+	return &FakeDrivers{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCsiV1alpha1) RESTClient() rest.Interface {
+func (c *FakeEbsV1alpha1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

@@ -8,8 +8,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// EBSCSIDrivers returns a EBSCSIDriverInformer.
-	EBSCSIDrivers() EBSCSIDriverInformer
+	// Drivers returns a DriverInformer.
+	Drivers() DriverInformer
 }
 
 type version struct {
@@ -23,7 +23,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// EBSCSIDrivers returns a EBSCSIDriverInformer.
-func (v *version) EBSCSIDrivers() EBSCSIDriverInformer {
-	return &eBSCSIDriverInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+// Drivers returns a DriverInformer.
+func (v *version) Drivers() DriverInformer {
+	return &driverInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
