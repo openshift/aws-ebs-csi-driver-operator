@@ -268,6 +268,7 @@ func (c *csiDriverOperator) sync() error {
 
 func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, err error) {
 	if err != nil {
+		// Operator is Degraded: could not finish what it was doing
 		v1helpers.SetOperatorCondition(&status.Conditions,
 			operatorv1.OperatorCondition{
 				Type:    operatorv1.OperatorStatusTypeDegraded,
@@ -275,12 +276,25 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 				Reason:  "OperatorSync",
 				Message: err.Error(),
 			})
+		// Operator is Progressing: some action failed, will try to progress more after exp. backoff.
+		// Do not overwrite existing "Progressing=true" condition to keep its message.
+		cnd := v1helpers.FindOperatorCondition(status.Conditions, operatorv1.OperatorStatusTypeProgressing)
+		if cnd == nil || cnd.Status == operatorv1.ConditionFalse {
+			v1helpers.SetOperatorCondition(&status.Conditions,
+				operatorv1.OperatorCondition{
+					Type:    operatorv1.OperatorStatusTypeProgressing,
+					Status:  operatorv1.ConditionTrue,
+					Reason:  "OperatorSync",
+					Message: err.Error(),
+				})
+		}
 	} else {
 		v1helpers.SetOperatorCondition(&status.Conditions,
 			operatorv1.OperatorCondition{
 				Type:   operatorv1.OperatorStatusTypeDegraded,
 				Status: operatorv1.ConditionFalse,
 			})
+		// Progressing condition was set in c.handleSync().
 	}
 }
 
