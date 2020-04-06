@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+
 	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,6 +45,7 @@ type testObjects struct {
 	daemonSet          *appsv1.DaemonSet
 	credentialsRequest *unstructured.Unstructured
 	ebsCSIDriver       *v1alpha1.EBSCSIDriver
+	credentialsSecret  *v1.Secret
 }
 
 type testContext struct {
@@ -76,6 +79,10 @@ func newOperator(test operatorTest) *testContext {
 		initialObjects = append(initialObjects, test.initialObjects.daemonSet)
 	}
 
+	if test.initialObjects.credentialsSecret != nil {
+		initialObjects = append(initialObjects, test.initialObjects.credentialsSecret)
+	}
+
 	coreClient := fakecore.NewSimpleClientset(initialObjects...)
 	coreInformerFactory := coreinformers.NewSharedInformerFactory(coreClient, 0 /*no resync */)
 
@@ -85,6 +92,9 @@ func newOperator(test operatorTest) *testContext {
 	}
 	if test.initialObjects.daemonSet != nil {
 		coreInformerFactory.Apps().V1().DaemonSets().Informer().GetIndexer().Add(test.initialObjects.daemonSet)
+	}
+	if test.initialObjects.credentialsSecret != nil {
+		coreInformerFactory.Core().V1().Secrets().Informer().GetIndexer().Add(test.initialObjects.credentialsSecret)
 	}
 	if test.reactors.deployments != nil {
 		test.reactors.deployments(coreClient, coreInformerFactory)
@@ -137,6 +147,7 @@ func newOperator(test operatorTest) *testContext {
 		coreInformerFactory.Apps().V1().Deployments(),
 		coreInformerFactory.Apps().V1().DaemonSets(),
 		coreInformerFactory.Storage().V1().StorageClasses(),
+		coreInformerFactory.Core().V1().Secrets(),
 		coreClient,
 		dynamicClient,
 		versionGetter,
@@ -405,6 +416,21 @@ func withCredentialsRequestGeneration(generation int64) credentialsRequestModifi
 	}
 }
 
+// Secret with cloud credentials
+func getCredentialsSecret() *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      credentialsSecret,
+			Namespace: operandNamespace,
+		},
+		Data: map[string][]byte{
+			"aws_access_key_id":     []byte("foo"),
+			"aws_secret_access_key": []byte("bar"),
+		},
+		Type: "opaque",
+	}
+}
+
 // This reactor is always enabled and bumps Deployment and DaemonSet generation when they get updated.
 func addGenerationReactor(client *fakecore.Clientset) {
 	client.PrependReactor("*", "deployments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -450,10 +476,24 @@ func TestSync(t *testing.T) {
 	tests := []operatorTest{
 		{
 			// Only EBSCSIDriver exists, everything else is created
-			name:   "initial sync",
+			name:   "initial sync without cloud Secret",
 			images: defaultImages(),
 			initialObjects: testObjects{
 				ebsCSIDriver: ebsCSIDriver(),
+			},
+			expectedObjects: testObjects{
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+			},
+			expectErr: true,
+		},
+		{
+			// Only EBSCSIDriver exists, everything else is created
+			name:   "initial sync with cloud Secret",
+			images: defaultImages(),
+			initialObjects: testObjects{
+				ebsCSIDriver: ebsCSIDriver(),
+				// Adding secrets to test Deployment / DaemonSet creation
+				credentialsSecret: getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -466,6 +506,7 @@ func TestSync(t *testing.T) {
 					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeAvailable)),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -481,6 +522,7 @@ func TestSync(t *testing.T) {
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver:       ebsCSIDriver(withGenerations(1, 1, 1)),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -495,6 +537,7 @@ func TestSync(t *testing.T) {
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -511,6 +554,7 @@ func TestSync(t *testing.T) {
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver:       ebsCSIDriver(withGenerations(1, 1, 1)), // the operator knows the old generation of the Deployment
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -526,6 +570,7 @@ func TestSync(t *testing.T) {
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // Progressing due to Generation change
 					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -542,6 +587,7 @@ func TestSync(t *testing.T) {
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver:       ebsCSIDriver(withGenerations(1, 1, 1)),                     // the operator knows the old generation of the Deployment
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(2)), // modified by user
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -557,6 +603,7 @@ func TestSync(t *testing.T) {
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(3)), // Updated by the operator
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -577,6 +624,7 @@ func TestSync(t *testing.T) {
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -592,6 +640,7 @@ func TestSync(t *testing.T) {
 					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // The operator is Progressing
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeAvailable)),                                             // The operator is not Available (controller not running...)
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -612,6 +661,7 @@ func TestSync(t *testing.T) {
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -627,6 +677,7 @@ func TestSync(t *testing.T) {
 					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeProgressing), // The operator is Progressing, but still Available
 					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -645,6 +696,7 @@ func TestSync(t *testing.T) {
 					withLogLevel(opv1.Trace), // User changed the log level...
 					withGeneration(2, 1)),    //... which caused the Generation to increase
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel6, defaultImages(), // The operator changed cmdline arguments with a new log level
@@ -661,6 +713,7 @@ func TestSync(t *testing.T) {
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // Progressing due to Generation change
 					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 	}

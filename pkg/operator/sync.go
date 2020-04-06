@@ -25,12 +25,13 @@ import (
 )
 
 const (
-	csiDriver      = "csidriver.yaml"
-	namespace      = "namespace.yaml"
-	serviceAccount = "serviceaccount.yaml"
-	storageClass   = "storageclass.yaml"
-	daemonSet      = "node_daemonset.yaml"
-	deployment     = "controller_deployment.yaml"
+	csiDriver         = "csidriver.yaml"
+	namespace         = "namespace.yaml"
+	serviceAccount    = "serviceaccount.yaml"
+	storageClass      = "storageclass.yaml"
+	daemonSet         = "node_daemonset.yaml"
+	deployment        = "controller_deployment.yaml"
+	credentialsSecret = "aws-cloud-credentials"
 )
 
 var (
@@ -222,6 +223,11 @@ func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.EBSCSIDriv
 
 	cr, _, err = applyCredentialsRequest(c.dynamicClient, c.eventRecorder, cr, expectedGeneration, forceRollout)
 	return cr, err
+}
+
+func (c *csiDriverOperator) tryCredentialsSecret(instance *v1alpha1.EBSCSIDriver) error {
+	_, err := c.secretInformer.Lister().Secrets(operandNamespace).Get(credentialsSecret)
+	return err
 }
 
 func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) error {

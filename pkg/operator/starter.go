@@ -76,6 +76,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().DaemonSets(),
 		ctrlCtx.KubeNamespacedInformerFactory.Storage().V1().StorageClasses(),
+		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().Secrets(),
 		ctrlCtx.ClientBuilder.KubeClientOrDie(operandName),
 		dynamicClient,
 		versionGetter,

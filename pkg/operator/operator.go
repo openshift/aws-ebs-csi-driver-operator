@@ -72,6 +72,7 @@ type csiDriverOperator struct {
 	kubeClient      kubernetes.Interface
 	dynamicClient   dynamic.Interface
 	pvInformer      coreinformersv1.PersistentVolumeInformer
+	secretInformer  coreinformersv1.SecretInformer
 	versionGetter   status.VersionGetter
 	eventRecorder   events.Recorder
 	informersSynced []cache.InformerSynced
@@ -108,6 +109,7 @@ func NewCSIDriverOperator(
 	deployInformer appsinformersv1.DeploymentInformer,
 	dsInformer appsinformersv1.DaemonSetInformer,
 	storageClassInformer storageinformersv1.StorageClassInformer,
+	secretInformer coreinformersv1.SecretInformer,
 	kubeClient kubernetes.Interface,
 	dynamicClient dynamic.Interface,
 	versionGetter status.VersionGetter,
@@ -121,6 +123,7 @@ func NewCSIDriverOperator(
 		kubeClient:      kubeClient,
 		dynamicClient:   dynamicClient,
 		pvInformer:      pvInformer,
+		secretInformer:  secretInformer,
 		versionGetter:   versionGetter,
 		eventRecorder:   eventRecorder,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
@@ -157,6 +160,9 @@ func NewCSIDriverOperator(
 
 	client.Informer().AddEventHandler(csiOperator.eventHandler("ebscsidriver"))
 	csiOperator.informersSynced = append(csiOperator.informersSynced, client.Informer().HasSynced)
+
+	secretInformer.Informer().AddEventHandler(csiOperator.eventHandler("secret"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, secretInformer.Informer().HasSynced)
 
 	csiOperator.syncHandler = csiOperator.sync
 
@@ -286,6 +292,20 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 		return fmt.Errorf("failed to sync namespace: %v", err)
 	}
 
+	credentialsRequest, err := c.syncCredentialsRequest(instance)
+	if err != nil {
+		return fmt.Errorf("failed to sync CredentialsRequest: %v", err)
+	}
+
+	err = c.tryCredentialsSecret(instance)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Have a nice event instead of "secret XYZ not found"
+			return fmt.Errorf("waiting for cloud credentials secret provided by cloud-credential-operator")
+		}
+		return fmt.Errorf("error waiting for cloud credentials:: %v", err)
+	}
+
 	err = c.syncServiceAccounts(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync ServiceAccount: %v", err)
@@ -304,11 +324,6 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 	daemonSet, err := c.syncDaemonSet(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync DaemonSet: %v", err)
-	}
-
-	credentialsRequest, err := c.syncCredentialsRequest(instance)
-	if err != nil {
-		return fmt.Errorf("failed to sync CredentialsRequest: %v", err)
 	}
 
 	err = c.syncStorageClass(instance)
