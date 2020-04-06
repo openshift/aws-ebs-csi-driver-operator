@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	rbacinformersv1 "k8s.io/client-go/informers/rbac/v1"
@@ -69,7 +70,9 @@ const (
 type csiDriverOperator struct {
 	client          OperatorClient
 	kubeClient      kubernetes.Interface
+	dynamicClient   dynamic.Interface
 	pvInformer      coreinformersv1.PersistentVolumeInformer
+	secretInformer  coreinformersv1.SecretInformer
 	versionGetter   status.VersionGetter
 	eventRecorder   events.Recorder
 	informersSynced []cache.InformerSynced
@@ -106,7 +109,9 @@ func NewCSIDriverOperator(
 	deployInformer appsinformersv1.DeploymentInformer,
 	dsInformer appsinformersv1.DaemonSetInformer,
 	storageClassInformer storageinformersv1.StorageClassInformer,
+	secretInformer coreinformersv1.SecretInformer,
 	kubeClient kubernetes.Interface,
+	dynamicClient dynamic.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
 	operatorVersion string,
@@ -116,7 +121,9 @@ func NewCSIDriverOperator(
 	csiOperator := &csiDriverOperator{
 		client:          client,
 		kubeClient:      kubeClient,
+		dynamicClient:   dynamicClient,
 		pvInformer:      pvInformer,
+		secretInformer:  secretInformer,
 		versionGetter:   versionGetter,
 		eventRecorder:   eventRecorder,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
@@ -153,6 +160,9 @@ func NewCSIDriverOperator(
 
 	client.Informer().AddEventHandler(csiOperator.eventHandler("ebscsidriver"))
 	csiOperator.informersSynced = append(csiOperator.informersSynced, client.Informer().HasSynced)
+
+	secretInformer.Informer().AddEventHandler(csiOperator.eventHandler("secret"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, secretInformer.Informer().HasSynced)
 
 	csiOperator.syncHandler = csiOperator.sync
 
@@ -226,6 +236,9 @@ func (c *csiDriverOperator) sync() error {
 	}()
 
 	syncErr := c.handleSync(instanceCopy)
+	if syncErr != nil {
+		c.eventRecorder.Eventf("SyncError", "Error syncing CSI driver: %s", syncErr)
+	}
 	c.updateSyncError(&instanceCopy.Status.OperatorStatus, syncErr)
 
 	if _, _, err := v1helpers.UpdateStatus(c.client, func(status *operatorv1.OperatorStatus) error {
@@ -255,6 +268,7 @@ func (c *csiDriverOperator) sync() error {
 
 func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, err error) {
 	if err != nil {
+		// Operator is Degraded: could not finish what it was doing
 		v1helpers.SetOperatorCondition(&status.Conditions,
 			operatorv1.OperatorCondition{
 				Type:    operatorv1.OperatorStatusTypeDegraded,
@@ -262,12 +276,25 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 				Reason:  "OperatorSync",
 				Message: err.Error(),
 			})
+		// Operator is Progressing: some action failed, will try to progress more after exp. backoff.
+		// Do not overwrite existing "Progressing=true" condition to keep its message.
+		cnd := v1helpers.FindOperatorCondition(status.Conditions, operatorv1.OperatorStatusTypeProgressing)
+		if cnd == nil || cnd.Status == operatorv1.ConditionFalse {
+			v1helpers.SetOperatorCondition(&status.Conditions,
+				operatorv1.OperatorCondition{
+					Type:    operatorv1.OperatorStatusTypeProgressing,
+					Status:  operatorv1.ConditionTrue,
+					Reason:  "OperatorSync",
+					Message: err.Error(),
+				})
+		}
 	} else {
 		v1helpers.SetOperatorCondition(&status.Conditions,
 			operatorv1.OperatorCondition{
 				Type:   operatorv1.OperatorStatusTypeDegraded,
 				Status: operatorv1.ConditionFalse,
 			})
+		// Progressing condition was set in c.handleSync().
 	}
 }
 
@@ -280,6 +307,20 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 	err = c.syncNamespace(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync namespace: %v", err)
+	}
+
+	credentialsRequest, err := c.syncCredentialsRequest(instance)
+	if err != nil {
+		return fmt.Errorf("failed to sync CredentialsRequest: %v", err)
+	}
+
+	err = c.tryCredentialsSecret(instance)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Have a nice event instead of "secret XYZ not found"
+			return fmt.Errorf("waiting for cloud credentials secret provided by cloud-credential-operator")
+		}
+		return fmt.Errorf("error waiting for cloud credentials:: %v", err)
 	}
 
 	err = c.syncServiceAccounts(instance)
@@ -307,7 +348,7 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.EBSCSIDriver) error {
 		return fmt.Errorf("failed to sync StorageClass: %v", err)
 	}
 
-	if err := c.syncStatus(instance, deployment, daemonSet); err != nil {
+	if err := c.syncStatus(instance, deployment, daemonSet, credentialsRequest); err != nil {
 		return fmt.Errorf("failed to sync status: %v", err)
 	}
 

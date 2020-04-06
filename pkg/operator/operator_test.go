@@ -7,11 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+
 	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	coreinformers "k8s.io/client-go/informers"
 	fakecore "k8s.io/client-go/kubernetes/fake"
@@ -38,9 +41,11 @@ type operatorTest struct {
 }
 
 type testObjects struct {
-	deployment   *appsv1.Deployment
-	daemonSet    *appsv1.DaemonSet
-	ebsCSIDriver *v1alpha1.EBSCSIDriver
+	deployment         *appsv1.Deployment
+	daemonSet          *appsv1.DaemonSet
+	credentialsRequest *unstructured.Unstructured
+	ebsCSIDriver       *v1alpha1.EBSCSIDriver
+	credentialsSecret  *v1.Secret
 }
 
 type testContext struct {
@@ -49,6 +54,7 @@ type testContext struct {
 	coreInformers     coreinformers.SharedInformerFactory
 	operatorClient    *fakeop.Clientset
 	operatorInformers opinformers.SharedInformerFactory
+	dynamicClient     *fakeDynamicClient
 }
 
 type addCoreReactors func(*fakecore.Clientset, coreinformers.SharedInformerFactory)
@@ -73,6 +79,10 @@ func newOperator(test operatorTest) *testContext {
 		initialObjects = append(initialObjects, test.initialObjects.daemonSet)
 	}
 
+	if test.initialObjects.credentialsSecret != nil {
+		initialObjects = append(initialObjects, test.initialObjects.credentialsSecret)
+	}
+
 	coreClient := fakecore.NewSimpleClientset(initialObjects...)
 	coreInformerFactory := coreinformers.NewSharedInformerFactory(coreClient, 0 /*no resync */)
 
@@ -82,6 +92,9 @@ func newOperator(test operatorTest) *testContext {
 	}
 	if test.initialObjects.daemonSet != nil {
 		coreInformerFactory.Apps().V1().DaemonSets().Informer().GetIndexer().Add(test.initialObjects.daemonSet)
+	}
+	if test.initialObjects.credentialsSecret != nil {
+		coreInformerFactory.Core().V1().Secrets().Informer().GetIndexer().Add(test.initialObjects.credentialsSecret)
 	}
 	if test.reactors.deployments != nil {
 		test.reactors.deployments(coreClient, coreInformerFactory)
@@ -118,6 +131,11 @@ func newOperator(test operatorTest) *testContext {
 	versionGetter.SetVersion("operator", testVersion)
 	versionGetter.SetVersion("aws-ebs-csi-driver", testVersion)
 
+	dynamicClient := &fakeDynamicClient{}
+	if test.initialObjects.credentialsRequest != nil {
+		dynamicClient.credentialRequest = test.initialObjects.credentialsRequest
+	}
+
 	recorder := events.NewInMemoryRecorder("operator")
 	op := NewCSIDriverOperator(client,
 		coreInformerFactory.Core().V1().PersistentVolumes(),
@@ -129,7 +147,9 @@ func newOperator(test operatorTest) *testContext {
 		coreInformerFactory.Apps().V1().Deployments(),
 		coreInformerFactory.Apps().V1().DaemonSets(),
 		coreInformerFactory.Storage().V1().StorageClasses(),
+		coreInformerFactory.Core().V1().Secrets(),
 		coreClient,
+		dynamicClient,
 		versionGetter,
 		recorder,
 		testVersion,
@@ -143,6 +163,7 @@ func newOperator(test operatorTest) *testContext {
 		coreInformers:     coreInformerFactory,
 		operatorClient:    operatorClient,
 		operatorInformers: operatorInformerFactory,
+		dynamicClient:     dynamicClient,
 	}
 }
 
@@ -199,22 +220,29 @@ func withGeneration(generations ...int64) ebsCSIDriverModifier {
 	}
 }
 
-func withGenerations(generation int64) ebsCSIDriverModifier {
+func withGenerations(deployment, daemonset, credentialsRequest int64) ebsCSIDriverModifier {
 	return func(i *v1alpha1.EBSCSIDriver) *v1alpha1.EBSCSIDriver {
 		i.Status.Generations = []opv1.GenerationStatus{
 			{
 				Group:          appsv1.GroupName,
-				LastGeneration: generation,
+				LastGeneration: deployment,
 				Name:           "aws-ebs-csi-driver-controller",
 				Namespace:      operandNamespace,
 				Resource:       "deployments",
 			},
 			{
 				Group:          appsv1.GroupName,
-				LastGeneration: generation,
+				LastGeneration: daemonset,
 				Name:           "aws-ebs-csi-driver-node",
 				Namespace:      operandNamespace,
 				Resource:       "daemonsets",
+			},
+			{
+				Group:          credentialsRequestGroup,
+				LastGeneration: credentialsRequest,
+				Name:           "openshift-aws-ebs-csi-driver",
+				Namespace:      credentialRequestNamespace,
+				Resource:       credentialsRequestResource,
 			},
 		}
 		return i
@@ -370,6 +398,39 @@ func withDaemonSetGeneration(generations ...int64) daemonSetModifier {
 	}
 }
 
+// CredentialsRequest
+type credentialsRequestModifier func(*unstructured.Unstructured) *unstructured.Unstructured
+
+func getCredentialsRequest(modifiers ...credentialsRequestModifier) *unstructured.Unstructured {
+	cr := readCredentialRequestsOrDie(generated.MustAsset(credentialsRequest))
+	for _, modifier := range modifiers {
+		cr = modifier(cr)
+	}
+	return cr
+}
+
+func withCredentialsRequestGeneration(generation int64) credentialsRequestModifier {
+	return func(cr *unstructured.Unstructured) *unstructured.Unstructured {
+		cr.SetGeneration(generation)
+		return cr
+	}
+}
+
+// Secret with cloud credentials
+func getCredentialsSecret() *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      credentialsSecret,
+			Namespace: operandNamespace,
+		},
+		Data: map[string][]byte{
+			"aws_access_key_id":     []byte("foo"),
+			"aws_secret_access_key": []byte("bar"),
+		},
+		Type: "opaque",
+	}
+}
+
 // This reactor is always enabled and bumps Deployment and DaemonSet generation when they get updated.
 func addGenerationReactor(client *fakecore.Clientset) {
 	client.PrependReactor("*", "deployments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -415,10 +476,24 @@ func TestSync(t *testing.T) {
 	tests := []operatorTest{
 		{
 			// Only EBSCSIDriver exists, everything else is created
-			name:   "initial sync",
+			name:   "initial sync without cloud Secret",
 			images: defaultImages(),
 			initialObjects: testObjects{
 				ebsCSIDriver: ebsCSIDriver(),
+			},
+			expectedObjects: testObjects{
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+			},
+			expectErr: true,
+		},
+		{
+			// Only EBSCSIDriver exists, everything else is created
+			name:   "initial sync with cloud Secret",
+			images: defaultImages(),
+			initialObjects: testObjects{
+				ebsCSIDriver: ebsCSIDriver(),
+				// Adding secrets to test Deployment / DaemonSet creation
+				credentialsSecret: getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -427,9 +502,11 @@ func TestSync(t *testing.T) {
 					withDaemonSetGeneration(1, 0)),
 				ebsCSIDriver: ebsCSIDriver(
 					withStatus(replica0),
-					withGenerations(1),
+					withGenerations(1, 1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeAvailable)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -443,7 +520,9 @@ func TestSync(t *testing.T) {
 				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(1, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
-				ebsCSIDriver: ebsCSIDriver(withGenerations(1)),
+				ebsCSIDriver:       ebsCSIDriver(withGenerations(1, 1, 1)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -454,9 +533,11 @@ func TestSync(t *testing.T) {
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver: ebsCSIDriver(
 					withStatus(replica2), // 1 deployment + 1 daemonSet
-					withGenerations(1),
+					withGenerations(1, 1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -471,7 +552,9 @@ func TestSync(t *testing.T) {
 				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
 					withDaemonSetGeneration(2, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
-				ebsCSIDriver: ebsCSIDriver(withGenerations(1)), // the operator knows the old generation of the Deployment
+				ebsCSIDriver:       ebsCSIDriver(withGenerations(1, 1, 1)), // the operator knows the old generation of the Deployment
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -482,10 +565,45 @@ func TestSync(t *testing.T) {
 					withDaemonSetGeneration(3, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver: ebsCSIDriver(
-					withStatus(replica2), // 1 deployment + 1 daemonSet
-					withGenerations(3),   // now the operator knows generation 1
+					withStatus(replica2),     // 1 deployment + 1 daemonSet
+					withGenerations(3, 3, 1), // now the operator knows generation 1
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // Progressing due to Generation change
 					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
+			},
+		},
+		{
+			// CredentialRequests is modified by user, and gets replaced by the operator.
+			name:   "CredentialRequests modified by user",
+			images: defaultImages(),
+			initialObjects: testObjects{
+				deployment: getDeployment(argsLevel2, defaultImages(),
+					withDeploymentReplicas(1),
+					withDeploymentGeneration(1, 1),
+					withDeploymentStatus(replica1, replica1, replica1)),
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
+					withDaemonSetGeneration(1, 1),
+					withDaemonSetStatus(replica1, replica1, replica1)),
+				ebsCSIDriver:       ebsCSIDriver(withGenerations(1, 1, 1)),                     // the operator knows the old generation of the Deployment
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(2)), // modified by user
+				credentialsSecret:  getCredentialsSecret(),
+			},
+			expectedObjects: testObjects{
+				deployment: getDeployment(argsLevel2, defaultImages(),
+					withDeploymentReplicas(1),
+					withDeploymentGeneration(1, 1),
+					withDeploymentStatus(replica1, replica1, replica1)),
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
+					withDaemonSetGeneration(1, 1),
+					withDaemonSetStatus(replica1, replica1, replica1)),
+				ebsCSIDriver: ebsCSIDriver(
+					withStatus(replica2),     // 1 deployment + 1 daemonSet
+					withGenerations(1, 1, 3), // now the operator knows generation 3
+					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
+					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(3)), // Updated by the operator
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -501,10 +619,12 @@ func TestSync(t *testing.T) {
 					withDaemonSetStatus(1, 1, 1)), // the DaemonSet has 1 pod
 				ebsCSIDriver: ebsCSIDriver(
 					withStatus(replica1),
-					withGenerations(1),
+					withGenerations(1, 1, 1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -515,10 +635,12 @@ func TestSync(t *testing.T) {
 					withDaemonSetStatus(1, 1, 1)),
 				ebsCSIDriver: ebsCSIDriver(
 					withStatus(replica1), // 0 deployments + 1 daemonSet
-					withGenerations(1),
+					withGenerations(1, 1, 1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // The operator is Progressing
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeAvailable)),                                             // The operator is not Available (controller not running...)
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -534,10 +656,12 @@ func TestSync(t *testing.T) {
 					withDaemonSetStatus(1, 1, 1)), // the DaemonSet has 1 pod
 				ebsCSIDriver: ebsCSIDriver(
 					withStatus(replica1),
-					withGenerations(1),
+					withGenerations(1, 1, 1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImages(),
@@ -548,10 +672,12 @@ func TestSync(t *testing.T) {
 					withDaemonSetStatus(1, 1, 1)), // no change to the DaemonSet
 				ebsCSIDriver: ebsCSIDriver(
 					withStatus(replica1), // 0 deployments + 1 daemonSet
-					withGenerations(1),
+					withGenerations(1, 1, 1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeProgressing), // The operator is Progressing, but still Available
 					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 		{
@@ -566,9 +692,11 @@ func TestSync(t *testing.T) {
 					withDaemonSetGeneration(1, 1),
 					withDaemonSetStatus(replica1, replica1, replica1)),
 				ebsCSIDriver: ebsCSIDriver(
-					withGenerations(1),
+					withGenerations(1, 1, 1),
 					withLogLevel(opv1.Trace), // User changed the log level...
 					withGeneration(2, 1)),    //... which caused the Generation to increase
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel6, defaultImages(), // The operator changed cmdline arguments with a new log level
@@ -580,10 +708,12 @@ func TestSync(t *testing.T) {
 				ebsCSIDriver: ebsCSIDriver(
 					withStatus(replica2), // 1 deployment + 1 daemonSet
 					withLogLevel(opv1.Trace),
-					withGenerations(2),
+					withGenerations(2, 2, 1),
 					withGeneration(2, 2),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // Progressing due to Generation change
 					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
 	}
@@ -645,6 +775,16 @@ func TestSync(t *testing.T) {
 					t.Errorf("Unexpected EBSCSIDriver %+v content:\n%s", operandName, cmp.Diff(test.expectedObjects.ebsCSIDriver, actualEBSCSIDriver))
 				}
 			}
+
+			// Check expectedObjects.credentialsRequest
+			if test.expectedObjects.credentialsRequest != nil {
+				actualRequest := ctx.dynamicClient.credentialRequest
+				sanitizeCredentialsRequest(actualRequest)
+				sanitizeCredentialsRequest(test.expectedObjects.credentialsRequest)
+				if !equality.Semantic.DeepEqual(test.expectedObjects.credentialsRequest, actualRequest) {
+					t.Errorf("Unexpected CredentialsRequest %+v content:\n%s", operandName, cmp.Diff(test.expectedObjects.credentialsRequest, actualRequest))
+				}
+			}
 		})
 	}
 }
@@ -686,6 +826,14 @@ func sanitizeEBSCSIDriver(instance *v1alpha1.EBSCSIDriver) {
 	sort.Slice(instance.Status.Conditions, func(i, j int) bool {
 		return instance.Status.Conditions[i].Type < instance.Status.Conditions[j].Type
 	})
+}
+
+func sanitizeCredentialsRequest(instance *unstructured.Unstructured) {
+	// Ignore ResourceVersion
+	if instance == nil {
+		return
+	}
+	instance.SetResourceVersion("0")
 }
 
 func defaultImages() images {

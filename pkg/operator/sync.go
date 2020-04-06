@@ -8,7 +8,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -23,12 +25,13 @@ import (
 )
 
 const (
-	csiDriver      = "csidriver.yaml"
-	namespace      = "namespace.yaml"
-	serviceAccount = "serviceaccount.yaml"
-	storageClass   = "storageclass.yaml"
-	daemonSet      = "node_daemonset.yaml"
-	deployment     = "controller_deployment.yaml"
+	csiDriver         = "csidriver.yaml"
+	namespace         = "namespace.yaml"
+	serviceAccount    = "serviceaccount.yaml"
+	storageClass      = "storageclass.yaml"
+	daemonSet         = "node_daemonset.yaml"
+	deployment        = "controller_deployment.yaml"
+	credentialsSecret = "aws-cloud-credentials"
 )
 
 var (
@@ -51,6 +54,7 @@ var (
 		"rbac/controller_privileged_binding.yaml",
 		"rbac/node_privileged_binding.yaml",
 	}
+	credentialsRequest = "credentials.yaml"
 )
 
 func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.EBSCSIDriver) (*appsv1.Deployment, error) {
@@ -192,6 +196,40 @@ func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.EBSCSIDriver) error {
 	return nil
 }
 
+func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.EBSCSIDriver) (*unstructured.Unstructured, error) {
+	cr := readCredentialRequestsOrDie(generated.MustAsset(credentialsRequest))
+
+	// Set spec.secretRef.namespace
+	err := unstructured.SetNestedField(cr.Object, operandNamespace, "spec", "secretRef", "namespace")
+	if err != nil {
+		return nil, err
+	}
+
+	forceRollout := false
+	if c.versionChanged("operator", c.operatorVersion) {
+		// Operator version changed. The new one _may_ have updated Deployment -> we should deploy it.
+		forceRollout = true
+	}
+
+	var expectedGeneration int64 = -1
+	generation := resourcemerge.GenerationFor(
+		instance.Status.Generations,
+		schema.GroupResource{Group: credentialsRequestGroup, Resource: credentialsRequestResource},
+		cr.GetNamespace(),
+		cr.GetName())
+	if generation != nil {
+		expectedGeneration = generation.LastGeneration
+	}
+
+	cr, _, err = applyCredentialsRequest(c.dynamicClient, c.eventRecorder, cr, expectedGeneration, forceRollout)
+	return cr, err
+}
+
+func (c *csiDriverOperator) tryCredentialsSecret(instance *v1alpha1.EBSCSIDriver) error {
+	_, err := c.secretInformer.Lister().Secrets(operandNamespace).Get(credentialsSecret)
+	return err
+}
+
 func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.EBSCSIDriver) error {
 	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
 
@@ -279,11 +317,20 @@ func getLogLevel(logLevel operatorv1.LogLevel) int {
 	}
 }
 
-func (c *csiDriverOperator) syncStatus(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) error {
+func (c *csiDriverOperator) syncStatus(instance *v1alpha1.EBSCSIDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet, credentialsRequest *unstructured.Unstructured) error {
 	c.syncConditions(instance, deployment, daemonSet)
 
 	resourcemerge.SetDeploymentGeneration(&instance.Status.Generations, deployment)
 	resourcemerge.SetDaemonSetGeneration(&instance.Status.Generations, daemonSet)
+	if credentialsRequest != nil {
+		resourcemerge.SetGeneration(&instance.Status.Generations, operatorv1.GenerationStatus{
+			Group:          credentialsRequestGroup,
+			Resource:       credentialsRequestResource,
+			Namespace:      credentialsRequest.GetNamespace(),
+			Name:           credentialsRequest.GetName(),
+			LastGeneration: credentialsRequest.GetGeneration(),
+		})
+	}
 
 	instance.Status.ObservedGeneration = instance.Generation
 
@@ -445,6 +492,13 @@ func (c *csiDriverOperator) deleteAll() error {
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+	}
+
+	cr := readCredentialRequestsOrDie(generated.MustAsset(credentialsRequest))
+	err = c.dynamicClient.Resource(credentialsRequestResourceGVR).Namespace(cr.GetNamespace()).Delete(context.TODO(), cr.GetName(), metav1.DeleteOptions{})
+	reportDeleteEvent(c.eventRecorder, cr, err)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
 	}
 
 	return nil
