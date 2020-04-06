@@ -236,6 +236,9 @@ func (c *csiDriverOperator) sync() error {
 	}()
 
 	syncErr := c.handleSync(instanceCopy)
+	if syncErr != nil {
+		c.eventRecorder.Eventf("SyncError", "Error syncing CSI driver: %s", syncErr)
+	}
 	c.updateSyncError(&instanceCopy.Status.OperatorStatus, syncErr)
 
 	if _, _, err := v1helpers.UpdateStatus(c.client, func(status *operatorv1.OperatorStatus) error {
