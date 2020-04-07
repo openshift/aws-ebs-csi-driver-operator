@@ -1,13 +1,13 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: ebscsidrivers.ebs.aws.csi.openshift.io
+  name: drivers.ebs.aws.csi.openshift.io
 spec:
   group: ebs.aws.csi..openshift.io
   names:
     kind: Driver
-    plural: ebscsidrivers
-    singular: ebscsidriver
+    plural: drivers
+    singular: driver
   preserveUnknownFields: false
   scope: Cluster
   subresources:

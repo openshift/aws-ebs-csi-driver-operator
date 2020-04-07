@@ -158,7 +158,7 @@ func NewCSIDriverOperator(
 	storageClassInformer.Informer().AddEventHandler(csiOperator.eventHandler("storageclass"))
 	csiOperator.informersSynced = append(csiOperator.informersSynced, storageClassInformer.Informer().HasSynced)
 
-	client.Informer().AddEventHandler(csiOperator.eventHandler("ebscsidriver"))
+	client.Informer().AddEventHandler(csiOperator.eventHandler("driver"))
 	csiOperator.informersSynced = append(csiOperator.informersSynced, client.Informer().HasSynced)
 
 	secretInformer.Informer().AddEventHandler(csiOperator.eventHandler("secret"))

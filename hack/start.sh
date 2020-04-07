@@ -88,7 +88,7 @@ EOF
 
 repo_dir="$(dirname $0)/.."
 
-cp ${repo_dir}/manifests/*.yaml ${manifest}/
+cp ${repo_dir}/manifests/hack/base-manifests/*.yaml ${manifest}/
 
 for infile in $( ls ${repo_dir}/hack/start-manifests/*.yaml ); do
     outfile=${manifest}/$( basename ${infile} )
