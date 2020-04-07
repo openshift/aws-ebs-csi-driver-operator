@@ -1,0 +1,12 @@
+{
+  "apiVersion": "ebs.aws.csi.openshift.io/v1alpha1",
+  "kind": "Driver",
+  "metadata": {
+    "name": "cluster"
+  },
+  "spec": {
+    "managementState": "Managed",
+    "operatorLogLevel": "Trace",
+    "logLevel": "Trace"
+  }
+}

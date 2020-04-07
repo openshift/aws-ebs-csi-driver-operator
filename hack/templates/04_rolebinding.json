@@ -1,0 +1,20 @@
+{
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "RoleBinding",
+    "metadata": {
+        "name": "$SERVICE_ACCOUNT_NAME-rolebinding",
+        "namespace": "openshift-aws-ebs-csi-driver-operator"
+    },
+    "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Role",
+        "name": "$SERVICE_ACCOUNT_NAME-role"
+    },
+    "subjects": [
+        {
+            "kind": "ServiceAccount",
+            "name": "$SERVICE_ACCOUNT_NAME",
+            "namespace": "openshift-aws-ebs-csi-driver-operator"
+        }
+    ]
+}

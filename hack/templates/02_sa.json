@@ -1,0 +1,8 @@
+{
+    "apiVersion": "v1",
+    "kind": "ServiceAccount",
+    "metadata": {
+        "name": "$SERVICE_ACCOUNT_NAME",
+        "namespace": "openshift-aws-ebs-csi-driver-operator"
+    }
+}
