@@ -38,6 +38,12 @@ spec:
           type: string
         metadata:
           type: object
+          properties:
+            name:
+              type: string
+              # Force "cluster" as CR name.
+              enum:
+               - cluster
         spec:
           description:
             DriverSpec is the specification of the desired behavior of
