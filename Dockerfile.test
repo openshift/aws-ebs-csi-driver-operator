@@ -1,11 +1,5 @@
-# This image contains scripts and YAML manifests for e2e tests.
-# It is going to be used to install the operator in prow jobs
-# of all sidecars & AWS EBS CSI driver to prevent regressions.
+# "src" is build by a prow job when building final images.
+# It contains full repository sources + jq + pyhon with yaml module.
+# Use it as test image for the operator.
 
-FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
-WORKDIR /go/src/github.com/openshift/aws-ebs-csi-driver-operator
-
-# Make a full copy of the operator sources for now to be able
-# to experiment in a prow job without changing this image.
-# TODO: extract just the files we need for e2e.
-COPY . .
+FROM src
