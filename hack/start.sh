@@ -60,6 +60,7 @@ REPO_ROOT="$(dirname $0)/.."
 OCP_VERSION=${OCP_VERSION:-4.5}
 YAML2JSON=$REPO_ROOT/hack/yaml2json.py
 IMAGE_FORMAT=${IMAGE_FORMAT:-""}
+ARTIFACT_DIR=${ARTIFACT_DIR:-""}
 MANIFEST=$(mktemp -d)
 trap cleanup exit
 
