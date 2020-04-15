@@ -108,7 +108,6 @@ spec:
           - use
           resourceNames:
           - privileged
-          - hostmount-anyuid
         - apiGroups:
           - ""
           resources:
