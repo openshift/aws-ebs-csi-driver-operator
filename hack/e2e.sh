@@ -14,5 +14,16 @@ fi
 # Start the operator
 ${REPO_ROOT}/hack/start.sh
 
+# Wait for the CSI driver to get deployed. This is necessary for topology tests
+# - they need the driver on all nodes.
+
+# Step1: The operator says it's available (at least some pods are running).
+echo "Waiting for drivers.ebs.aws.csi.openshift.io/cluster"
+oc wait drivers.ebs.aws.csi.openshift.io/cluster --for=condition=Available --timeout=5m
+
+# Step2: Wait for *all* pods to be running.
+echo "Waiting for all driver pods"
+oc wait -n openshift-aws-ebs-csi-driver pod --all --for=condition=Ready --timeout=5m
+
 # Run openshift-tests
 TEST_CSI_DRIVER_FILES=${REPO_ROOT}/test/e2e/manifest.yaml openshift-tests run openshift/csi $ADDITIONAL_TEST_ARGS
