@@ -57,7 +57,6 @@ cleanup(){
 
 DRYRUN=false
 REPO_ROOT="$(dirname $0)/.."
-OCP_VERSION=${OCP_VERSION:-4.5}
 YAML2JSON=$REPO_ROOT/hack/yaml2json.py
 IMAGE_FORMAT=${IMAGE_FORMAT:-""}
 ARTIFACT_DIR=${ARTIFACT_DIR:-""}
@@ -65,8 +64,7 @@ MANIFEST=$(mktemp -d)
 trap cleanup exit
 
 # Find the latest OCP version. It's the greatest 4.x directory in /manifests dir
-OCP_VERSION=$( ls $REPO_ROOT/manifests | sort | grep "^4" | tail -n 1 )
-CSV_FILE=$REPO_ROOT/manifests/${OCP_VERSION}/aws-ebs-csi-driver-operator.v${OCP_VERSION}.0.clusterserviceversion.yaml
+CSV_FILE=$REPO_ROOT/bundle/manifests/aws-ebs-csi-driver-operator.clusterserviceversion.yaml
 log::debug "Using CSV $CSV_FILE"
 
 if [ ! -e $CSV_FILE ]; then

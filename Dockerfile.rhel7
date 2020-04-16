@@ -5,7 +5,7 @@ RUN make
 
 FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
 COPY --from=builder /go/src/github.com/openshift/aws-ebs-csi-driver-operator/aws-ebs-csi-driver-operator /usr/bin/
-COPY manifests /manifests
+COPY bundle bundle/
 ENTRYPOINT ["/usr/bin/aws-ebs-csi-driver-operator"]
 LABEL com.redhat.delivery.appregistry=true
 LABEL io.k8s.display-name="OpenShift AWS EBS CSI Driver Operator" \
