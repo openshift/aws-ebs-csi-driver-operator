@@ -338,7 +338,7 @@ spec:
                 operator: Exists
               containers:
               - name: aws-ebs-csi-driver-operator
-                image: quay.io/gnufied/aws-ebs-csi-operator:0.30
+                image: quay.io/gnufied/aws-ebs-csi-operator:0.40
                 imagePullPolicy: Always
                 args:
                 - start

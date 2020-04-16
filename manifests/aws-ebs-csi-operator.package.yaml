@@ -1,4 +1,0 @@
-packageName: aws-ebs-csi-driver-operator
-channels:
-- name: "4.5"
-  currentCSV: aws-ebs-csi-driver-operator.v4.5.0
