@@ -47,7 +47,7 @@ make your images public.
 We can apply following YAML to install the operator:
 
 
-```
+```yaml
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -94,7 +94,7 @@ Where you can replace image-index with version you built.
 If you are in a hurry and want to just install the operator you can simply apply following YAML:
 
 
-```
+```yaml
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -136,18 +136,12 @@ spec:
 
 After operator is installed you can create cluster CR via:
 
-```
-{
-  "apiVersion": "ebs.aws.csi.openshift.io/v1alpha1",
-  "kind": "Driver",
-  "metadata": {
-    "name": "cluster",
-    "namespace": "openshift-aws-ebs-csi-driver-operator"
-  },
-  "spec": {
-    "managementState": "Managed",
-    "operatorLogLevel": "Trace",
-    "logLevel": "Trace"
-  }
-}
+```yaml
+apiVersion: ebs.aws.csi.openshift.io/v1alpha1
+kind: Driver
+metadata:
+  name: cluster
+  namespace: openshift-aws-ebs-csi-driver-operator
+spec:
+  managementState: Managed
 ```
