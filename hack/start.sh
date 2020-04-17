@@ -99,8 +99,8 @@ s,quay.io/openshift/origin-csi-external-resizer:latest,$(get_image csi-external-
 s,quay.io/openshift/origin-csi-external-snapshotter:latest,$(get_image csi-external-snapshotter),
 s,quay.io/openshift/origin-csi-node-driver-registrar:latest,$(get_image csi-node-driver-registrar),
 s,quay.io/openshift/origin-csi-livenessprobe:latest,$(get_image csi-livenessprobe),
-s,registry.svc.ci.openshift.org/ocp/4.5:aws-ebs-csi-driver,$(get_image aws-ebs-csi-driver),
-s,quay.io/gnufied/aws-ebs-csi-operator:0.30,$(get_image aws-ebs-csi-driver-operator),
+s,quay.io/openshift/origin-aws-ebs-csi-driver:latest,$(get_image aws-ebs-csi-driver),
+s,quay.io/openshift/origin-aws-ebs-csi-driver-operator:latest,$(get_image aws-ebs-csi-driver-operator),
 EOF
 else
     log::warn 'Missing $IMAGE_FORMAT, using images from CSV'

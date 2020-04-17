@@ -338,7 +338,7 @@ spec:
                 operator: Exists
               containers:
               - name: aws-ebs-csi-driver-operator
-                image: quay.io/gnufied/aws-ebs-csi-operator:0.40
+                image: quay.io/openshift/origin-aws-ebs-csi-driver-operator:latest
                 imagePullPolicy: Always
                 args:
                 - start
@@ -348,7 +348,7 @@ spec:
                 - name: OPERAND_IMAGE_VERSION
                   value: "0.0.1"
                 - name: DRIVER_IMAGE
-                  value: registry.svc.ci.openshift.org/ocp/4.5:aws-ebs-csi-driver
+                  value: quay.io/openshift/origin-aws-ebs-csi-driver:latest
                 - name: PROVISIONER_IMAGE
                   value: quay.io/openshift/origin-csi-external-provisioner:latest
                 - name: ATTACHER_IMAGE
