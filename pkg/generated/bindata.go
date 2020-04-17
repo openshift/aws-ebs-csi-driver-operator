@@ -88,8 +88,7 @@ spec:
       containers:
         # Warning: the operator expects the first container to be the CSI driver
         - name: csi-driver
-          # TODO: replace with quay.io image
-          image: registry.svc.ci.openshift.org/ocp/4.5:aws-ebs-csi-driver
+          image: quay.io/openshift/origin-aws-ebs-csi-driver:latest
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr
@@ -320,8 +319,7 @@ spec:
         - name: csi-driver
           securityContext:
             privileged: true
-          # TODO: replace with quay.io image
-          image: registry.svc.ci.openshift.org/ocp/4.5:aws-ebs-csi-driver
+          image: quay.io/openshift/origin-aws-ebs-csi-driver:latest
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr

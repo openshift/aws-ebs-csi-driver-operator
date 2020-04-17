@@ -838,8 +838,7 @@ func sanitizeCredentialsRequest(instance *unstructured.Unstructured) {
 
 func defaultImages() images {
 	return images{
-		// TODO: replace with quay.io when it's mirrored there
-		csiDriver:           "registry.svc.ci.openshift.org/ocp/4.5:aws-ebs-csi-driver",
+		csiDriver:           "quay.io/openshift/origin-aws-ebs-csi-driver:latest",
 		provisioner:         "quay.io/openshift/origin-csi-external-provisioner:latest",
 		attacher:            "quay.io/openshift/origin-csi-external-attacher:latest",
 		resizer:             "quay.io/openshift/origin-csi-external-resizer:latest",
