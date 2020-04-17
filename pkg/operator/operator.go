@@ -68,14 +68,16 @@ const (
 )
 
 type csiDriverOperator struct {
-	client          OperatorClient
-	kubeClient      kubernetes.Interface
-	dynamicClient   dynamic.Interface
-	pvInformer      coreinformersv1.PersistentVolumeInformer
-	secretInformer  coreinformersv1.SecretInformer
-	versionGetter   status.VersionGetter
-	eventRecorder   events.Recorder
-	informersSynced []cache.InformerSynced
+	client             OperatorClient
+	kubeClient         kubernetes.Interface
+	dynamicClient      dynamic.Interface
+	pvInformer         coreinformersv1.PersistentVolumeInformer
+	secretInformer     coreinformersv1.SecretInformer
+	deploymentInformer appsinformersv1.DeploymentInformer
+	dsSetInformer      appsinformersv1.DaemonSetInformer
+	versionGetter      status.VersionGetter
+	eventRecorder      events.Recorder
+	informersSynced    []cache.InformerSynced
 
 	syncHandler func() error
 
@@ -119,17 +121,19 @@ func NewCSIDriverOperator(
 	images images,
 ) *csiDriverOperator {
 	csiOperator := &csiDriverOperator{
-		client:          client,
-		kubeClient:      kubeClient,
-		dynamicClient:   dynamicClient,
-		pvInformer:      pvInformer,
-		secretInformer:  secretInformer,
-		versionGetter:   versionGetter,
-		eventRecorder:   eventRecorder,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
-		operatorVersion: operatorVersion,
-		operandVersion:  operandVersion,
-		images:          images,
+		client:             client,
+		kubeClient:         kubeClient,
+		dynamicClient:      dynamicClient,
+		pvInformer:         pvInformer,
+		secretInformer:     secretInformer,
+		deploymentInformer: deployInformer,
+		dsSetInformer:      dsInformer,
+		versionGetter:      versionGetter,
+		eventRecorder:      eventRecorder,
+		queue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
+		operatorVersion:    operatorVersion,
+		operandVersion:     operandVersion,
+		images:             images,
 	}
 
 	csiOperator.informersSynced = append(csiOperator.informersSynced, pvInformer.Informer().HasSynced)

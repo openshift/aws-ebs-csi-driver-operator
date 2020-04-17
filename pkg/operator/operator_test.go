@@ -72,10 +72,12 @@ func newOperator(test operatorTest) *testContext {
 	// Convert to []runtime.Object
 	var initialObjects []runtime.Object
 	if test.initialObjects.deployment != nil {
+		addDeploymentHash(test.initialObjects.deployment)
 		initialObjects = append(initialObjects, test.initialObjects.deployment)
 	}
 
 	if test.initialObjects.daemonSet != nil {
+		addDaemonSetHash(test.initialObjects.daemonSet)
 		initialObjects = append(initialObjects, test.initialObjects.daemonSet)
 	}
 
@@ -133,6 +135,7 @@ func newOperator(test operatorTest) *testContext {
 
 	dynamicClient := &fakeDynamicClient{}
 	if test.initialObjects.credentialsRequest != nil {
+		addCredentialsRequestHash(test.initialObjects.credentialsRequest)
 		dynamicClient.credentialRequest = test.initialObjects.credentialsRequest
 	}
 
@@ -716,6 +719,41 @@ func TestSync(t *testing.T) {
 				credentialsSecret:  getCredentialsSecret(),
 			},
 		},
+		{
+			// Deployment and DaemonSet update images
+			name:   "image change",
+			images: defaultImages(),
+			initialObjects: testObjects{
+				deployment: getDeployment(argsLevel2, oldImages(),
+					withDeploymentGeneration(1, 1),
+					withDeploymentStatus(replica1, replica1, replica1)),
+				daemonSet: getDaemonSet(argsLevel2, oldImages(),
+					withDaemonSetGeneration(1, 1),
+					withDaemonSetStatus(replica1, replica1, replica1)),
+				ebsCSIDriver: ebsCSIDriver(
+					withStatus(replica2), // 1 deployment + 1 daemonSet
+					withGenerations(1, 1, 1),
+					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
+					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
+			},
+			expectedObjects: testObjects{
+				deployment: getDeployment(argsLevel2, defaultImages(),
+					withDeploymentGeneration(2, 1),
+					withDeploymentStatus(replica1, replica1, replica1)),
+				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
+					withDaemonSetGeneration(2, 1),
+					withDaemonSetStatus(replica1, replica1, replica1)),
+				ebsCSIDriver: ebsCSIDriver(
+					withStatus(replica2), // 1 deployment + 1 daemonSet
+					withGenerations(2, 2, 1),
+					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing),
+					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+				credentialsSecret:  getCredentialsSecret(),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -799,6 +837,7 @@ func sanitizeDeployment(deployment *appsv1.Deployment) {
 	}
 	// Remove force annotations, they're random
 	delete(deployment.Annotations, "operator.openshift.io/force")
+	delete(deployment.Annotations, specHashAnnotation)
 	delete(deployment.Spec.Template.Annotations, "operator.openshift.io/force")
 }
 
@@ -812,6 +851,7 @@ func sanitizeDaemonSet(daemonSet *appsv1.DaemonSet) {
 	}
 	// Remove force annotations, they're random
 	delete(daemonSet.Annotations, "operator.openshift.io/force")
+	delete(daemonSet.Annotations, specHashAnnotation)
 	delete(daemonSet.Spec.Template.Annotations, "operator.openshift.io/force")
 }
 
@@ -834,6 +874,14 @@ func sanitizeCredentialsRequest(instance *unstructured.Unstructured) {
 		return
 	}
 	instance.SetResourceVersion("0")
+	annotations := instance.GetAnnotations()
+	if annotations != nil {
+		delete(annotations, specHashAnnotation)
+		if len(annotations) == 0 {
+			annotations = nil
+		}
+		instance.SetAnnotations(annotations)
+	}
 }
 
 func defaultImages() images {
@@ -845,5 +893,17 @@ func defaultImages() images {
 		snapshotter:         "quay.io/openshift/origin-csi-external-snapshotter:latest",
 		nodeDriverRegistrar: "quay.io/openshift/origin-csi-node-driver-registrar:latest",
 		livenessProbe:       "quay.io/openshift/origin-csi-livenessprobe:latest",
+	}
+}
+
+func oldImages() images {
+	return images{
+		csiDriver:           "quay.io/openshift/origin-aws-ebs-csi-driver:old",
+		provisioner:         "quay.io/openshift/origin-csi-external-provisioner:old",
+		attacher:            "quay.io/openshift/origin-csi-external-attacher:old",
+		resizer:             "quay.io/openshift/origin-csi-external-resizer:old",
+		snapshotter:         "quay.io/openshift/origin-csi-external-snapshotter:old",
+		nodeDriverRegistrar: "quay.io/openshift/origin-csi-node-driver-registrar:old",
+		livenessProbe:       "quay.io/openshift/origin-csi-livenessprobe:old",
 	}
 }

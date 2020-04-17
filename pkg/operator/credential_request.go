@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 
 	"github.com/openshift/client-go/config/clientset/versioned/scheme"
@@ -11,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -43,8 +45,11 @@ func applyCredentialsRequest(client dynamic.Interface, recorder events.Recorder,
 		return nil, false, fmt.Errorf("invalid object: name cannot be empty")
 	}
 
-	crClient := client.Resource(credentialsRequestResourceGVR).Namespace(required.GetNamespace())
+	if err := addCredentialsRequestHash(required); err != nil {
+		return nil, false, err
+	}
 
+	crClient := client.Resource(credentialsRequestResourceGVR).Namespace(required.GetNamespace())
 	existing, err := crClient.Get(context.TODO(), required.GetName(), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		actual, err := crClient.Create(context.TODO(), required, metav1.CreateOptions{})
@@ -59,10 +64,20 @@ func applyCredentialsRequest(client dynamic.Interface, recorder events.Recorder,
 		return nil, false, err
 	}
 
-	// Check only CredentialRequest.Generation.
-	// Currently, the object does not use annotations / labels, so we don't sync them.
-	if existing.GetGeneration() == expectedGeneration && !forceRollout {
-		return existing, false, err
+	// Check CredentialRequest.Generation.
+	needApply := forceRollout
+	if existing.GetGeneration() != expectedGeneration {
+		needApply = true
+	}
+
+	// Check specHashAnnotation
+	existingAnnotations := existing.GetAnnotations()
+	if existingAnnotations == nil || existingAnnotations[specHashAnnotation] != required.GetAnnotations()[specHashAnnotation] {
+		needApply = true
+	}
+
+	if !needApply {
+		return existing, false, nil
 	}
 
 	requiredCopy := required.DeepCopy()
@@ -72,4 +87,19 @@ func applyCredentialsRequest(client dynamic.Interface, recorder events.Recorder,
 		return nil, false, err
 	}
 	return actual, existing.GetResourceVersion() != actual.GetResourceVersion(), nil
+}
+
+func addCredentialsRequestHash(cr *unstructured.Unstructured) error {
+	jsonBytes, err := json.Marshal(cr.Object["spec"])
+	if err != nil {
+		return err
+	}
+	specHash := fmt.Sprintf("%x", sha256.Sum256(jsonBytes))
+	annotations := cr.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[specHashAnnotation] = specHash
+	cr.SetAnnotations(annotations)
+	return nil
 }
