@@ -195,7 +195,7 @@ func (c *csiDriverOperator) sync() error {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.Warningf("Operator instance not found: %v", err)
-			return c.deleteAll()
+			return nil
 		}
 		return err
 	}
