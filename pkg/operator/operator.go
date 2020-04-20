@@ -2,6 +2,7 @@ package operator
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +43,9 @@ const (
 	operatorFinalizer = "csi.storage.operator.openshift.io"
 	operatorNamespace = "openshift-aws-ebs-csi-driver-operator"
 
+	// For events as "source component name"
+	operatorName = "openshift-aws-ebs-csi-driver-operator"
+
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
 
@@ -76,7 +80,6 @@ type csiDriverOperator struct {
 	deploymentInformer appsinformersv1.DeploymentInformer
 	dsSetInformer      appsinformersv1.DaemonSetInformer
 	versionGetter      status.VersionGetter
-	eventRecorder      events.Recorder
 	informersSynced    []cache.InformerSynced
 
 	syncHandler func() error
@@ -115,7 +118,6 @@ func NewCSIDriverOperator(
 	kubeClient kubernetes.Interface,
 	dynamicClient dynamic.Interface,
 	versionGetter status.VersionGetter,
-	eventRecorder events.Recorder,
 	operatorVersion string,
 	operandVersion string,
 	images images,
@@ -129,7 +131,6 @@ func NewCSIDriverOperator(
 		deploymentInformer: deployInformer,
 		dsSetInformer:      dsInformer,
 		versionGetter:      versionGetter,
-		eventRecorder:      eventRecorder,
 		queue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
 		operatorVersion:    operatorVersion,
 		operandVersion:     operandVersion,
@@ -195,10 +196,12 @@ func (c *csiDriverOperator) sync() error {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.Warningf("Operator instance not found: %v", err)
-			return c.deleteAll()
+			return c.deleteAll(nil)
 		}
 		return err
 	}
+
+	eventRecorder := c.recorderForInstance(instance)
 
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// CR is NOT being deleted, so make sure it has the finalizer
@@ -222,7 +225,7 @@ func (c *csiDriverOperator) sync() error {
 			// CSI driver is not being used, we can go ahead and remove finalizer and delete the operand
 			removeFinalizer(instance, operatorFinalizer)
 			c.client.UpdateFinalizers(instance)
-			return c.deleteAll()
+			return c.deleteAll(eventRecorder)
 		}
 	}
 
@@ -239,9 +242,9 @@ func (c *csiDriverOperator) sync() error {
 		klog.Info("Finished syncing operator at ", time.Since(startTime))
 	}()
 
-	syncErr := c.handleSync(instanceCopy)
+	syncErr := c.handleSync(instanceCopy, eventRecorder)
 	if syncErr != nil {
-		c.eventRecorder.Eventf("SyncError", "Error syncing CSI driver: %s", syncErr)
+		eventRecorder.Eventf("SyncError", "Error syncing CSI driver: %s", syncErr)
 	}
 	c.updateSyncError(&instanceCopy.Status.OperatorStatus, syncErr)
 
@@ -302,18 +305,18 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 	}
 }
 
-func (c *csiDriverOperator) handleSync(instance *v1alpha1.Driver) error {
-	err := c.syncCSIDriver(instance)
+func (c *csiDriverOperator) handleSync(instance *v1alpha1.Driver, eventRecorder events.Recorder) error {
+	err := c.syncCSIDriver(instance, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to sync CSIDriver: %v", err)
 	}
 
-	err = c.syncNamespace(instance)
+	err = c.syncNamespace(instance, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to sync namespace: %v", err)
 	}
 
-	credentialsRequest, err := c.syncCredentialsRequest(instance)
+	credentialsRequest, err := c.syncCredentialsRequest(instance, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to sync CredentialsRequest: %v", err)
 	}
@@ -327,27 +330,27 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.Driver) error {
 		return fmt.Errorf("error waiting for cloud credentials:: %v", err)
 	}
 
-	err = c.syncServiceAccounts(instance)
+	err = c.syncServiceAccounts(instance, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to sync ServiceAccount: %v", err)
 	}
 
-	err = c.syncRBAC(instance)
+	err = c.syncRBAC(instance, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to sync RBAC: %v", err)
 	}
 
-	deployment, err := c.syncDeployment(instance)
+	deployment, err := c.syncDeployment(instance, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to sync Deployment: %v", err)
 	}
 
-	daemonSet, err := c.syncDaemonSet(instance)
+	daemonSet, err := c.syncDaemonSet(instance, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to sync DaemonSet: %v", err)
 	}
 
-	err = c.syncStorageClass(instance)
+	err = c.syncStorageClass(instance, eventRecorder)
 	if err != nil {
 		return fmt.Errorf("failed to sync StorageClass: %v", err)
 	}
@@ -481,4 +484,20 @@ func removeFinalizer(instance *v1alpha1.Driver, f string) {
 		result = append(result, item)
 	}
 	instance.ObjectMeta.Finalizers = result
+}
+
+func (c *csiDriverOperator) recorderForInstance(instance *v1alpha1.Driver) events.Recorder {
+	// Guess Kind run-time, just in case it's changed in types.go
+	t := reflect.TypeOf(instance)
+	kind := t.Elem().Name()
+
+	ref := corev1.ObjectReference{
+		Kind:            kind,
+		Namespace:       instance.Namespace,
+		Name:            instance.Name,
+		UID:             instance.UID,
+		APIVersion:      v1alpha1.SchemeGroupVersion.String(),
+		ResourceVersion: instance.ResourceVersion,
+	}
+	return events.NewKubeRecorder(c.kubeClient.CoreV1().Events(""), operatorName, &ref)
 }

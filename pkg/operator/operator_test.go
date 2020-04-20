@@ -20,7 +20,6 @@ import (
 	fakecore "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/status"
 
@@ -139,7 +138,6 @@ func newOperator(test operatorTest) *testContext {
 		dynamicClient.credentialRequest = test.initialObjects.credentialsRequest
 	}
 
-	recorder := events.NewInMemoryRecorder("operator")
 	op := NewCSIDriverOperator(client,
 		coreInformerFactory.Core().V1().PersistentVolumes(),
 		coreInformerFactory.Core().V1().Namespaces(),
@@ -154,7 +152,6 @@ func newOperator(test operatorTest) *testContext {
 		coreClient,
 		dynamicClient,
 		versionGetter,
-		recorder,
 		testVersion,
 		testVersion,
 		test.images,

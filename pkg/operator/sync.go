@@ -60,7 +60,7 @@ var (
 	credentialsRequest = "credentials.yaml"
 )
 
-func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.Driver) (*appsv1.Deployment, error) {
+func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.Driver, eventRecorder events.Recorder) (*appsv1.Deployment, error) {
 	deploy := c.getExpectedDeployment(instance)
 
 	// Record the hash of the spec in an annotation so ApplyDeployment
@@ -73,7 +73,7 @@ func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.Driver) (*appsv1.D
 
 	deploy, _, err := resourceapply.ApplyDeployment(
 		c.kubeClient.AppsV1(),
-		c.eventRecorder,
+		eventRecorder,
 		deploy,
 		resourcemerge.ExpectedDeploymentGeneration(deploy, instance.Status.Generations),
 		false)
@@ -84,7 +84,7 @@ func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.Driver) (*appsv1.D
 	return deploy, nil
 }
 
-func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.Driver) (*appsv1.DaemonSet, error) {
+func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.Driver, eventRecorder events.Recorder) (*appsv1.DaemonSet, error) {
 	daemonSet := c.getExpectedDaemonSet(instance)
 
 	// Record the hash of the spec in an annotation so ApplyDaemonSet
@@ -97,7 +97,7 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.Driver) (*appsv1.Da
 
 	daemonSet, _, err := resourceapply.ApplyDaemonSet(
 		c.kubeClient.AppsV1(),
-		c.eventRecorder,
+		eventRecorder,
 		daemonSet,
 		resourcemerge.ExpectedDaemonSetGeneration(daemonSet, instance.Status.Generations),
 		false)
@@ -108,12 +108,12 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.Driver) (*appsv1.Da
 	return daemonSet, nil
 }
 
-func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.Driver, eventRecorder events.Recorder) error {
 	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
 
 	_, _, err := resourceapply.ApplyCSIDriverV1Beta1(
 		c.kubeClient.StorageV1beta1(),
-		c.eventRecorder,
+		eventRecorder,
 		csiDriver)
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.Driver) error {
 	return nil
 }
 
-func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.Driver, eventRecorder events.Recorder) error {
 	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
 
 	if namespace.Name != operandNamespace {
@@ -131,7 +131,7 @@ func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.Driver) error {
 
 	_, _, err := resourceapply.ApplyNamespace(
 		c.kubeClient.CoreV1(),
-		c.eventRecorder,
+		eventRecorder,
 		namespace)
 	if err != nil {
 		return err
@@ -140,7 +140,7 @@ func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.Driver) error {
 	return nil
 }
 
-func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.Driver, eventRecorder events.Recorder) error {
 	for _, s := range serviceAccounts {
 		serviceAccount := resourceread.ReadServiceAccountV1OrDie(generated.MustAsset(s))
 
@@ -149,7 +149,7 @@ func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.Driver) error
 
 		_, _, err := resourceapply.ApplyServiceAccount(
 			c.kubeClient.CoreV1(),
-			c.eventRecorder,
+			eventRecorder,
 			serviceAccount)
 		if err != nil {
 			return err
@@ -159,10 +159,10 @@ func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.Driver) error
 	return nil
 }
 
-func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.Driver, eventRecorder events.Recorder) error {
 	for _, r := range clusterRoles {
 		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
-		_, _, err := resourceapply.ApplyClusterRole(c.kubeClient.RbacV1(), c.eventRecorder, role)
+		_, _, err := resourceapply.ApplyClusterRole(c.kubeClient.RbacV1(), eventRecorder, role)
 		if err != nil {
 			return err
 		}
@@ -170,7 +170,7 @@ func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.Driver) error {
 
 	for _, b := range clusterRoleBindings {
 		binding := resourceread.ReadClusterRoleBindingV1OrDie(generated.MustAsset(b))
-		_, _, err := resourceapply.ApplyClusterRoleBinding(c.kubeClient.RbacV1(), c.eventRecorder, binding)
+		_, _, err := resourceapply.ApplyClusterRoleBinding(c.kubeClient.RbacV1(), eventRecorder, binding)
 		if err != nil {
 			return err
 		}
@@ -179,7 +179,7 @@ func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.Driver) error {
 	return nil
 }
 
-func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.Driver) (*unstructured.Unstructured, error) {
+func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.Driver, eventRecorder events.Recorder) (*unstructured.Unstructured, error) {
 	cr := readCredentialRequestsOrDie(generated.MustAsset(credentialsRequest))
 
 	// Set spec.secretRef.namespace
@@ -204,7 +204,7 @@ func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.Driver) (*
 		expectedGeneration = generation.LastGeneration
 	}
 
-	cr, _, err = applyCredentialsRequest(c.dynamicClient, c.eventRecorder, cr, expectedGeneration, forceRollout)
+	cr, _, err = applyCredentialsRequest(c.dynamicClient, eventRecorder, cr, expectedGeneration, forceRollout)
 	return cr, err
 }
 
@@ -213,12 +213,12 @@ func (c *csiDriverOperator) tryCredentialsSecret(instance *v1alpha1.Driver) erro
 	return err
 }
 
-func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.Driver, eventRecorder events.Recorder) error {
 	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
 
 	_, _, err := resourceapply.ApplyStorageClass(
 		c.kubeClient.StorageV1(),
-		c.eventRecorder,
+		eventRecorder,
 		storageClass)
 	if err != nil {
 		return err
@@ -435,11 +435,11 @@ func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.Driver, 
 }
 
 // TODO: move this to resourceapply package and delete reportDeleteEvent()
-func (c *csiDriverOperator) deleteAll() error {
+func (c *csiDriverOperator) deleteAll(eventRecorder events.Recorder) error {
 	// Delete all namespaced resources at once by deleting the namespace
 	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
 	err := c.kubeClient.CoreV1().Namespaces().Delete(context.TODO(), namespace.Name, metav1.DeleteOptions{})
-	reportDeleteEvent(c.eventRecorder, namespace, err)
+	reportDeleteEvent(eventRecorder, namespace, err)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -447,14 +447,14 @@ func (c *csiDriverOperator) deleteAll() error {
 	// Then delete all non-namespaced ones
 	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
 	err = c.kubeClient.StorageV1().StorageClasses().Delete(context.TODO(), storageClass.Name, metav1.DeleteOptions{})
-	reportDeleteEvent(c.eventRecorder, storageClass, err)
+	reportDeleteEvent(eventRecorder, storageClass, err)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
 	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
 	err = c.kubeClient.StorageV1beta1().CSIDrivers().Delete(context.TODO(), csiDriver.Name, metav1.DeleteOptions{})
-	reportDeleteEvent(c.eventRecorder, csiDriver, err)
+	reportDeleteEvent(eventRecorder, csiDriver, err)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -462,7 +462,7 @@ func (c *csiDriverOperator) deleteAll() error {
 	for _, r := range clusterRoles {
 		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
 		err := c.kubeClient.RbacV1().ClusterRoles().Delete(context.TODO(), role.Name, metav1.DeleteOptions{})
-		reportDeleteEvent(c.eventRecorder, role, err)
+		reportDeleteEvent(eventRecorder, role, err)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -471,7 +471,7 @@ func (c *csiDriverOperator) deleteAll() error {
 	for _, b := range clusterRoleBindings {
 		binding := resourceread.ReadClusterRoleBindingV1OrDie(generated.MustAsset(b))
 		err := c.kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), binding.Name, metav1.DeleteOptions{})
-		reportDeleteEvent(c.eventRecorder, binding, err)
+		reportDeleteEvent(eventRecorder, binding, err)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -479,7 +479,7 @@ func (c *csiDriverOperator) deleteAll() error {
 
 	cr := readCredentialRequestsOrDie(generated.MustAsset(credentialsRequest))
 	err = c.dynamicClient.Resource(credentialsRequestResourceGVR).Namespace(cr.GetNamespace()).Delete(context.TODO(), cr.GetName(), metav1.DeleteOptions{})
-	reportDeleteEvent(c.eventRecorder, cr, err)
+	reportDeleteEvent(eventRecorder, cr, err)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -488,6 +488,9 @@ func (c *csiDriverOperator) deleteAll() error {
 }
 
 func reportDeleteEvent(recorder events.Recorder, obj runtime.Object, originalErr error, details ...string) {
+	if recorder == nil {
+		return
+	}
 	gvk := resourcehelper.GuessObjectGroupVersionKind(obj)
 	switch {
 	case originalErr != nil && !apierrors.IsNotFound(originalErr):

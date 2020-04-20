@@ -80,7 +80,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlCtx.ClientBuilder.KubeClientOrDie(operandName),
 		dynamicClient,
 		versionGetter,
-		controllerConfig.EventRecorder,
 		os.Getenv(operatorVersionEnvName),
 		os.Getenv(operandVersionEnvName),
 		imagesFromEnv(),
