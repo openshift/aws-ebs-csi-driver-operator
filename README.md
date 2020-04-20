@@ -6,6 +6,8 @@ This operator is currently under heavy development and is not ready for general 
 
 # How to use this operator with OLM by building locally
 
+The process documented below assums you have `opm` tool installed. You can install it by compiling a recent version of https://github.com/operator-framework/operator-registry and placing `opm` binary somewhere in `$PATH`.
+
 1. Build a operator image using following command:
 
 ```
@@ -87,54 +89,9 @@ spec:
   sourceNamespace: openshift-aws-ebs-csi-driver-operator
 ```
 
-Where you can replace image-index with version you built.
+Where you can replace image-index with version you built. This should get the operator installed in `openshift-aws-ebs-csi-driver-operator` namespace.
 
-# Quick start
-
-If you are in a hurry and want to just install the operator you can simply apply following YAML:
-
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-aws-ebs-csi-driver-operator
----
-apiVersion: operators.coreos.com/v1alpha2
-kind: OperatorGroup
-metadata:
-  name: aws-driver-operator-group
-  namespace: openshift-aws-ebs-csi-driver-operator
-  spec:
-    targetNamespaces:
-    - openshift-aws-ebs-csi-driver-operator
-
----
-
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: aws-driver-manifests
-  namespace: openshift-aws-ebs-csi-driver-operator
-spec:
-  sourceType: grpc
-  image: quay.io/gnufied/olm-index:1.0.0
-
----
-
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: aws-driver-subscription
-  namespace: openshift-aws-ebs-csi-driver-operator
-spec:
-  channel: preview
-  name: aws-ebs-csi-driver-operator
-  source: aws-driver-manifests
-  sourceNamespace: openshift-aws-ebs-csi-driver-operator
-```
-
-After operator is installed you can create cluster CR via:
+7. We still need to create an instance of `Driver` CR to instantiate driver install. This can be done by applying following YAML:
 
 ```yaml
 apiVersion: ebs.aws.csi.openshift.io/v1alpha1
