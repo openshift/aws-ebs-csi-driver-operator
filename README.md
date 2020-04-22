@@ -6,7 +6,7 @@ This operator is currently under heavy development and is not ready for general 
 
 # How to use this operator with OLM by building locally
 
-The process documented below assums you have `opm` tool installed. You can install it by compiling a recent version of https://github.com/operator-framework/operator-registry and placing `opm` binary somewhere in `$PATH`.
+The process documented below assumes you have `opm` tool installed. You can install it by compiling a recent version of https://github.com/operator-framework/operator-registry and placing `opm` binary somewhere in `$PATH`.
 
 1. Build a operator image using following command:
 
