@@ -3,6 +3,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
+    "operatorframework.io/suggested-namespace": openshift-aws-ebs-csi-driver-operator
     containerImage: quay.io/openshift/origin-aws-ebs-csi-driver-operator:latest
     categories: "Storage"
     capabilities: Basic Install
