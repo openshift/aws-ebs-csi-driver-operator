@@ -2,7 +2,6 @@ package operator
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"strings"
 
@@ -12,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/json"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -27,13 +25,14 @@ import (
 )
 
 const (
-	csiDriver          = "csidriver.yaml"
-	namespace          = "namespace.yaml"
-	serviceAccount     = "serviceaccount.yaml"
-	storageClass       = "storageclass.yaml"
-	daemonSet          = "node_daemonset.yaml"
-	deployment         = "controller_deployment.yaml"
-	credentialsSecret  = "aws-cloud-credentials"
+	csiDriver         = "csidriver.yaml"
+	namespace         = "namespace.yaml"
+	serviceAccount    = "serviceaccount.yaml"
+	storageClass      = "storageclass.yaml"
+	daemonSet         = "node_daemonset.yaml"
+	deployment        = "controller_deployment.yaml"
+	credentialsSecret = "aws-cloud-credentials"
+	// From github.com/openshift/library-go/pkg/operator/resource/resourceapply/apps.go
 	specHashAnnotation = "operator.openshift.io/spec-hash"
 )
 
@@ -63,20 +62,11 @@ var (
 func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.Driver) (*appsv1.Deployment, error) {
 	deploy := c.getExpectedDeployment(instance)
 
-	// Record the hash of the spec in an annotation so ApplyDeployment
-	// below detects its change. This is going to cover log level, image
-	// and/or bindata changes.
-	// TODO: use resourceapply.ApplyDeployment when it gets hashing of Spec.
-	if err := addDeploymentHash(deploy); err != nil {
-		return nil, err
-	}
-
 	deploy, _, err := resourceapply.ApplyDeployment(
 		c.kubeClient.AppsV1(),
 		c.eventRecorder,
 		deploy,
-		resourcemerge.ExpectedDeploymentGeneration(deploy, instance.Status.Generations),
-		false)
+		resourcemerge.ExpectedDeploymentGeneration(deploy, instance.Status.Generations))
 	if err != nil {
 		return nil, err
 	}
@@ -87,20 +77,11 @@ func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.Driver) (*appsv1.D
 func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.Driver) (*appsv1.DaemonSet, error) {
 	daemonSet := c.getExpectedDaemonSet(instance)
 
-	// Record the hash of the spec in an annotation so ApplyDaemonSet
-	// below detects its change. This is going to cover log level, image
-	// and/or bindata changes.
-	// TODO: use resourceapply.ApplyDaemonSet when it gets hashing of Spec.
-	if err := addDaemonSetHash(daemonSet); err != nil {
-		return nil, err
-	}
-
 	daemonSet, _, err := resourceapply.ApplyDaemonSet(
 		c.kubeClient.AppsV1(),
 		c.eventRecorder,
 		daemonSet,
-		resourcemerge.ExpectedDaemonSetGeneration(daemonSet, instance.Status.Generations),
-		false)
+		resourcemerge.ExpectedDaemonSetGeneration(daemonSet, instance.Status.Generations))
 	if err != nil {
 		return nil, err
 	}
@@ -497,30 +478,4 @@ func reportDeleteEvent(recorder events.Recorder, obj runtime.Object, originalErr
 	default:
 		recorder.Eventf(fmt.Sprintf("%sDeleted", gvk.Kind), "Deleted %s:\n%s", resourcehelper.FormatResourceForCLIWithNamespace(obj), strings.Join(details, "\n"))
 	}
-}
-
-func addDeploymentHash(deployment *appsv1.Deployment) error {
-	jsonBytes, err := json.Marshal(deployment.Spec)
-	if err != nil {
-		return err
-	}
-	specHash := fmt.Sprintf("%x", sha256.Sum256(jsonBytes))
-	if deployment.Annotations == nil {
-		deployment.Annotations = map[string]string{}
-	}
-	deployment.Annotations[specHashAnnotation] = specHash
-	return nil
-}
-
-func addDaemonSetHash(daemonSet *appsv1.DaemonSet) error {
-	jsonBytes, err := json.Marshal(daemonSet.Spec)
-	if err != nil {
-		return err
-	}
-	specHash := fmt.Sprintf("%x", sha256.Sum256(jsonBytes))
-	if daemonSet.Annotations == nil {
-		daemonSet.Annotations = map[string]string{}
-	}
-	daemonSet.Annotations[specHashAnnotation] = specHash
-	return nil
 }

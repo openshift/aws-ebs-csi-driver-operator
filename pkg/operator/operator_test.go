@@ -21,6 +21,7 @@ import (
 	core "k8s.io/client-go/testing"
 
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/status"
 
@@ -72,12 +73,12 @@ func newOperator(test operatorTest) *testContext {
 	// Convert to []runtime.Object
 	var initialObjects []runtime.Object
 	if test.initialObjects.deployment != nil {
-		addDeploymentHash(test.initialObjects.deployment)
+		resourceapply.SetSpecHashAnnotation(&test.initialObjects.deployment.ObjectMeta, test.initialObjects.deployment.Spec)
 		initialObjects = append(initialObjects, test.initialObjects.deployment)
 	}
 
 	if test.initialObjects.daemonSet != nil {
-		addDaemonSetHash(test.initialObjects.daemonSet)
+		resourceapply.SetSpecHashAnnotation(&test.initialObjects.daemonSet.ObjectMeta, test.initialObjects.daemonSet.Spec)
 		initialObjects = append(initialObjects, test.initialObjects.daemonSet)
 	}
 
@@ -305,12 +306,6 @@ func getDeployment(logLevel int, images images, modifiers ...deploymentModifier)
 		}
 	}
 
-	// Set by ApplyDeployment()
-	if dep.Annotations == nil {
-		dep.Annotations = map[string]string{}
-	}
-	dep.Annotations["operator.openshift.io/pull-spec"] = images.csiDriver
-
 	for _, modifier := range modifiers {
 		dep = modifier(dep)
 	}
@@ -361,12 +356,6 @@ func getDaemonSet(logLevel int, images images, modifiers ...daemonSetModifier) *
 			}
 		}
 	}
-
-	// Set by ApplyDaemonSet()
-	if ds.Annotations == nil {
-		ds.Annotations = map[string]string{}
-	}
-	ds.Annotations["operator.openshift.io/pull-spec"] = images.csiDriver
 
 	for _, modifier := range modifiers {
 		ds = modifier(ds)
@@ -835,10 +824,8 @@ func sanitizeDeployment(deployment *appsv1.Deployment) {
 	if len(deployment.Annotations) == 0 {
 		deployment.Annotations = nil
 	}
-	// Remove force annotations, they're random
-	delete(deployment.Annotations, "operator.openshift.io/force")
+	// Remove random annotations set by ApplyDeployment
 	delete(deployment.Annotations, specHashAnnotation)
-	delete(deployment.Spec.Template.Annotations, "operator.openshift.io/force")
 }
 
 func sanitizeDaemonSet(daemonSet *appsv1.DaemonSet) {
@@ -849,10 +836,8 @@ func sanitizeDaemonSet(daemonSet *appsv1.DaemonSet) {
 	if len(daemonSet.Annotations) == 0 {
 		daemonSet.Annotations = nil
 	}
-	// Remove force annotations, they're random
-	delete(daemonSet.Annotations, "operator.openshift.io/force")
+	// Remove random annotations set by ApplyDeployment
 	delete(daemonSet.Annotations, specHashAnnotation)
-	delete(daemonSet.Spec.Template.Annotations, "operator.openshift.io/force")
 }
 
 func sanitizeEBSCSIDriver(instance *v1alpha1.Driver) {
