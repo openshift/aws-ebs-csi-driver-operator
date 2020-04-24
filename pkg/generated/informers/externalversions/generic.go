@@ -36,9 +36,9 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=ebs.aws.csi.openshift.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("drivers"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Ebs().V1alpha1().Drivers().Informer()}, nil
+	// Group=csi.openshift.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("awsebsdrivers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Csi().V1alpha1().AWSEBSDrivers().Informer()}, nil
 
 	}
 

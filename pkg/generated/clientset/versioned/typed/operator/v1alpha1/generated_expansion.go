@@ -2,4 +2,4 @@
 
 package v1alpha1
 
-type DriverExpansion interface{}
+type AWSEBSDriverExpansion interface{}

@@ -1,6 +1,6 @@
 {
-  "apiVersion": "ebs.aws.csi.openshift.io/v1alpha1",
-  "kind": "Driver",
+  "apiVersion": "csi.openshift.io/v1alpha1",
+  "kind": "AWSEBSDriver",
   "metadata": {
     "name": "cluster"
   },

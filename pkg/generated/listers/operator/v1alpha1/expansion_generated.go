@@ -2,6 +2,6 @@
 
 package v1alpha1
 
-// DriverListerExpansion allows custom methods to be added to
-// DriverLister.
-type DriverListerExpansion interface{}
+// AWSEBSDriverListerExpansion allows custom methods to be added to
+// AWSEBSDriverLister.
+type AWSEBSDriverListerExpansion interface{}

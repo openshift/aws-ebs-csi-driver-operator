@@ -17,8 +17,8 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "ebs.aws.csi.openshift.io/v1alpha1",
-          "kind": "Driver",
+          "apiVersion": "csi.openshift.io/v1alpha1",
+          "kind": "AWSEBSDriver",
           "metadata": {
             "name": "cluster"
           },
@@ -308,7 +308,7 @@ spec:
           - update
           - delete
         - apiGroups:
-          - ebs.aws.csi.openshift.io
+          - csi.openshift.io
           resources:
           - "*"
           verbs:
@@ -371,10 +371,10 @@ spec:
 
   customresourcedefinitions:
     owned:
-    - kind: Driver
+    - kind: AWSEBSDriver
       displayName: EBS CSI Driver
-      group: ebs.aws.csi.openshift.io
-      name: drivers.ebs.aws.csi.openshift.io
+      group: csi.openshift.io
+      name: awsebsdrivers.csi.openshift.io
       description: Manage EBS CSI driver for OpenShift
       version: v1alpha1
       specDescriptors:

@@ -5,7 +5,7 @@ package versioned
 import (
 	"fmt"
 
-	ebsv1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/typed/operator/v1alpha1"
+	csiv1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/typed/operator/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -13,19 +13,19 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	EbsV1alpha1() ebsv1alpha1.EbsV1alpha1Interface
+	CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	ebsV1alpha1 *ebsv1alpha1.EbsV1alpha1Client
+	csiV1alpha1 *csiv1alpha1.CsiV1alpha1Client
 }
 
-// EbsV1alpha1 retrieves the EbsV1alpha1Client
-func (c *Clientset) EbsV1alpha1() ebsv1alpha1.EbsV1alpha1Interface {
-	return c.ebsV1alpha1
+// CsiV1alpha1 retrieves the CsiV1alpha1Client
+func (c *Clientset) CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface {
+	return c.csiV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -49,7 +49,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.ebsV1alpha1, err = ebsv1alpha1.NewForConfig(&configShallowCopy)
+	cs.csiV1alpha1, err = csiv1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.ebsV1alpha1 = ebsv1alpha1.NewForConfigOrDie(c)
+	cs.csiV1alpha1 = csiv1alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -74,7 +74,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.ebsV1alpha1 = ebsv1alpha1.New(c)
+	cs.csiV1alpha1 = csiv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

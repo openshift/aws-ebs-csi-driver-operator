@@ -302,7 +302,7 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 	}
 }
 
-func (c *csiDriverOperator) handleSync(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) handleSync(instance *v1alpha1.AWSEBSDriver) error {
 	err := c.syncCSIDriver(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync CSIDriver: %v", err)
@@ -375,7 +375,7 @@ func (c *csiDriverOperator) enqueue(obj interface{}) {
 	if cm, ok := obj.(*corev1.ConfigMap); ok && cm.GetAnnotations() != nil && cm.GetAnnotations()[resourcelock.LeaderElectionRecordAnnotationKey] != "" {
 		return
 	}
-	// Sync corresponding Driver instance. Since there is only one, sync that one.
+	// Sync corresponding AWSEBSDriver instance. Since there is only one, sync that one.
 	// It will check all other objects (Deployment, DaemonSet) and update/overwrite them as needed.
 	c.queue.Add(globalConfigName)
 }
@@ -462,7 +462,7 @@ func logInformerEvent(kind, obj interface{}, message string) {
 	}
 }
 
-func addFinalizer(instance *v1alpha1.Driver, f string) bool {
+func addFinalizer(instance *v1alpha1.AWSEBSDriver, f string) bool {
 	for _, item := range instance.ObjectMeta.Finalizers {
 		if item == f {
 			return false
@@ -472,7 +472,7 @@ func addFinalizer(instance *v1alpha1.Driver, f string) bool {
 	return true
 }
 
-func removeFinalizer(instance *v1alpha1.Driver, f string) {
+func removeFinalizer(instance *v1alpha1.AWSEBSDriver, f string) {
 	var result []string
 	for _, item := range instance.ObjectMeta.Finalizers {
 		if item == f {

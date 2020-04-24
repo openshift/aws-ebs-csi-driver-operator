@@ -8,8 +8,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// Drivers returns a DriverInformer.
-	Drivers() DriverInformer
+	// AWSEBSDrivers returns a AWSEBSDriverInformer.
+	AWSEBSDrivers() AWSEBSDriverInformer
 }
 
 type version struct {
@@ -23,7 +23,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// Drivers returns a DriverInformer.
-func (v *version) Drivers() DriverInformer {
-	return &driverInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+// AWSEBSDrivers returns a AWSEBSDriverInformer.
+func (v *version) AWSEBSDrivers() AWSEBSDriverInformer {
+	return &aWSEBSDriverInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

@@ -18,8 +18,8 @@ ${REPO_ROOT}/hack/start.sh
 # - they need the driver on all nodes.
 
 # Step1: The operator says it's available (at least some pods are running).
-echo "Waiting for drivers.ebs.aws.csi.openshift.io/cluster"
-oc wait drivers.ebs.aws.csi.openshift.io/cluster --for=condition=Available --timeout=5m
+echo "Waiting for awsebsdriver.csi.openshift.io/cluster"
+oc wait awsebsdriver.csi.openshift.io/cluster --for=condition=Available --timeout=5m
 
 # Step2: Wait for *all* pods to be running.
 echo "Waiting for all driver pods"

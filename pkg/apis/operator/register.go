@@ -2,5 +2,5 @@ package operator
 
 // GroupName is the group name used in this package
 const (
-	GroupName = "ebs.aws.csi.openshift.io"
+	GroupName = "csi.openshift.io"
 )
