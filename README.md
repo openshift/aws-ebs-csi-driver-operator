@@ -94,8 +94,8 @@ Where you can replace image-index with version you built. This should get the op
 7. We still need to create an instance of `Driver` CR to instantiate driver install. This can be done by applying following YAML:
 
 ```yaml
-apiVersion: ebs.aws.csi.openshift.io/v1alpha1
-kind: Driver
+apiVersion: csi.openshift.io/v1alpha1
+kind: AWSEBSDriver
 metadata:
   name: cluster
   namespace: openshift-aws-ebs-csi-driver-operator

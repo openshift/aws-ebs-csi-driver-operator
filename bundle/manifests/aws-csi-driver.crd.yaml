@@ -1,13 +1,13 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: drivers.ebs.aws.csi.openshift.io
+  name: awsebsdrivers.csi.openshift.io
 spec:
-  group: ebs.aws.csi.openshift.io
+  group: csi.openshift.io
   names:
-    kind: Driver
-    plural: drivers
-    singular: driver
+    kind: AWSEBSDriver
+    plural: awsebsdrivers
+    singular: awsebsdriver
   preserveUnknownFields: false
   scope: Cluster
   subresources:
@@ -20,7 +20,7 @@ spec:
   validation:
     openAPIV3Schema:
       description:
-        Driver provides information to configure an operator to
+        AWSEBSDriver provides information to configure an operator to
         manage the AWS EBS CSI driver.
       type: object
       properties:
@@ -46,7 +46,7 @@ spec:
                - cluster
         spec:
           description:
-            DriverSpec is the specification of the desired behavior of
+            AWSEBSDriverSpec is the specification of the desired behavior of
             the AWS EBS CSI driver operator.
           type: object
           properties:
@@ -89,7 +89,7 @@ spec:
               x-kubernetes-preserve-unknown-fields: true
         status:
           description:
-            DriverStatus defines the observed status of
+            AWSEBSDriverStatus defines the observed status of
             the AWS EBS CSI driver operator.
           type: object
           properties:

@@ -60,7 +60,7 @@ var (
 	credentialsRequest = "credentials.yaml"
 )
 
-func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.Driver) (*appsv1.Deployment, error) {
+func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.AWSEBSDriver) (*appsv1.Deployment, error) {
 	deploy := c.getExpectedDeployment(instance)
 
 	// Record the hash of the spec in an annotation so ApplyDeployment
@@ -84,7 +84,7 @@ func (c *csiDriverOperator) syncDeployment(instance *v1alpha1.Driver) (*appsv1.D
 	return deploy, nil
 }
 
-func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.Driver) (*appsv1.DaemonSet, error) {
+func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.AWSEBSDriver) (*appsv1.DaemonSet, error) {
 	daemonSet := c.getExpectedDaemonSet(instance)
 
 	// Record the hash of the spec in an annotation so ApplyDaemonSet
@@ -108,7 +108,7 @@ func (c *csiDriverOperator) syncDaemonSet(instance *v1alpha1.Driver) (*appsv1.Da
 	return daemonSet, nil
 }
 
-func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.AWSEBSDriver) error {
 	csiDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
 
 	_, _, err := resourceapply.ApplyCSIDriverV1Beta1(
@@ -122,7 +122,7 @@ func (c *csiDriverOperator) syncCSIDriver(instance *v1alpha1.Driver) error {
 	return nil
 }
 
-func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.AWSEBSDriver) error {
 	namespace := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
 
 	if namespace.Name != operandNamespace {
@@ -140,7 +140,7 @@ func (c *csiDriverOperator) syncNamespace(instance *v1alpha1.Driver) error {
 	return nil
 }
 
-func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.AWSEBSDriver) error {
 	for _, s := range serviceAccounts {
 		serviceAccount := resourceread.ReadServiceAccountV1OrDie(generated.MustAsset(s))
 
@@ -159,7 +159,7 @@ func (c *csiDriverOperator) syncServiceAccounts(instance *v1alpha1.Driver) error
 	return nil
 }
 
-func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.AWSEBSDriver) error {
 	for _, r := range clusterRoles {
 		role := resourceread.ReadClusterRoleV1OrDie(generated.MustAsset(r))
 		_, _, err := resourceapply.ApplyClusterRole(c.kubeClient.RbacV1(), c.eventRecorder, role)
@@ -179,7 +179,7 @@ func (c *csiDriverOperator) syncRBAC(instance *v1alpha1.Driver) error {
 	return nil
 }
 
-func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.Driver) (*unstructured.Unstructured, error) {
+func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.AWSEBSDriver) (*unstructured.Unstructured, error) {
 	cr := readCredentialRequestsOrDie(generated.MustAsset(credentialsRequest))
 
 	// Set spec.secretRef.namespace
@@ -208,12 +208,12 @@ func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.Driver) (*
 	return cr, err
 }
 
-func (c *csiDriverOperator) tryCredentialsSecret(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) tryCredentialsSecret(instance *v1alpha1.AWSEBSDriver) error {
 	_, err := c.secretInformer.Lister().Secrets(operandNamespace).Get(credentialsSecret)
 	return err
 }
 
-func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.Driver) error {
+func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.AWSEBSDriver) error {
 	storageClass := resourceread.ReadStorageClassV1OrDie(generated.MustAsset(storageClass))
 
 	_, _, err := resourceapply.ApplyStorageClass(
@@ -227,7 +227,7 @@ func (c *csiDriverOperator) syncStorageClass(instance *v1alpha1.Driver) error {
 	return nil
 }
 
-func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.Driver) *appsv1.Deployment {
+func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.AWSEBSDriver) *appsv1.Deployment {
 	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
 
 	if c.images.csiDriver != "" {
@@ -260,7 +260,7 @@ func (c *csiDriverOperator) getExpectedDeployment(instance *v1alpha1.Driver) *ap
 	return deployment
 }
 
-func (c *csiDriverOperator) getExpectedDaemonSet(instance *v1alpha1.Driver) *appsv1.DaemonSet {
+func (c *csiDriverOperator) getExpectedDaemonSet(instance *v1alpha1.AWSEBSDriver) *appsv1.DaemonSet {
 	daemonSet := resourceread.ReadDaemonSetV1OrDie(generated.MustAsset(daemonSet))
 
 	if c.images.csiDriver != "" {
@@ -300,7 +300,7 @@ func getLogLevel(logLevel operatorv1.LogLevel) int {
 	}
 }
 
-func (c *csiDriverOperator) syncStatus(instance *v1alpha1.Driver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet, credentialsRequest *unstructured.Unstructured) error {
+func (c *csiDriverOperator) syncStatus(instance *v1alpha1.AWSEBSDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet, credentialsRequest *unstructured.Unstructured) error {
 	c.syncConditions(instance, deployment, daemonSet)
 
 	resourcemerge.SetDeploymentGeneration(&instance.Status.Generations, deployment)
@@ -330,7 +330,7 @@ func (c *csiDriverOperator) syncStatus(instance *v1alpha1.Driver, deployment *ap
 	return nil
 }
 
-func (c *csiDriverOperator) syncConditions(instance *v1alpha1.Driver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
+func (c *csiDriverOperator) syncConditions(instance *v1alpha1.AWSEBSDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
 	// The operator does not have any prerequisites (at least now)
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{
@@ -347,7 +347,7 @@ func (c *csiDriverOperator) syncConditions(instance *v1alpha1.Driver, deployment
 	c.syncAvailableCondition(instance, deployment, daemonSet)
 }
 
-func (c *csiDriverOperator) syncAvailableCondition(instance *v1alpha1.Driver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
+func (c *csiDriverOperator) syncAvailableCondition(instance *v1alpha1.AWSEBSDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
 	// TODO: is it enough to check if these values are >0? Or should be more strict and check against the exact desired value?
 	isDeploymentAvailable := deployment != nil && deployment.Status.AvailableReplicas > 0
 	isDaemonSetAvailable := daemonSet != nil && daemonSet.Status.NumberAvailable > 0
@@ -368,7 +368,7 @@ func (c *csiDriverOperator) syncAvailableCondition(instance *v1alpha1.Driver, de
 	}
 }
 
-func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.Driver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
+func (c *csiDriverOperator) syncProgressingCondition(instance *v1alpha1.AWSEBSDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
 	// Progressing: true when Deployment or DaemonSet have some work to do
 	// (false: when all replicas are updated to the latest release and available)/
 	var progressing operatorv1.ConditionStatus
