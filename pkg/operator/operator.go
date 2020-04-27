@@ -39,7 +39,7 @@ const (
 	operandName      = "aws-ebs-csi-driver"
 	operandNamespace = "openshift-aws-ebs-csi-driver"
 
-	operatorFinalizer = "csi.storage.operator.openshift.io"
+	operatorFinalizer = "operator.csi.openshift.io"
 	operatorNamespace = "openshift-aws-ebs-csi-driver-operator"
 
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
