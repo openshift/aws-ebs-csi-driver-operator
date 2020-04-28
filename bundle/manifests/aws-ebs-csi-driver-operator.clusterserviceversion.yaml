@@ -23,7 +23,9 @@ metadata:
             "name": "cluster"
           },
           "spec": {
-            "managementState": "Managed"
+            "managementState": "Managed",
+            "logLevel": "Normal",
+            "operatorLogLevel": "Normal"
           }
         }
       ]
