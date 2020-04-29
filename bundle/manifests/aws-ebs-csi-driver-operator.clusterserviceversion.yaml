@@ -6,7 +6,7 @@ metadata:
     "operatorframework.io/suggested-namespace": openshift-aws-ebs-csi-driver-operator
     containerImage: quay.io/openshift/origin-aws-ebs-csi-driver-operator:latest
     categories: "Storage"
-    capabilities: Basic Install
+    capabilities: Full Lifecycle
     description: |-
       Operator to install and maintain the AWS EBS CSI Driver on a cluster.
     certified: "false"
@@ -23,7 +23,9 @@ metadata:
             "name": "cluster"
           },
           "spec": {
-            "managementState": "Managed"
+            "managementState": "Managed",
+            "logLevel": "Normal",
+            "operatorLogLevel": "Normal"
           }
         }
       ]
