@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"strings"
 
 	"github.com/openshift/client-go/config/clientset/versioned/scheme"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -102,4 +103,57 @@ func addCredentialsRequestHash(cr *unstructured.Unstructured) error {
 	annotations[specHashAnnotation] = specHash
 	cr.SetAnnotations(annotations)
 	return nil
+}
+
+// getCredentialsRequestFailure finds all true conditions in CredentialsRequest
+// and composes an error message from them.
+func getCredentialsRequestFailure(cr *unstructured.Unstructured) string {
+	// Parse Unstructured CredentialsRequest. Ignore all errors and not found conditions
+	// - in the worst case, there is no message why the CredentialsRequest is stuck.
+	var msgs []string
+	conditions, found, err := unstructured.NestedFieldNoCopy(cr.Object, "status", "conditions")
+	if err != nil {
+		return ""
+	}
+	if !found {
+		return ""
+	}
+	conditionArray, ok := conditions.([]interface{})
+	if !ok {
+		return ""
+	}
+	for _, c := range conditionArray {
+		condition, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		t, found, err := unstructured.NestedString(condition, "type")
+		if err != nil {
+			continue
+		}
+		if !found {
+			continue
+		}
+		status, found, err := unstructured.NestedString(condition, "status")
+		if err != nil {
+			continue
+		}
+		if !found {
+			continue
+		}
+		message, found, err := unstructured.NestedString(condition, "message")
+		if err != nil {
+			continue
+		}
+		if !found {
+			continue
+		}
+		if status == "True" {
+			msgs = append(msgs, fmt.Sprintf("%s: %s", t, message))
+		}
+	}
+	if len(msgs) == 0 {
+		return ""
+	}
+	return strings.Join(msgs, ", ")
 }
