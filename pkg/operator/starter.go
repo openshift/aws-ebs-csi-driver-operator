@@ -16,7 +16,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
-	"github.com/openshift/library-go/pkg/operator/status"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/common"
 	clientset "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned"
@@ -63,8 +62,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}
 
 	ctrlCtx := common.CreateControllerContext(cb, ctx.Done(), operandNamespace)
-	versionGetter := status.NewVersionGetter()
-
 	operator := NewCSIDriverOperator(
 		*operatorClient,
 		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().PersistentVolumes(),
@@ -79,10 +76,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().Secrets(),
 		ctrlCtx.ClientBuilder.KubeClientOrDie(operandName),
 		dynamicClient,
-		versionGetter,
 		controllerConfig.EventRecorder,
-		os.Getenv(operatorVersionEnvName),
-		os.Getenv(operandVersionEnvName),
 		imagesFromEnv(),
 	)
 

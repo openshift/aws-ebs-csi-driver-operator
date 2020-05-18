@@ -169,12 +169,6 @@ func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.AWSEBSDriv
 		return nil, err
 	}
 
-	forceRollout := false
-	if c.versionChanged("operator", c.operatorVersion) {
-		// Operator version changed. The new one _may_ have updated Deployment -> we should deploy it.
-		forceRollout = true
-	}
-
 	var expectedGeneration int64 = -1
 	generation := resourcemerge.GenerationFor(
 		instance.Status.Generations,
@@ -185,7 +179,7 @@ func (c *csiDriverOperator) syncCredentialsRequest(instance *v1alpha1.AWSEBSDriv
 		expectedGeneration = generation.LastGeneration
 	}
 
-	cr, _, err = applyCredentialsRequest(c.dynamicClient, c.eventRecorder, cr, expectedGeneration, forceRollout)
+	cr, _, err = applyCredentialsRequest(c.dynamicClient, c.eventRecorder, cr, expectedGeneration)
 	return cr, err
 }
 
@@ -304,9 +298,6 @@ func (c *csiDriverOperator) syncStatus(instance *v1alpha1.AWSEBSDriver, deployme
 			instance.Status.ReadyReplicas = deployment.Status.UpdatedReplicas + daemonSet.Status.UpdatedNumberScheduled
 		}
 	}
-
-	c.setVersion("operator", c.operatorVersion)
-	c.setVersion("aws-ebs-csi-driver", c.operandVersion)
 
 	return nil
 }
