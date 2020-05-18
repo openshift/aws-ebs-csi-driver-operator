@@ -58,7 +58,8 @@ const (
 	nodeDriverRegistrarContainerIndex = 1
 	livenessProbeContainerIndex       = 2 // Only in DaemonSet
 
-	globalConfigName = "cluster"
+	globalConfigName    = "cluster"
+	managedByAnnotation = "csi.openshift.io/managed"
 
 	maxRetries = 15
 )
@@ -71,6 +72,9 @@ type csiDriverOperator struct {
 	secretInformer     coreinformersv1.SecretInformer
 	deploymentInformer appsinformersv1.DeploymentInformer
 	dsSetInformer      appsinformersv1.DaemonSetInformer
+	csiDriverInformer  storageinformersv1beta1.CSIDriverInformer
+	csiNodeInformer    storageinformersv1beta1.CSINodeInformer
+	namespaceInformer  coreinformersv1.NamespaceInformer
 	eventRecorder      events.Recorder
 	informersSynced    []cache.InformerSynced
 
@@ -100,6 +104,7 @@ func NewCSIDriverOperator(
 	pvInformer coreinformersv1.PersistentVolumeInformer,
 	namespaceInformer coreinformersv1.NamespaceInformer,
 	csiDriverInformer storageinformersv1beta1.CSIDriverInformer,
+	csiNodeInformer storageinformersv1beta1.CSINodeInformer,
 	serviceAccountInformer coreinformersv1.ServiceAccountInformer,
 	clusterRoleInformer rbacinformersv1.ClusterRoleInformer,
 	clusterRoleBindingInformer rbacinformersv1.ClusterRoleBindingInformer,
@@ -120,6 +125,9 @@ func NewCSIDriverOperator(
 		secretInformer:     secretInformer,
 		deploymentInformer: deployInformer,
 		dsSetInformer:      dsInformer,
+		namespaceInformer:  namespaceInformer,
+		csiDriverInformer:  csiDriverInformer,
+		csiNodeInformer:    csiNodeInformer,
 		eventRecorder:      eventRecorder,
 		queue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
 		images:             images,
@@ -132,6 +140,9 @@ func NewCSIDriverOperator(
 
 	csiDriverInformer.Informer().AddEventHandler(csiOperator.eventHandler("csidriver"))
 	csiOperator.informersSynced = append(csiOperator.informersSynced, csiDriverInformer.Informer().HasSynced)
+
+	csiNodeInformer.Informer().AddEventHandler(csiOperator.eventHandler("csinode"))
+	csiOperator.informersSynced = append(csiOperator.informersSynced, csiNodeInformer.Informer().HasSynced)
 
 	serviceAccountInformer.Informer().AddEventHandler(csiOperator.eventHandler("serviceaccount"))
 	csiOperator.informersSynced = append(csiOperator.informersSynced, csiDriverInformer.Informer().HasSynced)
@@ -269,30 +280,31 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 				Reason:  "OperatorSync",
 				Message: err.Error(),
 			})
-		// Operator is Progressing: some action failed, will try to progress more after exp. backoff.
-		// Do not overwrite existing "Progressing=true" condition to keep its message.
-		cnd := v1helpers.FindOperatorCondition(status.Conditions, operatorv1.OperatorStatusTypeProgressing)
-		if cnd == nil || cnd.Status == operatorv1.ConditionFalse {
-			v1helpers.SetOperatorCondition(&status.Conditions,
-				operatorv1.OperatorCondition{
-					Type:    operatorv1.OperatorStatusTypeProgressing,
-					Status:  operatorv1.ConditionTrue,
-					Reason:  "OperatorSync",
-					Message: err.Error(),
-				})
-		}
-	} else {
-		v1helpers.SetOperatorCondition(&status.Conditions,
-			operatorv1.OperatorCondition{
-				Type:   operatorv1.OperatorStatusTypeDegraded,
-				Status: operatorv1.ConditionFalse,
-			})
-		// Progressing condition was set in c.handleSync().
+		return
 	}
+
+	// No error
+	v1helpers.SetOperatorCondition(&status.Conditions,
+		operatorv1.OperatorCondition{
+			Type:   operatorv1.OperatorStatusTypeDegraded,
+			Status: operatorv1.ConditionFalse,
+		})
+	// Progressing condition was set in c.handleSync().
 }
 
 func (c *csiDriverOperator) handleSync(instance *v1alpha1.AWSEBSDriver) error {
-	err := c.syncCSIDriver(instance)
+	err := c.checkPrereq(instance)
+	if err != nil {
+		c.setCondition(instance, operatorv1.OperatorStatusTypePrereqsSatisfied, false, "OtherDriverInstalled", err.Error())
+		c.setCondition(instance, operatorv1.OperatorStatusTypeProgressing, false, "OtherDriverInstalled", err.Error())
+		return err
+	}
+
+	c.setCondition(instance, operatorv1.OperatorStatusTypePrereqsSatisfied, true, "", "")
+	// Progressing: true until proven otherwise in syncStatus() below.
+	c.setCondition(instance, operatorv1.OperatorStatusTypeProgressing, true, "", "")
+
+	err = c.syncCSIDriver(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync CSIDriver: %v", err)
 	}
@@ -429,6 +441,75 @@ func (c *csiDriverOperator) isCSIDriverInUse() (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (c *csiDriverOperator) checkPrereq(instance *v1alpha1.AWSEBSDriver) error {
+	return c.checkPreviousInstall(instance)
+}
+
+func (c *csiDriverOperator) checkPreviousInstall(instance *v1alpha1.AWSEBSDriver) error {
+	// Check that there is no other CSI driver installation.
+	// Get the driver name
+	expectedDriver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
+	driverName := expectedDriver.Name
+	if err := c.checkPreviousCSIDriver(driverName); err != nil {
+		return err
+	}
+
+	// CSIDriver does not exist. Check if the operand namespace exists.
+	_, err := c.namespaceInformer.Lister().Get(operandNamespace)
+	if err == nil {
+		klog.V(4).Infof("Namespace %s exists", operandNamespace)
+
+		// OCP operand namespace exists. If there is a CSI driver installed, it must be the OCP one.
+		return nil
+	}
+	if !errors.IsNotFound(err) {
+		return fmt.Errorf("error getting Namespace %s: %s", operandNamespace, err)
+	}
+	klog.V(4).Infof("Namespace %s does not exist", operandNamespace)
+
+	// OCP operand namespace does not exist. Check if the driver is installed by inspecting all CSINodes
+	// (that's why we saved this loop to the last possible moment).
+	csiNodes, err := c.csiNodeInformer.Lister().List(labels.Everything())
+	if err != nil {
+		return fmt.Errorf("error listing CSINodes: %s", err)
+	}
+
+	for _, csiNode := range csiNodes {
+		for i := range csiNode.Spec.Drivers {
+			if csiNode.Spec.Drivers[i].Name == driverName {
+				klog.V(4).Infof("Node %s has CSI driver %s installed", csiNode.Name, driverName)
+				return fmt.Errorf("CSI driver %q is already installed, please uninstall it first before using this operator", driverName)
+			}
+		}
+	}
+	// No CSINode has the driver, the driver is not installed.
+	klog.V(4).Infof("No CSINode the CSI driver %s installed", driverName)
+	return nil
+}
+
+func (c *csiDriverOperator) checkPreviousCSIDriver(driverName string) error {
+	csiDriver, err := c.csiDriverInformer.Lister().Get(driverName)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// CSIDriver is missing, that's OK
+			klog.V(4).Infof("CSIDriver %s does not exist", driverName)
+			return nil
+		}
+		return fmt.Errorf("error getting CSIDriver: %s", err)
+	}
+
+	if csiDriver.Annotations != nil {
+		if _, found := csiDriver.Annotations[managedByAnnotation]; found {
+			// CSIDriver exists && has OCP annotation: continue managing the driver
+			klog.V(4).Infof("CSIDriver %s exist and has annotation %s", driverName, managedByAnnotation)
+			return nil
+		}
+	}
+	// CSIDriver exists && does not have OCP annotation: refuse to manage this driver.
+	klog.V(4).Infof("CSIDriver %s exist, but has no annotation %s", driverName, managedByAnnotation)
+	return fmt.Errorf("CSIDriver %q is already installed, please uninstall it first before using this operator", driverName)
 }
 
 func logInformerEvent(kind, obj interface{}, message string) {

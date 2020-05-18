@@ -302,13 +302,21 @@ func (c *csiDriverOperator) syncStatus(instance *v1alpha1.AWSEBSDriver, deployme
 	return nil
 }
 
-func (c *csiDriverOperator) syncConditions(instance *v1alpha1.AWSEBSDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
-	// The operator does not have any prerequisites (at least now)
+func (c *csiDriverOperator) setCondition(instance *v1alpha1.AWSEBSDriver, condition string, value bool, reason, msg string) {
+	v := operatorv1.ConditionFalse
+	if value {
+		v = operatorv1.ConditionTrue
+	}
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypePrereqsSatisfied,
-			Status: operatorv1.ConditionTrue,
+			Type:    condition,
+			Status:  v,
+			Reason:  reason,
+			Message: msg,
 		})
+}
+
+func (c *csiDriverOperator) syncConditions(instance *v1alpha1.AWSEBSDriver, deployment *appsv1.Deployment, daemonSet *appsv1.DaemonSet) {
 	// The operator is always upgradeable (at least now)
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{

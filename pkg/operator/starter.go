@@ -67,6 +67,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().PersistentVolumes(),
 		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().Namespaces(),
 		ctrlCtx.KubeNamespacedInformerFactory.Storage().V1beta1().CSIDrivers(),
+		ctrlCtx.KubeNamespacedInformerFactory.Storage().V1beta1().CSINodes(),
 		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().ServiceAccounts(),
 		ctrlCtx.KubeNamespacedInformerFactory.Rbac().V1().ClusterRoles(),
 		ctrlCtx.KubeNamespacedInformerFactory.Rbac().V1().ClusterRoleBindings(),
