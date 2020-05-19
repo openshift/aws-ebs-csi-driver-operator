@@ -346,19 +346,19 @@ spec:
                 args:
                 - start
                 env:
-                - name: DRIVER_IMAGE
+                - name: RELATED_IMAGE_DRIVER
                   value: quay.io/openshift/origin-aws-ebs-csi-driver:latest
-                - name: PROVISIONER_IMAGE
+                - name: RELATED_IMAGE_PROVISIONER
                   value: quay.io/openshift/origin-csi-external-provisioner:latest
-                - name: ATTACHER_IMAGE
+                - name: RELATED_IMAGE_ATTACHER
                   value: quay.io/openshift/origin-csi-external-attacher:latest
-                - name: RESIZER_IMAGE
+                - name: RELATED_IMAGE_RESIZER
                   value: quay.io/openshift/origin-csi-external-resizer:latest
-                - name: SNAPSHOTTER_IMAGE
+                - name: RELATED_IMAGE_SNAPSHOTTER
                   value: quay.io/openshift/origin-csi-external-snapshotter:latest
-                - name: NODE_DRIVER_REGISTRAR_IMAGE
+                - name: RELATED_IMAGE_NODE_DRIVER_REGISTRAR
                   value: quay.io/openshift/origin-csi-node-driver-registrar:latest
-                - name: LIVENESS_PROBE_IMAGE
+                - name: RELATED_IMAGE_LIVENESS_PROBE
                   value: quay.io/openshift/origin-csi-livenessprobe:latest
                 - name: POD_NAME
                   valueFrom:

@@ -41,13 +41,13 @@ const (
 	operatorFinalizer = "operator.csi.openshift.io"
 	operatorNamespace = "openshift-aws-ebs-csi-driver-operator"
 
-	driverImageEnvName              = "DRIVER_IMAGE"
-	provisionerImageEnvName         = "PROVISIONER_IMAGE"
-	attacherImageEnvName            = "ATTACHER_IMAGE"
-	resizerImageEnvName             = "RESIZER_IMAGE"
-	snapshotterImageEnvName         = "SNAPSHOTTER_IMAGE"
-	nodeDriverRegistrarImageEnvName = "NODE_DRIVER_REGISTRAR_IMAGE"
-	livenessProbeImageEnvName       = "LIVENESS_PROBE_IMAGE"
+	driverImageEnvName              = "RELATED_IMAGE_DRIVER"
+	provisionerImageEnvName         = "RELATED_IMAGE_PROVISIONER"
+	attacherImageEnvName            = "RELATED_IMAGE_ATTACHER"
+	resizerImageEnvName             = "RELATED_IMAGE_RESIZER"
+	snapshotterImageEnvName         = "RELATED_IMAGE_SNAPSHOTTER"
+	nodeDriverRegistrarImageEnvName = "RELATED_IMAGE_NODE_DRIVER_REGISTRAR"
+	livenessProbeImageEnvName       = "RELATED_IMAGE_LIVENESS_PROBE"
 
 	// Index of a container in assets/controller_deployment.yaml and assets/node_daemonset.yaml
 	csiDriverContainerIndex           = 0 // Both Deployment and DaemonSet
