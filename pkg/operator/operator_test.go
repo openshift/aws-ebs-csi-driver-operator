@@ -20,16 +20,14 @@ import (
 	fakecore "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
-	"github.com/openshift/library-go/pkg/operator/status"
-
 	opv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated"
 	fakeop "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/fake"
 	opinformers "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions"
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 )
 
 type operatorTest struct {
@@ -66,8 +64,6 @@ type testReactors struct {
 	daemonSets    addCoreReactors
 	ebsCSIDrivers addOperatorReactors
 }
-
-const testVersion = "0.0.1" // Version of the operator for testing purposes (instead of getenv)
 
 func newOperator(test operatorTest) *testContext {
 	// Convert to []runtime.Object
@@ -130,10 +126,6 @@ func newOperator(test operatorTest) *testContext {
 		Informers: operatorInformerFactory,
 	}
 
-	versionGetter := status.NewVersionGetter()
-	versionGetter.SetVersion("operator", testVersion)
-	versionGetter.SetVersion("aws-ebs-csi-driver", testVersion)
-
 	dynamicClient := &fakeDynamicClient{}
 	if test.initialObjects.credentialsRequest != nil {
 		addCredentialsRequestHash(test.initialObjects.credentialsRequest)
@@ -154,10 +146,7 @@ func newOperator(test operatorTest) *testContext {
 		coreInformerFactory.Core().V1().Secrets(),
 		coreClient,
 		dynamicClient,
-		versionGetter,
 		recorder,
-		testVersion,
-		testVersion,
 		test.images,
 	)
 

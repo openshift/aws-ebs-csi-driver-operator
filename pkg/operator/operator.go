@@ -26,7 +26,6 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
-	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	v1alpha1 "github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
@@ -41,9 +40,6 @@ const (
 
 	operatorFinalizer = "operator.csi.openshift.io"
 	operatorNamespace = "openshift-aws-ebs-csi-driver-operator"
-
-	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
-	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
 
 	driverImageEnvName              = "DRIVER_IMAGE"
 	provisionerImageEnvName         = "PROVISIONER_IMAGE"
@@ -75,7 +71,6 @@ type csiDriverOperator struct {
 	secretInformer     coreinformersv1.SecretInformer
 	deploymentInformer appsinformersv1.DeploymentInformer
 	dsSetInformer      appsinformersv1.DaemonSetInformer
-	versionGetter      status.VersionGetter
 	eventRecorder      events.Recorder
 	informersSynced    []cache.InformerSynced
 
@@ -114,10 +109,7 @@ func NewCSIDriverOperator(
 	secretInformer coreinformersv1.SecretInformer,
 	kubeClient kubernetes.Interface,
 	dynamicClient dynamic.Interface,
-	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
-	operatorVersion string,
-	operandVersion string,
 	images images,
 ) *csiDriverOperator {
 	csiOperator := &csiDriverOperator{
@@ -128,11 +120,8 @@ func NewCSIDriverOperator(
 		secretInformer:     secretInformer,
 		deploymentInformer: deployInformer,
 		dsSetInformer:      dsInformer,
-		versionGetter:      versionGetter,
 		eventRecorder:      eventRecorder,
 		queue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "aws-ebs-csi-driver"),
-		operatorVersion:    operatorVersion,
-		operandVersion:     operandVersion,
 		images:             images,
 	}
 
@@ -357,16 +346,6 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.AWSEBSDriver) error {
 	}
 
 	return nil
-}
-
-func (c *csiDriverOperator) setVersion(operandName, version string) {
-	if c.versionGetter.GetVersions()[operandName] != version {
-		c.versionGetter.SetVersion(operandName, version)
-	}
-}
-
-func (c *csiDriverOperator) versionChanged(operandName, version string) bool {
-	return c.versionGetter.GetVersions()[operandName] != version
 }
 
 func (c *csiDriverOperator) enqueue(obj interface{}) {

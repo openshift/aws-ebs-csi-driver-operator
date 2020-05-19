@@ -40,7 +40,7 @@ func readCredentialRequestsOrDie(objBytes []byte) *unstructured.Unstructured {
 	return udi.(*unstructured.Unstructured)
 }
 
-func applyCredentialsRequest(client dynamic.Interface, recorder events.Recorder, required *unstructured.Unstructured, expectedGeneration int64, forceRollout bool) (*unstructured.Unstructured, bool, error) {
+func applyCredentialsRequest(client dynamic.Interface, recorder events.Recorder, required *unstructured.Unstructured, expectedGeneration int64) (*unstructured.Unstructured, bool, error) {
 	if required.GetName() == "" {
 		return nil, false, fmt.Errorf("invalid object: name cannot be empty")
 	}
@@ -65,7 +65,7 @@ func applyCredentialsRequest(client dynamic.Interface, recorder events.Recorder,
 	}
 
 	// Check CredentialRequest.Generation.
-	needApply := forceRollout
+	needApply := false
 	if existing.GetGeneration() != expectedGeneration {
 		needApply = true
 	}

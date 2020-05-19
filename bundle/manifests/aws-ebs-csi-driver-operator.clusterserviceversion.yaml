@@ -346,10 +346,6 @@ spec:
                 args:
                 - start
                 env:
-                - name: OPERATOR_IMAGE_VERSION
-                  value: "0.0.1"
-                - name: OPERAND_IMAGE_VERSION
-                  value: "0.0.1"
                 - name: DRIVER_IMAGE
                   value: quay.io/openshift/origin-aws-ebs-csi-driver:latest
                 - name: PROVISIONER_IMAGE
