@@ -253,6 +253,9 @@ var _csidriverYaml = []byte(`apiVersion: storage.k8s.io/v1beta1
 kind: CSIDriver
 metadata:
   name: ebs.csi.aws.com
+  annotations:
+      # This CSIDriver is managed by an OCP CSI operator
+      csi.openshift.io/managed: "true"
 spec:
   attachRequired: true
   podInfoOnMount: false

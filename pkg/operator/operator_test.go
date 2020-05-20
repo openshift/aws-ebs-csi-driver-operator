@@ -12,6 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -45,6 +46,9 @@ type testObjects struct {
 	credentialsRequest *unstructured.Unstructured
 	ebsCSIDriver       *v1alpha1.AWSEBSDriver
 	credentialsSecret  *v1.Secret
+	csiDriver          *storagev1beta1.CSIDriver
+	csiNode            *storagev1beta1.CSINode
+	namespace          *v1.Namespace
 }
 
 type testContext struct {
@@ -82,6 +86,18 @@ func newOperator(test operatorTest) *testContext {
 		initialObjects = append(initialObjects, test.initialObjects.credentialsSecret)
 	}
 
+	if test.initialObjects.csiDriver != nil {
+		initialObjects = append(initialObjects, test.initialObjects.csiDriver)
+	}
+
+	if test.initialObjects.csiNode != nil {
+		initialObjects = append(initialObjects, test.initialObjects.csiNode)
+	}
+
+	if test.initialObjects.namespace != nil {
+		initialObjects = append(initialObjects, test.initialObjects.namespace)
+	}
+
 	coreClient := fakecore.NewSimpleClientset(initialObjects...)
 	coreInformerFactory := coreinformers.NewSharedInformerFactory(coreClient, 0 /*no resync */)
 
@@ -95,11 +111,20 @@ func newOperator(test operatorTest) *testContext {
 	if test.initialObjects.credentialsSecret != nil {
 		coreInformerFactory.Core().V1().Secrets().Informer().GetIndexer().Add(test.initialObjects.credentialsSecret)
 	}
+	if test.initialObjects.csiDriver != nil {
+		coreInformerFactory.Storage().V1beta1().CSIDrivers().Informer().GetIndexer().Add(test.initialObjects.csiDriver)
+	}
+	if test.initialObjects.csiNode != nil {
+		coreInformerFactory.Storage().V1beta1().CSINodes().Informer().GetIndexer().Add(test.initialObjects.csiNode)
+	}
 	if test.reactors.deployments != nil {
 		test.reactors.deployments(coreClient, coreInformerFactory)
 	}
 	if test.reactors.daemonSets != nil {
 		test.reactors.daemonSets(coreClient, coreInformerFactory)
+	}
+	if test.initialObjects.namespace != nil {
+		coreInformerFactory.Core().V1().Namespaces().Informer().GetIndexer().Add(test.initialObjects.namespace)
 	}
 
 	// Convert to []runtime.Object
@@ -137,6 +162,7 @@ func newOperator(test operatorTest) *testContext {
 		coreInformerFactory.Core().V1().PersistentVolumes(),
 		coreInformerFactory.Core().V1().Namespaces(),
 		coreInformerFactory.Storage().V1beta1().CSIDrivers(),
+		coreInformerFactory.Storage().V1beta1().CSINodes(),
 		coreInformerFactory.Core().V1().ServiceAccounts(),
 		coreInformerFactory.Rbac().V1().ClusterRoles(),
 		coreInformerFactory.Rbac().V1().ClusterRoleBindings(),
@@ -412,6 +438,47 @@ func getCredentialsSecret() *v1.Secret {
 	}
 }
 
+// CSIDriver
+type csiDriverModifier func(driver *storagev1beta1.CSIDriver) *storagev1beta1.CSIDriver
+
+func getCSIDriver(modifiers ...csiDriverModifier) *storagev1beta1.CSIDriver {
+	driver := resourceread.ReadCSIDriverV1Beta1OrDie(generated.MustAsset(csiDriver))
+	for _, modifier := range modifiers {
+		driver = modifier(driver)
+	}
+	return driver
+}
+
+// CSINode
+
+func getCSINode() *storagev1beta1.CSINode {
+	return &storagev1beta1.CSINode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node",
+		},
+		Spec: storagev1beta1.CSINodeSpec{
+			Drivers: []storagev1beta1.CSINodeDriver{
+				{
+					Name:   "ebs.csi.aws.com",
+					NodeID: "node",
+				},
+			},
+		},
+	}
+}
+
+// Namespace
+
+func getNamespace() *v1.Namespace {
+	ns := resourceread.ReadNamespaceV1OrDie(generated.MustAsset(namespace))
+	return ns
+}
+
+func csiDriverWithoutAnnotation(driver *storagev1beta1.CSIDriver) *storagev1beta1.CSIDriver {
+	driver.Annotations = nil
+	return driver
+}
+
 // This reactor is always enabled and bumps Deployment and DaemonSet generation when they get updated.
 func addGenerationReactor(client *fakecore.Clientset) {
 	client.PrependReactor("*", "deployments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -463,6 +530,7 @@ func TestSync(t *testing.T) {
 				ebsCSIDriver: ebsCSIDriver(),
 			},
 			expectedObjects: testObjects{
+				csiDriver:          getCSIDriver(),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
 			},
 			expectErr: true,
@@ -477,6 +545,7 @@ func TestSync(t *testing.T) {
 				credentialsSecret: getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 0)),
 				daemonSet: getDaemonSet(argsLevel2, defaultImages(),
@@ -495,6 +564,7 @@ func TestSync(t *testing.T) {
 			name:   "deployment fully deployed",
 			images: defaultImages(),
 			initialObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
@@ -506,6 +576,7 @@ func TestSync(t *testing.T) {
 				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
@@ -526,6 +597,7 @@ func TestSync(t *testing.T) {
 			name:   "deployment modified by user",
 			images: defaultImages(),
 			initialObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentReplicas(2),      // User changed replicas
 					withDeploymentGeneration(2, 1), // ... which changed Generation
@@ -538,6 +610,7 @@ func TestSync(t *testing.T) {
 				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentReplicas(1),      // The operator fixed replica count
 					withDeploymentGeneration(3, 1), // ... which bumps generation again
@@ -559,6 +632,7 @@ func TestSync(t *testing.T) {
 			name:   "CredentialRequests modified by user",
 			images: defaultImages(),
 			initialObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentReplicas(1),
 					withDeploymentGeneration(1, 1),
@@ -571,6 +645,7 @@ func TestSync(t *testing.T) {
 				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentReplicas(1),
 					withDeploymentGeneration(1, 1),
@@ -592,6 +667,7 @@ func TestSync(t *testing.T) {
 			name:   "deployment degraded",
 			images: defaultImages(),
 			initialObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // the Deployment has no pods
@@ -608,6 +684,7 @@ func TestSync(t *testing.T) {
 				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // no change to the Deployment
@@ -629,6 +706,7 @@ func TestSync(t *testing.T) {
 			name:   "update",
 			images: defaultImages(),
 			initialObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1 /*ready*/, 1 /*available*/, 0 /*updated*/)), // the Deployment is updating 1 pod
@@ -645,6 +723,7 @@ func TestSync(t *testing.T) {
 				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1, 1, 0)), // no change to the Deployment
@@ -666,6 +745,7 @@ func TestSync(t *testing.T) {
 			name:   "log level change",
 			images: defaultImages(),
 			initialObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
@@ -680,6 +760,7 @@ func TestSync(t *testing.T) {
 				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel6, defaultImages(), // The operator changed cmdline arguments with a new log level
 					withDeploymentGeneration(2, 1), // ... which caused the Generation to increase
 					withDeploymentStatus(replica1, replica1, replica1)),
@@ -702,6 +783,7 @@ func TestSync(t *testing.T) {
 			name:   "image change",
 			images: defaultImages(),
 			initialObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, oldImages(),
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
@@ -717,6 +799,7 @@ func TestSync(t *testing.T) {
 				credentialsSecret:  getCredentialsSecret(),
 			},
 			expectedObjects: testObjects{
+				csiDriver: getCSIDriver(),
 				deployment: getDeployment(argsLevel2, defaultImages(),
 					withDeploymentGeneration(2, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
@@ -731,6 +814,64 @@ func TestSync(t *testing.T) {
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
 				credentialsSecret:  getCredentialsSecret(),
 			},
+		},
+		{
+			// CSIDriver already exists and its annotation says is not managed by OCP
+			// -> refuse to install the driver
+			name:   "CSIDriver already installed",
+			images: defaultImages(),
+			initialObjects: testObjects{
+				namespace:    getNamespace(),
+				csiDriver:    getCSIDriver(csiDriverWithoutAnnotation),
+				ebsCSIDriver: ebsCSIDriver(),
+			},
+			expectedObjects: testObjects{
+				namespace: getNamespace(),
+				csiDriver: getCSIDriver(csiDriverWithoutAnnotation),
+				ebsCSIDriver: ebsCSIDriver(
+					withStatus(0),
+					withTrueConditions(opv1.OperatorStatusTypeDegraded),
+					withFalseConditions(opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing)),
+			},
+			expectErr: true,
+		},
+		{
+			// CSIDriver does not exists and CSINode with the driver already exists and operand's Namespace does not exist
+			// -> refuse to install the driver (Namespace would be present if it was OCP driver)
+			name:   "CSINode with the driver already exists",
+			images: defaultImages(),
+			initialObjects: testObjects{
+				csiNode:      getCSINode(),
+				ebsCSIDriver: ebsCSIDriver(),
+			},
+			expectedObjects: testObjects{
+				ebsCSIDriver: ebsCSIDriver(
+					withStatus(0),
+					withTrueConditions(opv1.OperatorStatusTypeDegraded),
+					withFalseConditions(opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing)),
+			},
+			expectErr: true,
+		},
+		{
+			// CSINode with the driver already exists, CSIDriver does not exist and Namespace exists
+			// -> continue installation of the driver
+			name:   "CSINode & Namespace with the driver already exists",
+			images: defaultImages(),
+			initialObjects: testObjects{
+				csiNode:      getCSINode(),
+				namespace:    getNamespace(),
+				ebsCSIDriver: ebsCSIDriver(),
+			},
+			expectedObjects: testObjects{
+				namespace: getNamespace(),
+				csiDriver: getCSIDriver(),
+				ebsCSIDriver: ebsCSIDriver(
+					withStatus(0),
+					withTrueConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing),
+					withFalseConditions()),
+				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
+			},
+			expectErr: true,
 		},
 	}
 
@@ -799,6 +940,17 @@ func TestSync(t *testing.T) {
 				sanitizeCredentialsRequest(test.expectedObjects.credentialsRequest)
 				if !equality.Semantic.DeepEqual(test.expectedObjects.credentialsRequest, actualRequest) {
 					t.Errorf("Unexpected CredentialsRequest %+v content:\n%s", operandName, cmp.Diff(test.expectedObjects.credentialsRequest, actualRequest))
+				}
+
+			}
+			// Check expectedObjects.csiDriver
+			if test.expectedObjects.csiDriver != nil {
+				actualDriver, err := ctx.coreClient.StorageV1beta1().CSIDrivers().Get(context.TODO(), test.expectedObjects.csiDriver.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Errorf("Failed to get CSIDriver %s: %v", test.expectedObjects.csiDriver.Name, err)
+				}
+				if !equality.Semantic.DeepEqual(test.expectedObjects.csiDriver, actualDriver) {
+					t.Errorf("Unexpected CSIDriver %+v content:\n%s", operandName, cmp.Diff(test.expectedObjects.csiDriver, actualDriver))
 				}
 			}
 		})
