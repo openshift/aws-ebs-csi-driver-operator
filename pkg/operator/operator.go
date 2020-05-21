@@ -322,7 +322,11 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.AWSEBSDriver) error {
 	err = c.tryCredentialsSecret(instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Have a nice event instead of "secret XYZ not found"
+			// Get the error message from credentialsRequest first
+			if msg := getCredentialsRequestFailure(credentialsRequest); msg != "" {
+				return fmt.Errorf("failed to obtain cloud credentials: %s", msg)
+			}
+			// Fall back to a generic message. Use something better than "secret XYZ not found".
 			return fmt.Errorf("waiting for cloud credentials secret provided by cloud-credential-operator")
 		}
 		return fmt.Errorf("error waiting for cloud credentials:: %v", err)
