@@ -23,7 +23,10 @@ import (
 	"k8s.io/klog"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
+	configinformersv1 "github.com/openshift/client-go/config/informers/externalversions/config/v1"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -58,6 +61,11 @@ const (
 	nodeDriverRegistrarContainerIndex = 1
 	livenessProbeContainerIndex       = 2 // Only in DaemonSet
 
+	// Reasons for condition types
+	reasonUnsupportedPlatform  = "UnsupportedPlatform"
+	reasonOtherDriverInstalled = "OtherDriverInstalled"
+
+	infraConfigName     = "cluster"
 	globalConfigName    = "cluster"
 	managedByAnnotation = "csi.openshift.io/managed"
 
@@ -68,6 +76,7 @@ type csiDriverOperator struct {
 	client             OperatorClient
 	kubeClient         kubernetes.Interface
 	dynamicClient      dynamic.Interface
+	infraInformer      configinformersv1.InfrastructureInformer
 	pvInformer         coreinformersv1.PersistentVolumeInformer
 	secretInformer     coreinformersv1.SecretInformer
 	deploymentInformer appsinformersv1.DeploymentInformer
@@ -101,6 +110,9 @@ type images struct {
 
 func NewCSIDriverOperator(
 	client OperatorClient,
+	kubeClient kubernetes.Interface,
+	dynamicClient dynamic.Interface,
+	infraInformer configinformersv1.InfrastructureInformer,
 	pvInformer coreinformersv1.PersistentVolumeInformer,
 	namespaceInformer coreinformersv1.NamespaceInformer,
 	csiDriverInformer storageinformersv1beta1.CSIDriverInformer,
@@ -112,8 +124,6 @@ func NewCSIDriverOperator(
 	dsInformer appsinformersv1.DaemonSetInformer,
 	storageClassInformer storageinformersv1.StorageClassInformer,
 	secretInformer coreinformersv1.SecretInformer,
-	kubeClient kubernetes.Interface,
-	dynamicClient dynamic.Interface,
 	eventRecorder events.Recorder,
 	images images,
 ) *csiDriverOperator {
@@ -121,6 +131,7 @@ func NewCSIDriverOperator(
 		client:             client,
 		kubeClient:         kubeClient,
 		dynamicClient:      dynamicClient,
+		infraInformer:      infraInformer,
 		pvInformer:         pvInformer,
 		secretInformer:     secretInformer,
 		deploymentInformer: deployInformer,
@@ -133,6 +144,7 @@ func NewCSIDriverOperator(
 		images:             images,
 	}
 
+	csiOperator.informersSynced = append(csiOperator.informersSynced, infraInformer.Informer().HasSynced)
 	csiOperator.informersSynced = append(csiOperator.informersSynced, pvInformer.Informer().HasSynced)
 
 	namespaceInformer.Informer().AddEventHandler(csiOperator.eventHandler("namespace"))
@@ -295,8 +307,6 @@ func (c *csiDriverOperator) updateSyncError(status *operatorv1.OperatorStatus, e
 func (c *csiDriverOperator) handleSync(instance *v1alpha1.AWSEBSDriver) error {
 	err := c.checkPrereq(instance)
 	if err != nil {
-		c.setCondition(instance, operatorv1.OperatorStatusTypePrereqsSatisfied, false, "OtherDriverInstalled", err.Error())
-		c.setCondition(instance, operatorv1.OperatorStatusTypeProgressing, false, "OtherDriverInstalled", err.Error())
 		return err
 	}
 
@@ -448,7 +458,34 @@ func (c *csiDriverOperator) isCSIDriverInUse() (bool, error) {
 }
 
 func (c *csiDriverOperator) checkPrereq(instance *v1alpha1.AWSEBSDriver) error {
-	return c.checkPreviousInstall(instance)
+	if err := c.checkInfra(); err != nil {
+		msg := "AWS EBS CSI driver requires an AWS cluster."
+		c.setCondition(instance, operatorv1.OperatorStatusTypeProgressing, false, reasonUnsupportedPlatform, msg)
+		c.setCondition(instance, operatorv1.OperatorStatusTypePrereqsSatisfied, false, reasonUnsupportedPlatform, msg)
+		return err
+	}
+
+	if err := c.checkPreviousInstall(instance); err != nil {
+		msg := "AWS EBS CSI driver is already installed on the cluster."
+		c.setCondition(instance, operatorv1.OperatorStatusTypePrereqsSatisfied, false, reasonOtherDriverInstalled, msg)
+		c.setCondition(instance, operatorv1.OperatorStatusTypeProgressing, false, reasonOtherDriverInstalled, msg)
+		return err
+	}
+
+	return nil
+}
+
+func (c *csiDriverOperator) checkInfra() error {
+	infra, err := c.infraInformer.Lister().Get(infraConfigName)
+	if err != nil {
+		return err
+	}
+
+	if infra.Status.Platform != configv1.AWSPlatformType {
+		return fmt.Errorf("platform %q is not supported by the AWS EBS CSI driver", infra.Status.Platform)
+	}
+
+	return nil
 }
 
 func (c *csiDriverOperator) checkPreviousInstall(instance *v1alpha1.AWSEBSDriver) error {

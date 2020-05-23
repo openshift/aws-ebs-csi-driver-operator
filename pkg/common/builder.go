@@ -8,6 +8,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
+
+	apiclientset "github.com/openshift/client-go/config/clientset/versioned"
 )
 
 // Builder can create a variety of kubernetes client interface
@@ -24,6 +26,10 @@ func (cb *Builder) APIExtClientOrDie(name string) apiext.Interface {
 // KubeClientOrDie returns the kubernetes client interface for general kubernetes objects.
 func (cb *Builder) KubeClientOrDie(name string) kubernetes.Interface {
 	return kubernetes.NewForConfigOrDie(rest.AddUserAgent(cb.config, name))
+}
+
+func (cb *Builder) APIClientOrDie(name string) apiclientset.Interface {
+	return apiclientset.NewForConfigOrDie(rest.AddUserAgent(cb.config, name))
 }
 
 // NewBuilder returns a *ClientBuilder with the given kubeconfig.
