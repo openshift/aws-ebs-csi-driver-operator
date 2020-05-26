@@ -21,14 +21,19 @@ import (
 	fakecore "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 
+	configv1 "github.com/openshift/api/config/v1"
 	opv1 "github.com/openshift/api/operator/v1"
+	fakeapi "github.com/openshift/client-go/config/clientset/versioned/fake"
+	apiinformers "github.com/openshift/client-go/config/informers/externalversions"
+
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
+
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis/operator/v1alpha1"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated"
 	fakeop "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned/fake"
 	opinformers "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 )
 
 type operatorTest struct {
@@ -44,6 +49,7 @@ type testObjects struct {
 	deployment         *appsv1.Deployment
 	daemonSet          *appsv1.DaemonSet
 	credentialsRequest *unstructured.Unstructured
+	infrastructure     *configv1.Infrastructure
 	ebsCSIDriver       *v1alpha1.AWSEBSDriver
 	credentialsSecret  *v1.Secret
 	csiDriver          *storagev1beta1.CSIDriver
@@ -157,8 +163,25 @@ func newOperator(test operatorTest) *testContext {
 		dynamicClient.credentialRequest = test.initialObjects.credentialsRequest
 	}
 
+	// Add infra object
+	initialInfras := []runtime.Object{getInfrastructure()}
+
+	if test.initialObjects.infrastructure != nil {
+		initialInfras = []runtime.Object{test.initialObjects.infrastructure}
+	}
+
+	apiClient := fakeapi.NewSimpleClientset(initialInfras...)
+	apiInformerFactory := apiinformers.NewSharedInformerFactory(apiClient, 0)
+
+	// Fill in the informer
+	apiInformerFactory.Config().V1().Infrastructures().Informer().GetIndexer().Add(initialInfras[0])
+
 	recorder := events.NewInMemoryRecorder("operator")
-	op := NewCSIDriverOperator(client,
+	op := NewCSIDriverOperator(
+		client,
+		coreClient,
+		dynamicClient,
+		apiInformerFactory.Config().V1().Infrastructures(),
 		coreInformerFactory.Core().V1().PersistentVolumes(),
 		coreInformerFactory.Core().V1().Namespaces(),
 		coreInformerFactory.Storage().V1beta1().CSIDrivers(),
@@ -170,8 +193,6 @@ func newOperator(test operatorTest) *testContext {
 		coreInformerFactory.Apps().V1().DaemonSets(),
 		coreInformerFactory.Storage().V1().StorageClasses(),
 		coreInformerFactory.Core().V1().Secrets(),
-		coreClient,
-		dynamicClient,
 		recorder,
 		test.images,
 	)
@@ -436,6 +457,30 @@ func getCredentialsSecret() *v1.Secret {
 		},
 		Type: "opaque",
 	}
+}
+
+// Infrastructure
+type infraModifier func(infra *configv1.Infrastructure) *configv1.Infrastructure
+
+func getInfrastructure(modifiers ...infraModifier) *configv1.Infrastructure {
+	infra := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      infraConfigName,
+			Namespace: v1.NamespaceAll,
+		},
+		Status: configv1.InfrastructureStatus{
+			Platform: configv1.AWSPlatformType,
+		},
+	}
+	for _, modifier := range modifiers {
+		infra = modifier(infra)
+	}
+	return infra
+}
+
+func withGCP(infra *configv1.Infrastructure) *configv1.Infrastructure {
+	infra.Status.Platform = configv1.GCPPlatformType
+	return infra
 }
 
 // CSIDriver
@@ -871,6 +916,23 @@ func TestSync(t *testing.T) {
 					withFalseConditions()),
 				credentialsRequest: getCredentialsRequest(withCredentialsRequestGeneration(1)),
 			},
+			expectErr: true,
+		},
+		{
+			// Operator was installed in a platform other than AWS
+			name:   "Operator in wrong platform",
+			images: defaultImages(),
+			initialObjects: testObjects{
+				ebsCSIDriver:   ebsCSIDriver(),
+				infrastructure: getInfrastructure(withGCP),
+			},
+			expectedObjects: testObjects{
+				ebsCSIDriver: ebsCSIDriver(
+					withStatus(replica0),
+					withTrueConditions(opv1.OperatorStatusTypeDegraded),
+					withFalseConditions(opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing)),
+			},
+
 			expectErr: true,
 		},
 	}

@@ -6,6 +6,8 @@ import (
 
 	apiextinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/client-go/informers"
+
+	apiinformers "github.com/openshift/client-go/config/informers/externalversions"
 )
 
 const (
@@ -24,6 +26,7 @@ type ControllerContext struct {
 	ClientBuilder                 *Builder
 	APIExtInformerFactory         apiextinformers.SharedInformerFactory
 	KubeNamespacedInformerFactory informers.SharedInformerFactory
+	APIInformerFactory            apiinformers.SharedInformerFactory
 
 	Stop <-chan struct{}
 
@@ -41,10 +44,14 @@ func CreateControllerContext(cb *Builder, stop <-chan struct{}, operandNamespace
 	kubeClient := cb.KubeClientOrDie("kube-shared-informer")
 	kubeNamespacedSharedInformer := informers.NewFilteredSharedInformerFactory(kubeClient, resyncPeriod()(), operandNamespace, nil)
 
+	apiClient := cb.APIClientOrDie("api-shared-informer")
+	apiInformerFactory := apiinformers.NewSharedInformerFactory(apiClient, resyncPeriod()())
+
 	return &ControllerContext{
 		ClientBuilder:                 cb,
 		APIExtInformerFactory:         apiExtSharedInformer,
 		KubeNamespacedInformerFactory: kubeNamespacedSharedInformer,
+		APIInformerFactory:            apiInformerFactory,
 		Stop:                          stop,
 		InformersStarted:              make(chan struct{}),
 		ResyncPeriod:                  resyncPeriod(),

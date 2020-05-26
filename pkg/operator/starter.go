@@ -13,6 +13,7 @@ import (
 
 	apiclientset "github.com/openshift/client-go/config/clientset/versioned"
 	apiinformers "github.com/openshift/client-go/config/informers/externalversions"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
@@ -64,6 +65,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	ctrlCtx := common.CreateControllerContext(cb, ctx.Done(), operandNamespace)
 	operator := NewCSIDriverOperator(
 		*operatorClient,
+		ctrlCtx.ClientBuilder.KubeClientOrDie(operandName),
+		dynamicClient,
+		ctrlCtx.APIInformerFactory.Config().V1().Infrastructures(),
 		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().PersistentVolumes(),
 		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().Namespaces(),
 		ctrlCtx.KubeNamespacedInformerFactory.Storage().V1beta1().CSIDrivers(),
@@ -75,8 +79,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().DaemonSets(),
 		ctrlCtx.KubeNamespacedInformerFactory.Storage().V1().StorageClasses(),
 		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().Secrets(),
-		ctrlCtx.ClientBuilder.KubeClientOrDie(operandName),
-		dynamicClient,
 		controllerConfig.EventRecorder,
 		imagesFromEnv(),
 	)
@@ -92,6 +94,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	for _, informer := range []interface {
 		Start(stopCh <-chan struct{})
 	}{
+		ctrlCtx.APIInformerFactory,
 		ctrlInformers,
 		apiInformers,
 		ctrlCtx.KubeNamespacedInformerFactory,
