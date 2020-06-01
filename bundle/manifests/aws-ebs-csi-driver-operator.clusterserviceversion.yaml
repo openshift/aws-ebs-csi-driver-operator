@@ -38,7 +38,7 @@ spec:
   minKubeVersion: 1.17.0
   description: |-
      Operator to install and maintain the AWS EBS CSI Driver on a cluster.
-  displayName: AWS EBS CSI Operator
+  displayName: AWS EBS CSI Driver Operator
   keywords: ['aws', 'CSI']
   maintainers:
   - name: Red Hat
