@@ -64,6 +64,7 @@ const (
 	// Reasons for condition types
 	reasonUnsupportedPlatform  = "UnsupportedPlatform"
 	reasonOtherDriverInstalled = "OtherDriverInstalled"
+	reasonRemovingOperand      = "RemovingOperand"
 
 	infraConfigName     = "cluster"
 	globalConfigName    = "cluster"
@@ -212,32 +213,6 @@ func (c *csiDriverOperator) sync() error {
 		return err
 	}
 
-	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
-		// CR is NOT being deleted, so make sure it has the finalizer
-		if addFinalizer(instance, operatorFinalizer) {
-			c.client.UpdateFinalizers(instance)
-		}
-	} else {
-		// User tried to delete the CR, let's evaluate if we can
-		// delete the operand and remove the finalizer from the CR
-		ok, err := c.isCSIDriverInUse()
-		if err != nil {
-			return err
-		}
-
-		if ok {
-			// CSI driver is being used but CR has been marked for deletion,
-			// so we can't delete or sync the operand nor remove the finalizer
-			klog.Warningf("CR is being deleted but there are resources using the CSI driver")
-			return nil
-		} else {
-			// CSI driver is not being used, we can go ahead and remove finalizer and delete the operand
-			removeFinalizer(instance, operatorFinalizer)
-			c.client.UpdateFinalizers(instance)
-			return c.deleteAll()
-		}
-	}
-
 	// We only support Managed for now
 	if instance.Spec.ManagementState != operatorv1.Managed {
 		return nil
@@ -309,10 +284,25 @@ func (c *csiDriverOperator) handleSync(instance *v1alpha1.AWSEBSDriver) error {
 	if err != nil {
 		return err
 	}
-
 	c.setCondition(instance, operatorv1.OperatorStatusTypePrereqsSatisfied, true, "", "")
-	// Progressing: true until proven otherwise in syncStatus() below.
+
+	// Progressing: true until proven otherwise
 	c.setCondition(instance, operatorv1.OperatorStatusTypeProgressing, true, "", "")
+
+	// Update CR finalizer
+	err = c.updateFinalizer(instance)
+	if err != nil {
+		return err
+	}
+
+	if !instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Deletion timestamp is set, so user tried to delete the CR
+		if !hasFinalizer(instance, operatorFinalizer) {
+			return c.deleteAll()
+		}
+		// We can't delete the operand nor sync it
+		return nil
+	}
 
 	err = c.syncCSIDriver(instance)
 	if err != nil {
@@ -438,6 +428,41 @@ func (c *csiDriverOperator) handleErr(err error, key interface{}) {
 	c.queue.AddAfter(key, 1*time.Minute)
 }
 
+func (c *csiDriverOperator) updateFinalizer(instance *v1alpha1.AWSEBSDriver) error {
+	var updated bool
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// CR is NOT being deleted, so make sure it has the finalizer
+		if addFinalizer(instance, operatorFinalizer) {
+			updated = true
+		}
+	} else {
+		// Deletion timestamp is set, so user tried to delete the CR
+		// Let's evaluate if we can delete the operand and remove the finalizer
+		ok, err := c.isCSIDriverInUse()
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			removeFinalizer(instance, operatorFinalizer)
+			updated = true
+		} else {
+			klog.Warningf("CR is being deleted but there are resources using the CSI driver")
+			msg := fmt.Sprintf("Waiting for all PV(s) using the CSI driver to be removed")
+			c.setCondition(instance, operatorv1.OperatorStatusTypeProgressing, true, reasonRemovingOperand, msg)
+		}
+	}
+
+	if updated {
+		_, _, err := c.client.UpdateFinalizers(instance)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (c *csiDriverOperator) isCSIDriverInUse() (bool, error) {
 	pvcs, err := c.pvInformer.Lister().List(labels.Everything())
 	if err != nil {
@@ -561,6 +586,15 @@ func logInformerEvent(kind, obj interface{}, message string) {
 		}
 		klog.V(6).Infof("Received event: %s %s %s", kind, objMeta.GetName(), message)
 	}
+}
+
+func hasFinalizer(instance *v1alpha1.AWSEBSDriver, f string) bool {
+	for _, item := range instance.ObjectMeta.Finalizers {
+		if item == f {
+			return true
+		}
+	}
+	return false
 }
 
 func addFinalizer(instance *v1alpha1.AWSEBSDriver, f string) bool {
