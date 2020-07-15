@@ -31,6 +31,14 @@ func (c OperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv
 	return &instance.Spec.OperatorSpec, &instance.Status.OperatorStatus, instance.ResourceVersion, nil
 }
 
+func (c OperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
+	instance, err := c.Informers.Csi().V1alpha1().AWSEBSDrivers().Lister().Get(globalConfigName)
+	if err != nil {
+		return nil, err
+	}
+	return &instance.ObjectMeta, nil
+}
+
 func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
 	original, err := c.Informers.Csi().V1alpha1().AWSEBSDrivers().Lister().Get(globalConfigName)
 	if err != nil {
