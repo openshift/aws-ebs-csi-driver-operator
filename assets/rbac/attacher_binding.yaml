@@ -5,7 +5,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: aws-ebs-csi-driver-controller-sa
-    namespace: openshift-aws-ebs-csi-driver
+    namespace: openshift-cluster-csi-drivers
 roleRef:
   kind: ClusterRole
   name: ebs-external-attacher-role

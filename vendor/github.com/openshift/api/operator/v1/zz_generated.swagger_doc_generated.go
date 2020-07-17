@@ -161,6 +161,16 @@ func (Console) SwaggerDoc() map[string]string {
 	return map_Console
 }
 
+var map_ConsoleConfigRoute = map[string]string{
+	"":         "ConsoleConfigRoute holds information on external route access to console.",
+	"hostname": "hostname is the desired custom domain under which console will be available.",
+	"secret":   "secret points to secret in the openshift-config namespace that contains custom certificate and key and needs to be created manually by the cluster admin. Referenced Secret is required to contain following key value pairs: - \"tls.crt\" - to specifies custom certificate - \"tls.key\" - to specifies private key of the custom certificate If the custom hostname uses the default routing suffix of the cluster, the Secret specification for a serving certificate will not be needed.",
+}
+
+func (ConsoleConfigRoute) SwaggerDoc() map[string]string {
+	return map_ConsoleConfigRoute
+}
+
 var map_ConsoleCustomization = map[string]string{
 	"":                     "ConsoleCustomization defines a list of optional configuration for the console UI.",
 	"brand":                "brand is the default branding of the web console which can be overridden by providing the brand field.  There is a limited set of specific brand options. This field controls elements of the console such as the logo. Invalid value will prevent a console rollout.",
@@ -186,6 +196,7 @@ var map_ConsoleSpec = map[string]string{
 	"":              "ConsoleSpec is the specification of the desired behavior of the Console.",
 	"customization": "customization is used to optionally provide a small set of customization options to the web console.",
 	"providers":     "providers contains configuration for using specific service providers.",
+	"route":         "route contains hostname and secret reference that contains the serving certificate. If a custom route is specified, a new route will be created with the provided hostname, under which console will be available. In case of custom hostname uses the default routing suffix of the cluster, the Secret specification for a serving certificate will not be needed. In case of custom hostname points to an arbitrary domain, manual DNS configurations steps are necessary. The default console route will be maintained to reserve the default hostname for console if the custom route is removed. If not specified, default route will be used.",
 }
 
 func (ConsoleSpec) SwaggerDoc() map[string]string {
@@ -207,6 +218,49 @@ var map_StatuspageProvider = map[string]string{
 
 func (StatuspageProvider) SwaggerDoc() map[string]string {
 	return map_StatuspageProvider
+}
+
+var map_CSIDriverConfig = map[string]string{
+	"":           "CSIDriverConfig is the CSI driver specific configuration",
+	"driverName": "DriverName holds the name of the CSI driver",
+}
+
+func (CSIDriverConfig) SwaggerDoc() map[string]string {
+	return map_CSIDriverConfig
+}
+
+var map_ClusterCSIDriver = map[string]string{
+	"":       "ClusterCSIDriver object allows management and configuration of a CSI driver operator installed by default in OpenShift.",
+	"spec":   "spec holds user settable values for configuration",
+	"status": "status holds observed values from the cluster. They may not be overridden.",
+}
+
+func (ClusterCSIDriver) SwaggerDoc() map[string]string {
+	return map_ClusterCSIDriver
+}
+
+var map_ClusterCSIDriverList = map[string]string{
+	"": "ClusterCSIDriverList contains a list of ClusterCSIDriver",
+}
+
+func (ClusterCSIDriverList) SwaggerDoc() map[string]string {
+	return map_ClusterCSIDriverList
+}
+
+var map_ClusterCSIDriverSpec = map[string]string{
+	"": "ClusterCSIDriverSpec is the desired behavior of CSI driver operator",
+}
+
+func (ClusterCSIDriverSpec) SwaggerDoc() map[string]string {
+	return map_ClusterCSIDriverSpec
+}
+
+var map_ClusterCSIDriverStatus = map[string]string{
+	"": "ClusterCSIDriverStatus is the observed status of CSI driver operator",
+}
+
+func (ClusterCSIDriverStatus) SwaggerDoc() map[string]string {
+	return map_ClusterCSIDriverStatus
 }
 
 var map_CSISnapshotController = map[string]string{
@@ -318,6 +372,51 @@ func (EtcdList) SwaggerDoc() map[string]string {
 	return map_EtcdList
 }
 
+var map_AWSClassicLoadBalancerParameters = map[string]string{
+	"": "AWSClassicLoadBalancerParameters holds configuration parameters for an AWS Classic load balancer.",
+}
+
+func (AWSClassicLoadBalancerParameters) SwaggerDoc() map[string]string {
+	return map_AWSClassicLoadBalancerParameters
+}
+
+var map_AWSLoadBalancerParameters = map[string]string{
+	"":                    "AWSLoadBalancerParameters provides configuration settings that are specific to AWS load balancers.",
+	"type":                "type is the type of AWS load balancer to instantiate for an ingresscontroller.\n\nValid values are:\n\n* \"Classic\": A Classic Load Balancer that makes routing decisions at either\n  the transport layer (TCP/SSL) or the application layer (HTTP/HTTPS). See\n  the following for additional details:\n\n    https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#clb\n\n* \"NLB\": A Network Load Balancer that makes routing decisions at the\n  transport layer (TCP/SSL). See the following for additional details:\n\n    https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#nlb",
+	"classicLoadBalancer": "classicLoadBalancerParameters holds configuration parameters for an AWS classic load balancer. Present only if type is Classic.",
+	"networkLoadBalancer": "networkLoadBalancerParameters holds configuration parameters for an AWS network load balancer. Present only if type is NLB.",
+}
+
+func (AWSLoadBalancerParameters) SwaggerDoc() map[string]string {
+	return map_AWSLoadBalancerParameters
+}
+
+var map_AWSNetworkLoadBalancerParameters = map[string]string{
+	"": "AWSNetworkLoadBalancerParameters holds configuration parameters for an AWS Network load balancer.",
+}
+
+func (AWSNetworkLoadBalancerParameters) SwaggerDoc() map[string]string {
+	return map_AWSNetworkLoadBalancerParameters
+}
+
+var map_AccessLogging = map[string]string{
+	"":              "AccessLogging describes how client requests should be logged.",
+	"destination":   "destination is where access logs go.",
+	"httpLogFormat": "httpLogFormat specifies the format of the log message for an HTTP request.\n\nIf this field is empty, log messages use the implementation's default HTTP log format.  For HAProxy's default HTTP log format, see the HAProxy documentation: http://cbonte.github.io/haproxy-dconv/2.0/configuration.html#8.2.3",
+}
+
+func (AccessLogging) SwaggerDoc() map[string]string {
+	return map_AccessLogging
+}
+
+var map_ContainerLoggingDestinationParameters = map[string]string{
+	"": "ContainerLoggingDestinationParameters describes parameters for the Container logging destination type.",
+}
+
+func (ContainerLoggingDestinationParameters) SwaggerDoc() map[string]string {
+	return map_ContainerLoggingDestinationParameters
+}
+
 var map_EndpointPublishingStrategy = map[string]string{
 	"":             "EndpointPublishingStrategy is a way to publish the endpoints of an IngressController, and represents the type and any additional configuration for a specific type.",
 	"type":         "type is the publishing strategy to use. Valid values are:\n\n* LoadBalancerService\n\nPublishes the ingress controller using a Kubernetes LoadBalancer Service.\n\nIn this configuration, the ingress controller deployment uses container networking. A LoadBalancer Service is created to publish the deployment.\n\nSee: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer\n\nIf domain is set, a wildcard DNS record will be managed to point at the LoadBalancer Service's external name. DNS records are managed only in DNS zones defined by dns.config.openshift.io/cluster .spec.publicZone and .spec.privateZone.\n\nWildcard DNS management is currently supported only on the AWS, Azure, and GCP platforms.\n\n* HostNetwork\n\nPublishes the ingress controller on node ports where the ingress controller is deployed.\n\nIn this configuration, the ingress controller deployment uses host networking, bound to node ports 80 and 443. The user is responsible for configuring an external load balancer to publish the ingress controller via the node ports.\n\n* Private\n\nDoes not publish the ingress controller.\n\nIn this configuration, the ingress controller deployment uses container networking, and is not explicitly published. The user must manually publish the ingress controller.\n\n* NodePortService\n\nPublishes the ingress controller using a Kubernetes NodePort Service.\n\nIn this configuration, the ingress controller deployment uses container networking. A NodePort Service is created to publish the deployment. The specific node ports are dynamically allocated by OpenShift; however, to support static port allocations, user changes to the node port field of the managed NodePort Service will preserved.",
@@ -349,12 +448,30 @@ func (IngressController) SwaggerDoc() map[string]string {
 	return map_IngressController
 }
 
+var map_IngressControllerHTTPHeaders = map[string]string{
+	"":                      "IngressControllerHTTPHeaders specifies how the IngressController handles certain HTTP headers.",
+	"forwardedHeaderPolicy": "forwardedHeaderPolicy specifies when and how the IngressController sets the Forwarded, X-Forwarded-For, X-Forwarded-Host, X-Forwarded-Port, X-Forwarded-Proto, and X-Forwarded-Proto-Version HTTP headers.  The value may be one of the following:\n\n* \"Append\", which specifies that the IngressController appends the\n  headers, preserving existing headers.\n\n* \"Replace\", which specifies that the IngressController sets the\n  headers, replacing any existing Forwarded or X-Forwarded-* headers.\n\n* \"IfNone\", which specifies that the IngressController sets the\n  headers if they are not already set.\n\n* \"Never\", which specifies that the IngressController never sets the\n  headers, preserving any existing headers.\n\nBy default, the policy is \"Append\".",
+}
+
+func (IngressControllerHTTPHeaders) SwaggerDoc() map[string]string {
+	return map_IngressControllerHTTPHeaders
+}
+
 var map_IngressControllerList = map[string]string{
 	"": "IngressControllerList contains a list of IngressControllers.",
 }
 
 func (IngressControllerList) SwaggerDoc() map[string]string {
 	return map_IngressControllerList
+}
+
+var map_IngressControllerLogging = map[string]string{
+	"":       "IngressControllerLogging describes what should be logged where.",
+	"access": "access describes how the client requests should be logged.\n\nIf this field is empty, access logging is disabled.",
+}
+
+func (IngressControllerLogging) SwaggerDoc() map[string]string {
+	return map_IngressControllerLogging
 }
 
 var map_IngressControllerSpec = map[string]string{
@@ -368,6 +485,8 @@ var map_IngressControllerSpec = map[string]string{
 	"nodePlacement":              "nodePlacement enables explicit control over the scheduling of the ingress controller.\n\nIf unset, defaults are used. See NodePlacement for more details.",
 	"tlsSecurityProfile":         "tlsSecurityProfile specifies settings for TLS connections for ingresscontrollers.\n\nIf unset, the default is based on the apiservers.config.openshift.io/cluster resource.\n\nNote that when using the Old, Intermediate, and Modern profile types, the effective profile configuration is subject to change between releases. For example, given a specification to use the Intermediate profile deployed on release X.Y.Z, an upgrade to release X.Y.Z+1 may cause a new profile configuration to be applied to the ingress controller, resulting in a rollout.\n\nNote that the minimum TLS version for ingress controllers is 1.1, and the maximum TLS version is 1.2.  An implication of this restriction is that the Modern TLS profile type cannot be used because it requires TLS 1.3.",
 	"routeAdmission":             "routeAdmission defines a policy for handling new route claims (for example, to allow or deny claims across namespaces).\n\nIf empty, defaults will be applied. See specific routeAdmission fields for details about their defaults.",
+	"logging":                    "logging defines parameters for what should be logged where.  If this field is empty, operational logs are enabled but access logs are disabled.",
+	"httpHeaders":                "httpHeaders defines policy for HTTP headers.\n\nIf this field is empty, the default values are used.",
 }
 
 func (IngressControllerSpec) SwaggerDoc() map[string]string {
@@ -390,12 +509,24 @@ func (IngressControllerStatus) SwaggerDoc() map[string]string {
 }
 
 var map_LoadBalancerStrategy = map[string]string{
-	"":      "LoadBalancerStrategy holds parameters for a load balancer.",
-	"scope": "scope indicates the scope at which the load balancer is exposed. Possible values are \"External\" and \"Internal\".",
+	"":                   "LoadBalancerStrategy holds parameters for a load balancer.",
+	"scope":              "scope indicates the scope at which the load balancer is exposed. Possible values are \"External\" and \"Internal\".",
+	"providerParameters": "providerParameters holds desired load balancer information specific to the underlying infrastructure provider.\n\nIf empty, defaults will be applied. See specific providerParameters fields for details about their defaults.",
 }
 
 func (LoadBalancerStrategy) SwaggerDoc() map[string]string {
 	return map_LoadBalancerStrategy
+}
+
+var map_LoggingDestination = map[string]string{
+	"":          "LoggingDestination describes a destination for log messages.",
+	"type":      "type is the type of destination for logs.  It must be one of the following:\n\n* Container\n\nThe ingress operator configures the sidecar container named \"logs\" on the ingress controller pod and configures the ingress controller to write logs to the sidecar.  The logs are then available as container logs.  The expectation is that the administrator configures a custom logging solution that reads logs from this sidecar.  Note that using container logs means that logs may be dropped if the rate of logs exceeds the container runtime's or the custom logging solution's capacity.\n\n* Syslog\n\nLogs are sent to a syslog endpoint.  The administrator must specify an endpoint that can receive syslog messages.  The expectation is that the administrator has configured a custom syslog instance.",
+	"syslog":    "syslog holds parameters for a syslog endpoint.  Present only if type is Syslog.",
+	"container": "container holds parameters for the Container logging destination. Present only if type is Container.",
+}
+
+func (LoggingDestination) SwaggerDoc() map[string]string {
+	return map_LoggingDestination
 }
 
 var map_NodePlacement = map[string]string{
@@ -424,13 +555,35 @@ func (PrivateStrategy) SwaggerDoc() map[string]string {
 	return map_PrivateStrategy
 }
 
+var map_ProviderLoadBalancerParameters = map[string]string{
+	"":     "ProviderLoadBalancerParameters holds desired load balancer information specific to the underlying infrastructure provider.",
+	"type": "type is the underlying infrastructure provider for the load balancer. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"OpenStack\", and \"VSphere\".",
+	"aws":  "aws provides configuration settings that are specific to AWS load balancers.\n\nIf empty, defaults will be applied. See specific aws fields for details about their defaults.",
+}
+
+func (ProviderLoadBalancerParameters) SwaggerDoc() map[string]string {
+	return map_ProviderLoadBalancerParameters
+}
+
 var map_RouteAdmissionPolicy = map[string]string{
 	"":                   "RouteAdmissionPolicy is an admission policy for allowing new route claims.",
 	"namespaceOwnership": "namespaceOwnership describes how host name claims across namespaces should be handled.\n\nValue must be one of:\n\n- Strict: Do not allow routes in different namespaces to claim the same host.\n\n- InterNamespaceAllowed: Allow routes to claim different paths of the same\n  host name across namespaces.\n\nIf empty, the default is Strict.",
+	"wildcardPolicy":     "wildcardPolicy describes how routes with wildcard policies should be handled for the ingress controller. WildcardPolicy controls use of routes [1] exposed by the ingress controller based on the route's wildcard policy.\n\n[1] https://github.com/openshift/api/blob/master/route/v1/types.go\n\nNote: Updating WildcardPolicy from WildcardsAllowed to WildcardsDisallowed will cause admitted routes with a wildcard policy of Subdomain to stop working. These routes must be updated to a wildcard policy of None to be readmitted by the ingress controller.\n\nWildcardPolicy supports WildcardsAllowed and WildcardsDisallowed values.\n\nIf empty, defaults to \"WildcardsDisallowed\".",
 }
 
 func (RouteAdmissionPolicy) SwaggerDoc() map[string]string {
 	return map_RouteAdmissionPolicy
+}
+
+var map_SyslogLoggingDestinationParameters = map[string]string{
+	"":         "SyslogLoggingDestinationParameters describes parameters for the Syslog logging destination type.",
+	"address":  "address is the IP address of the syslog endpoint that receives log messages.",
+	"port":     "port is the UDP port number of the syslog endpoint that receives log messages.",
+	"facility": "facility specifies the syslog facility of log messages.\n\nIf this field is empty, the facility is \"local1\".",
+}
+
+func (SyslogLoggingDestinationParameters) SwaggerDoc() map[string]string {
+	return map_SyslogLoggingDestinationParameters
 }
 
 var map_KubeAPIServer = map[string]string{
@@ -522,7 +675,8 @@ func (DefaultNetworkDefinition) SwaggerDoc() map[string]string {
 }
 
 var map_HybridOverlayConfig = map[string]string{
-	"hybridClusterNetwork": "HybridClusterNetwork defines a network space given to nodes on an additional overlay network.",
+	"hybridClusterNetwork":   "HybridClusterNetwork defines a network space given to nodes on an additional overlay network.",
+	"hybridOverlayVXLANPort": "HybridOverlayVXLANPort defines the VXLAN port number to be used by the additional overlay network. Default is 4789",
 }
 
 func (HybridOverlayConfig) SwaggerDoc() map[string]string {
@@ -797,6 +951,40 @@ var map_ServiceCatalogControllerManagerList = map[string]string{
 
 func (ServiceCatalogControllerManagerList) SwaggerDoc() map[string]string {
 	return map_ServiceCatalogControllerManagerList
+}
+
+var map_Storage = map[string]string{
+	"":       "Storage provides a means to configure an operator to manage the cluster storage operator. `cluster` is the canonical name.",
+	"spec":   "spec holds user settable values for configuration",
+	"status": "status holds observed values from the cluster. They may not be overridden.",
+}
+
+func (Storage) SwaggerDoc() map[string]string {
+	return map_Storage
+}
+
+var map_StorageList = map[string]string{
+	"": "StorageList contains a list of Storages.",
+}
+
+func (StorageList) SwaggerDoc() map[string]string {
+	return map_StorageList
+}
+
+var map_StorageSpec = map[string]string{
+	"": "StorageSpec is the specification of the desired behavior of the cluster storage operator.",
+}
+
+func (StorageSpec) SwaggerDoc() map[string]string {
+	return map_StorageSpec
+}
+
+var map_StorageStatus = map[string]string{
+	"": "StorageStatus defines the observed status of the cluster storage operator.",
+}
+
+func (StorageStatus) SwaggerDoc() map[string]string {
+	return map_StorageStatus
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

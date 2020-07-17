@@ -9,25 +9,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	targets/openshift/deps-gomod.mk \
 	targets/openshift/images.mk \
 	targets/openshift/bindata.mk \
-	targets/openshift/codegen.mk \
 )
-
-# Codegen module needs setting these required variables
-CODEGEN_OUTPUT_PACKAGE :=github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated
-CODEGEN_API_PACKAGE :=github.com/openshift/aws-ebs-csi-driver-operator/pkg/apis
-CODEGEN_GROUPS_VERSION :=operator:v1alpha1
-
-define run-codegen
-	"$(SHELL)" \
-        "$(CODEGEN_PKG)/generate-groups.sh" \
-	"$(CODEGEN_GENERATORS)" \
-	"$(CODEGEN_OUTPUT_PACKAGE)" \
-	"$(CODEGEN_API_PACKAGE)" \
-	"$(CODEGEN_GROUPS_VERSION)" \
-    --output-base $(CODEGEN_OUTPUT_BASE) \
-    --go-header-file $(CODEGEN_GO_HEADER_FILE) \
-    $1
-endef
 
 # Run core verification and all self contained tests.
 #
