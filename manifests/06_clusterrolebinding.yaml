@@ -1,7 +1,7 @@
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: aws-ebs-csi-driver-operator-clusterrole
+  name: aws-ebs-csi-driver-operator-clusterrolebinding
 subjects:
   - kind: ServiceAccount
     name: aws-ebs-csi-driver-operator
@@ -9,4 +9,4 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: aws-ebs-csi-driver-operator-clusterrole
