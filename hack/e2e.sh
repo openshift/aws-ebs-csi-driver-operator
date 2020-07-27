@@ -3,6 +3,7 @@
 set -e
 
 REPO_ROOT="$(dirname $0)/.."
+NAMESPACE="openshift-cluster-csi-drivers"
 
 # Prepare openshift-tests arguments for log output
 ADDITIONAL_TEST_ARGS=""
@@ -18,12 +19,12 @@ ${REPO_ROOT}/hack/start.sh
 # - they need the driver on all nodes.
 
 # Step1: The operator says it's available (at least some pods are running).
-echo "Waiting for awsebsdriver.csi.openshift.io/cluster"
-oc wait awsebsdriver.csi.openshift.io/cluster --for=condition=Available --timeout=5m
+echo "Waiting for clustercsidrivers.operator.openshift.io/ebs.csi.aws.com"
+oc wait clustercsidrivers.operator.openshift.io/ebs.csi.aws.com --for=condition=AWSEBSDriverControllerAvailable --timeout=5m
 
 # Step2: Wait for *all* pods to be running.
 echo "Waiting for all driver pods"
-oc wait -n openshift-aws-ebs-csi-driver pod --all --for=condition=Ready --timeout=5m
+oc wait -n "$NAMESPACE" pod --all --for=condition=Ready --timeout=5m
 
 # Run openshift-tests
 TEST_CSI_DRIVER_FILES=${REPO_ROOT}/test/e2e/manifest.yaml openshift-tests run openshift/csi $ADDITIONAL_TEST_ARGS

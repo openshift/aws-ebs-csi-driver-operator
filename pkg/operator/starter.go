@@ -3,136 +3,100 @@ package operator
 import (
 	"context"
 	"fmt"
-	"os"
-	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/client-go/dynamic"
+	dynamicclient "k8s.io/client-go/dynamic"
+	kubeclient "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 
-	apiclientset "github.com/openshift/client-go/config/clientset/versioned"
-	apiinformers "github.com/openshift/client-go/config/informers/externalversions"
-
+	opv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"github.com/openshift/library-go/pkg/operator/loglevel"
-	"github.com/openshift/library-go/pkg/operator/management"
+	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
+	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/common"
-	clientset "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/clientset/versioned"
-	informers "github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated/informers/externalversions"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated"
 )
 
 const (
-	resync = 20 * time.Minute
+	// Operand and operator run in the same namespace
+	defaultNamespace = "openshift-cluster-csi-drivers"
+	operatorName     = "aws-ebs-csi-driver-operator"
+	operandName      = "aws-ebs-csi-driver"
+	instanceName     = "ebs.csi.aws.com"
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
-	ctrlClientset, err := clientset.NewForConfig(controllerConfig.KubeConfig)
+	// Create clientsets and informers
+	kubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
+	dynamicClient := dynamicclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
+	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, defaultNamespace, "")
+
+	// Create GenericOperatorclient. This is used by the library-go controllers created down below
+	gvr := opv1.SchemeGroupVersion.WithResource("clustercsidrivers")
+	operatorClient, dynamicInformers, err := goc.NewClusterScopedOperatorClientWithConfigName(controllerConfig.KubeConfig, gvr, instanceName)
 	if err != nil {
 		return err
 	}
 
-	ctrlInformers := informers.NewSharedInformerFactoryWithOptions(
-		ctrlClientset,
-		resync,
-		informers.WithTweakListOptions(singleNameListOptions(globalConfigName)),
-	)
-
-	apiClientset, err := apiclientset.NewForConfig(controllerConfig.KubeConfig)
-	if err != nil {
-		return err
-	}
-
-	dynamicConfig := dynamic.ConfigFor(controllerConfig.KubeConfig)
-	dynamicClient, err := dynamic.NewForConfig(dynamicConfig)
-	if err != nil {
-		return err
-	}
-
-	apiInformers := apiinformers.NewSharedInformerFactoryWithOptions(apiClientset, resync)
-
-	operatorClient := &OperatorClient{
-		ctrlInformers,
-		ctrlClientset.CsiV1alpha1(),
-	}
-
-	cb, err := common.NewBuilder("")
-	if err != nil {
-		klog.Fatalf("error creating clients: %v", err)
-	}
-
-	ctrlCtx := common.CreateControllerContext(cb, ctx.Done(), operandNamespace)
-	operator := NewCSIDriverOperator(
-		*operatorClient,
-		ctrlCtx.ClientBuilder.KubeClientOrDie(operandName),
-		dynamicClient,
-		ctrlCtx.APIInformerFactory.Config().V1().Infrastructures(),
-		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().PersistentVolumes(),
-		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().Namespaces(),
-		ctrlCtx.KubeNamespacedInformerFactory.Storage().V1beta1().CSIDrivers(),
-		ctrlCtx.KubeNamespacedInformerFactory.Storage().V1beta1().CSINodes(),
-		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().ServiceAccounts(),
-		ctrlCtx.KubeNamespacedInformerFactory.Rbac().V1().ClusterRoles(),
-		ctrlCtx.KubeNamespacedInformerFactory.Rbac().V1().ClusterRoleBindings(),
-		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
-		ctrlCtx.KubeNamespacedInformerFactory.Apps().V1().DaemonSets(),
-		ctrlCtx.KubeNamespacedInformerFactory.Storage().V1().StorageClasses(),
-		ctrlCtx.KubeNamespacedInformerFactory.Core().V1().Secrets(),
+	csiControllerSet := csicontrollerset.NewCSIControllerSet(
+		operatorClient,
 		controllerConfig.EventRecorder,
-		imagesFromEnv(),
+	).WithLogLevelController().WithManagementStateController(
+		operandName,
+		false,
+	).WithStaticResourcesController(
+		"AWSEBSDriverStaticResources",
+		kubeClient,
+		kubeInformersForNamespaces,
+		generated.Asset,
+		[]string{
+			"storageclass.yaml",
+			"csidriver.yaml",
+			"controller_sa.yaml",
+			"node_sa.yaml",
+			"rbac/attacher_binding.yaml",
+			"rbac/attacher_role.yaml",
+			"rbac/controller_privileged_binding.yaml",
+			"rbac/node_privileged_binding.yaml",
+			"rbac/privileged_role.yaml",
+			"rbac/provisioner_binding.yaml",
+			"rbac/provisioner_role.yaml",
+			"rbac/resizer_binding.yaml",
+			"rbac/resizer_role.yaml",
+			"rbac/snapshotter_binding.yaml",
+			"rbac/snapshotter_role.yaml",
+		},
+	).WithCredentialsRequestController(
+		"AWSEBSDriverCredentialsRequestController",
+		defaultNamespace,
+		generated.MustAsset,
+		"credentials.yaml",
+		dynamicClient,
+	).WithCSIDriverController(
+		"AWSEBSDriverController",
+		instanceName,
+		operandName,
+		defaultNamespace,
+		generated.MustAsset,
+		kubeClient,
+		kubeInformersForNamespaces.InformersFor(defaultNamespace),
+		csicontrollerset.WithControllerService("controller.yaml"),
+		csicontrollerset.WithNodeService("node.yaml"),
 	)
 
-	// This controller syncs CR.Status.Conditions with the value in the field CR.Spec.ManagementStatus. It only supports Managed state
-	managementStateController := management.NewOperatorManagementStateController(operandName, operatorClient, controllerConfig.EventRecorder)
-	management.SetOperatorNotRemovable()
-
-	// This controller syncs the operator log level with the value set in the CR.Spec.OperatorLogLevel
-	logLevelController := loglevel.NewClusterOperatorLoggingController(operatorClient, controllerConfig.EventRecorder)
-
-	klog.Info("Starting the Informers.")
-	for _, informer := range []interface {
-		Start(stopCh <-chan struct{})
-	}{
-		ctrlCtx.APIInformerFactory,
-		ctrlInformers,
-		apiInformers,
-		ctrlCtx.KubeNamespacedInformerFactory,
-	} {
-		informer.Start(ctx.Done())
+	if err != nil {
+		return err
 	}
 
-	klog.Info("Starting the controllers")
-	for _, controller := range []interface {
-		Run(ctx context.Context, workers int)
-	}{
-		logLevelController,
-		managementStateController,
-	} {
-		go controller.Run(ctx, 1)
-	}
-	klog.Info("Starting the operator.")
-	go operator.Run(1, ctx.Done())
+	klog.Info("Starting the informers")
+	go kubeInformersForNamespaces.Start(ctx.Done())
+	go dynamicInformers.Start(ctx.Done())
+
+	klog.Info("Starting controllerset")
+	go csiControllerSet.Run(ctx, 1)
 
 	<-ctx.Done()
 
 	return fmt.Errorf("stopped")
-}
-
-func singleNameListOptions(name string) func(opts *metav1.ListOptions) {
-	return func(opts *metav1.ListOptions) {
-		opts.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
-	}
-}
-
-func imagesFromEnv() images {
-	return images{
-		csiDriver:           os.Getenv(driverImageEnvName),
-		provisioner:         os.Getenv(provisionerImageEnvName),
-		attacher:            os.Getenv(attacherImageEnvName),
-		resizer:             os.Getenv(resizerImageEnvName),
-		snapshotter:         os.Getenv(snapshotterImageEnvName),
-		nodeDriverRegistrar: os.Getenv(nodeDriverRegistrarImageEnvName),
-		livenessProbe:       os.Getenv(livenessProbeImageEnvName),
-	}
 }

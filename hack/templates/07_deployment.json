@@ -1,9 +1,0 @@
-{
-  "kind": "Deployment",
-  "apiVersion": "apps/v1",
-  "metadata": {
-    "name": "$DEPLOYMENT_NAME",
-    "namespace": "openshift-aws-ebs-csi-driver-operator"
-  },
-  "spec": $DEPLOYMENT_SPEC
-}
