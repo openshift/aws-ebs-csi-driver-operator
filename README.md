@@ -2,103 +2,46 @@
 
 An operator to deploy the [AWS EBS CSI driver](https://github.com/openshift/aws-ebs-csi-driver) in OKD.
 
-This operator is currently under heavy development and is not ready for general use yet.
+This operator is installed by the [cluster-storage-operator](https://github.com/openshift/cluster-storage-operator).
 
-# How to use this operator with OLM by building locally
+# Quick start
 
-The process documented below assums you have `opm` tool installed. You can install it by compiling a recent version of https://github.com/operator-framework/operator-registry and placing `opm` binary somewhere in `$PATH`.
+To build and run the operator locally:
 
-1. Build a operator image using following command:
+```shell
+# Create only the resources the operator needs to run via CLI
+oc apply -f manifests/00_crd.yaml
+oc apply -f manifests/01_namespace.yaml
+oc apply -f manifests/08_cr.yaml
 
-```
-~> make image-aws-ebs-csi-driver-operator
-```
+# Build the operator
+make
 
-tag and push this image to quay.io
+# Set the environment variables
+export DRIVER_IMAGE=quay.io/openshift/origin-aws-ebs-csi-driver:latest
+export PROVISIONER_IMAGE=quay.io/openshift/origin-csi-external-provisioner:latest
+export ATTACHER_IMAGE=quay.io/openshift/origin-csi-external-attacher:latest
+export RESIZER_IMAGE=quay.io/openshift/origin-csi-external-resizer:latest
+export SNAPSHOTTER_IMAGE=quay.io/openshift/origin-csi-external-snapshotter:latest
+export NODE_DRIVER_REGISTRAR_IMAGE=quay.io/openshift/origin-csi-node-driver-registrar:latest
+export LIVENESS_PROBE_IMAGE=quay.io/openshift/origin-csi-livenessprobe:latest
 
-2. Since the CSV in `bundle/manifests` directory contains a hardcoded reference to particular image version. Replace that field with image you tagged above.
-3. Now to build the bundle manifest image:
-
-```
-~> cd bundle
-~> opm alpha bundle build --directory . --tag quay.io/gnufied/ebs-csi-driver-operator-manifest:0.0.1 --package aws-ebs-csi-driver-operator --channels preview --default preview
-```
-
-This will give us an image called `quay.io/gnufied/ebs-csi-driver-operator-manifest:0.0.1` which can be pushed to quay.io
-
-4. Now lets validate if everything is right with the image:
-
-
-```
-~> cd bundle
-~> opm alpha bundle validate --tag quay.io/gnufied/ebs-csi-driver-operator-manifest:0.0.1
+# Run the operator via CLI
+./aws-ebs-csi-driver-operator start --kubeconfig $MY_KUBECONFIG --namespace openshift-cluster-csi-drivers
 ```
 
-5. Lets add this bundle image to a index image:
+To run the latest build of the operator:
 
+```shell
+# Set the environment variables
+export DRIVER_IMAGE=quay.io/openshift/origin-aws-ebs-csi-driver:latest
+export PROVISIONER_IMAGE=quay.io/openshift/origin-csi-external-provisioner:latest
+export ATTACHER_IMAGE=quay.io/openshift/origin-csi-external-attacher:latest
+export RESIZER_IMAGE=quay.io/openshift/origin-csi-external-resizer:latest
+export SNAPSHOTTER_IMAGE=quay.io/openshift/origin-csi-external-snapshotter:latest
+export NODE_DRIVER_REGISTRAR_IMAGE=quay.io/openshift/origin-csi-node-driver-registrar:latest
+export LIVENESS_PROBE_IMAGE=quay.io/openshift/origin-csi-livenessprobe:latest
 
-```
-~> opm index add --bundles quay.io/gnufied/ebs-csi-driver-operator-manifest:0.0.1 --tag quay.io/gnufied/olm-index:1.0.0 --container-tool docker
-```
-
-Where replace index image name and version with your choice. This should give us a index image which can be pushed to quay. Don't forget to
-make your images public.
-
-6. Using the index image with OLM:
-
-We can apply following YAML to install the operator:
-
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-aws-ebs-csi-driver-operator
----
-apiVersion: operators.coreos.com/v1alpha2
-kind: OperatorGroup
-metadata:
-  name: aws-driver-operator-group
-  namespace: openshift-aws-ebs-csi-driver-operator
-  spec:
-    targetNamespaces:
-    - openshift-aws-ebs-csi-driver-operator
-
----
-
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: aws-driver-manifests
-  namespace: openshift-aws-ebs-csi-driver-operator
-spec:
-  sourceType: grpc
-  image: quay.io/gnufied/olm-index:1.0.0
-
----
-
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: aws-driver-subscription
-  namespace: openshift-aws-ebs-csi-driver-operator
-spec:
-  channel: preview
-  name: aws-ebs-csi-driver-operator
-  source: aws-driver-manifests
-  sourceNamespace: openshift-aws-ebs-csi-driver-operator
-```
-
-Where you can replace image-index with version you built. This should get the operator installed in `openshift-aws-ebs-csi-driver-operator` namespace.
-
-7. We still need to create an instance of `Driver` CR to instantiate driver install. This can be done by applying following YAML:
-
-```yaml
-apiVersion: csi.openshift.io/v1alpha1
-kind: AWSEBSDriver
-metadata:
-  name: cluster
-  namespace: openshift-aws-ebs-csi-driver-operator
-spec:
-  managementState: Managed
+# Deploy the operator and everything it needs
+oc apply -f manifests/
 ```
