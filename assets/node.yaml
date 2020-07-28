@@ -50,6 +50,10 @@ spec:
             timeoutSeconds: 3
             periodSeconds: 10
             failureThreshold: 5
+          resources:
+            requests:
+              memory: 50Mi
+              cpu: 10m
         - name: csi-node-driver-registrar
           securityContext:
             privileged: true
@@ -72,6 +76,10 @@ spec:
               mountPath: /csi
             - name: registration-dir
               mountPath: /registration
+          resources:
+            requests:
+              memory: 50Mi
+              cpu: 10m
         - name: csi-liveness-probe
           image: ${LIVENESS_PROBE_IMAGE}
           args:
@@ -80,6 +88,10 @@ spec:
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
+          resources:
+            requests:
+              memory: 50Mi
+              cpu: 10m
       volumes:
         - name: kubelet-dir
           hostPath:
