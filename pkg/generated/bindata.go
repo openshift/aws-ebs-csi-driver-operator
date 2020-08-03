@@ -748,6 +748,9 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
 `)
 
 func rbacResizer_roleYamlBytes() ([]byte, error) {
