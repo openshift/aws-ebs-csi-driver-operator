@@ -46,7 +46,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		operandName,
 		false,
 	).WithStaticResourcesController(
-		"AWSEBSDriverStaticResources",
+		"AWSEBSDriverStaticResourcesController",
 		kubeClient,
 		kubeInformersForNamespaces,
 		generated.Asset,
@@ -55,17 +55,17 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"csidriver.yaml",
 			"controller_sa.yaml",
 			"node_sa.yaml",
-			"rbac/attacher_binding.yaml",
+			"rbac/privileged_role.yaml",
+			"rbac/provisioner_role.yaml",
 			"rbac/attacher_role.yaml",
+			"rbac/resizer_role.yaml",
+			"rbac/snapshotter_role.yaml",
 			"rbac/controller_privileged_binding.yaml",
 			"rbac/node_privileged_binding.yaml",
-			"rbac/privileged_role.yaml",
 			"rbac/provisioner_binding.yaml",
-			"rbac/provisioner_role.yaml",
+			"rbac/attacher_binding.yaml",
 			"rbac/resizer_binding.yaml",
-			"rbac/resizer_role.yaml",
 			"rbac/snapshotter_binding.yaml",
-			"rbac/snapshotter_role.yaml",
 		},
 	).WithCredentialsRequestController(
 		"AWSEBSDriverCredentialsRequestController",
@@ -73,16 +73,18 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		generated.MustAsset,
 		"credentials.yaml",
 		dynamicClient,
-	).WithCSIDriverController(
-		"AWSEBSDriverController",
-		instanceName,
-		operandName,
-		defaultNamespace,
+	).WithCSIDriverControllerService(
+		"AWSEBSDriverControllerServiceController",
 		generated.MustAsset,
+		"controller.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
-		csicontrollerset.WithControllerService("controller.yaml"),
-		csicontrollerset.WithNodeService("node.yaml"),
+	).WithCSIDriverNodeService(
+		"AWSEBSDriverNodeServiceController",
+		generated.MustAsset,
+		"node.yaml",
+		kubeClient,
+		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 	)
 
 	if err != nil {
