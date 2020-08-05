@@ -37,7 +37,7 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         image: quay.io/openshift/origin-aws-ebs-csi-driver-operator:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: aws-ebs-csi-driver-operator
       priorityClassName: system-cluster-critical
       serviceAccountName: aws-ebs-csi-driver-operator
