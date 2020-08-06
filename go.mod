@@ -1,6 +1,6 @@
 module github.com/openshift/aws-ebs-csi-driver-operator
 
-go 1.13
+go 1.14
 
 require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
@@ -13,5 +13,5 @@ require (
 	k8s.io/apimachinery v0.19.0-rc.2
 	k8s.io/client-go v0.19.0-rc.2
 	k8s.io/component-base v0.19.0-rc.2
-	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.3.0
 )
