@@ -46,7 +46,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		operandName,
 		false,
 	).WithStaticResourcesController(
-		"AWSEBSDriverStaticResources",
+		"AWSEBSDriverStaticResourcesController",
 		kubeClient,
 		kubeInformersForNamespaces,
 		generated.Asset,
@@ -73,16 +73,18 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		generated.MustAsset,
 		"credentials.yaml",
 		dynamicClient,
-	).WithCSIDriverController(
-		"AWSEBSDriverController",
-		instanceName,
-		operandName,
-		defaultNamespace,
+	).WithCSIDriverControllerService(
+		"AWSEBSDriverControllerServiceController",
 		generated.MustAsset,
+		"controller.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
-		csicontrollerset.WithControllerService("controller.yaml"),
-		csicontrollerset.WithNodeService("node.yaml"),
+	).WithCSIDriverNodeService(
+		"AWSEBSDriverNodeServiceController",
+		generated.MustAsset,
+		"node.yaml",
+		kubeClient,
+		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 	)
 
 	if err != nil {
