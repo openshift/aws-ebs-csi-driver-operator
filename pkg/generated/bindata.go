@@ -91,9 +91,14 @@ spec:
       hostNetwork: true
       serviceAccount: aws-ebs-csi-driver-controller-sa
       priorityClassName: system-cluster-critical
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
       tolerations:
         - key: CriticalAddonsOnly
           operator: Exists
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: "NoSchedule"
       containers:
         - name: csi-driver
           image: ${DRIVER_IMAGE}
