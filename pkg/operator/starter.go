@@ -91,11 +91,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
-	klog.Info("Starting the informers")
+	klog.Info("Starting informers")
 	go kubeInformersForNamespaces.Start(ctx.Done())
 	go dynamicInformers.Start(ctx.Done())
 
-	klog.Info("Starting controllerset")
+	klog.Info("Starting controller set")
 	go csiControllerSet.Run(ctx, 1)
 
 	<-ctx.Done()
