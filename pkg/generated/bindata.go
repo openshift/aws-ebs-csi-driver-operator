@@ -111,12 +111,12 @@ spec:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: aws-cloud-credentials
+                  name: ebs-cloud-credentials
                   key: aws_access_key_id
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: aws-cloud-credentials
+                  name: ebs-cloud-credentials
                   key: aws_secret_access_key
           ports:
             - name: healthz
