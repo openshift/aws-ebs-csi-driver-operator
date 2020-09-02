@@ -2,7 +2,6 @@
 // sources:
 // assets/controller.yaml
 // assets/controller_sa.yaml
-// assets/credentials.yaml
 // assets/csidriver.yaml
 // assets/namespace.yaml
 // assets/node.yaml
@@ -112,12 +111,12 @@ spec:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: aws-cloud-credentials
+                  name: ebs-cloud-credentials
                   key: aws_access_key_id
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: aws-cloud-credentials
+                  name: ebs-cloud-credentials
                   key: aws_secret_access_key
           ports:
             - name: healthz
@@ -231,54 +230,6 @@ func controller_saYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "controller_sa.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _credentialsYaml = []byte(`apiVersion: cloudcredential.openshift.io/v1
-kind: CredentialsRequest
-metadata:
-  name: openshift-cluster-csi-drivers
-  namespace: openshift-cloud-credential-operator
-spec:
-  secretRef:
-    name: aws-cloud-credentials
-    namespace: openshift-cluster-csi-drivers
-  providerSpec:
-    apiVersion: cloudcredential.openshift.io/v1
-    kind: AWSProviderSpec
-    statementEntries:
-    - effect: Allow
-      action:
-      - ec2:AttachVolume
-      - ec2:CreateSnapshot
-      - ec2:CreateTags
-      - ec2:CreateVolume
-      - ec2:DeleteSnapshot
-      - ec2:DeleteTags
-      - ec2:DeleteVolume
-      - ec2:DescribeInstances
-      - ec2:DescribeSnapshots
-      - ec2:DescribeTags
-      - ec2:DescribeVolumes
-      - ec2:DescribeVolumesModifications
-      - ec2:DetachVolume
-      - ec2:ModifyVolume
-      #- ec2:*
-      resource: "*"
-`)
-
-func credentialsYamlBytes() ([]byte, error) {
-	return _credentialsYaml, nil
-}
-
-func credentialsYaml() (*asset, error) {
-	bytes, err := credentialsYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "credentials.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -942,7 +893,6 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"controller.yaml":                         controllerYaml,
 	"controller_sa.yaml":                      controller_saYaml,
-	"credentials.yaml":                        credentialsYaml,
 	"csidriver.yaml":                          csidriverYaml,
 	"namespace.yaml":                          namespaceYaml,
 	"node.yaml":                               nodeYaml,
@@ -1004,7 +954,6 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"controller.yaml":    {controllerYaml, map[string]*bintree{}},
 	"controller_sa.yaml": {controller_saYaml, map[string]*bintree{}},
-	"credentials.yaml":   {credentialsYaml, map[string]*bintree{}},
 	"csidriver.yaml":     {csidriverYaml, map[string]*bintree{}},
 	"namespace.yaml":     {namespaceYaml, map[string]*bintree{}},
 	"node.yaml":          {nodeYaml, map[string]*bintree{}},

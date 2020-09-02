@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	dynamicclient "k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -29,7 +28,6 @@ const (
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
 	// Create clientsets and informers
 	kubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
-	dynamicClient := dynamicclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, defaultNamespace, "")
 
 	// Create GenericOperatorclient. This is used by the library-go controllers created down below
@@ -67,12 +65,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"rbac/snapshotter_role.yaml",
 			"rbac/snapshotter_binding.yaml",
 		},
-	).WithCredentialsRequestController(
-		"AWSEBSDriverCredentialsRequestController",
-		defaultNamespace,
-		generated.MustAsset,
-		"credentials.yaml",
-		dynamicClient,
 	).WithCSIDriverControllerService(
 		"AWSEBSDriverControllerServiceController",
 		generated.MustAsset,
