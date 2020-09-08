@@ -165,7 +165,7 @@ spec:
           image: ${RESIZER_IMAGE}
           args:
             - --csi-address=$(ADDRESS)
-            - --timeout=120s
+            - --timeout=300s
             - --v=${LOG_LEVEL}
           env:
             - name: ADDRESS
