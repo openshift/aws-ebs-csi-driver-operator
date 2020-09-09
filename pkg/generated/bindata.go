@@ -133,6 +133,7 @@ spec:
           image: ${PROVISIONER_IMAGE}
           args:
             - --csi-address=$(ADDRESS)
+            - --default-fstype=ext4
             - --feature-gates=Topology=true
             - --v=${LOG_LEVEL}
           env:
