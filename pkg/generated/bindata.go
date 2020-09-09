@@ -132,7 +132,6 @@ spec:
         - name: csi-provisioner
           image: ${PROVISIONER_IMAGE}
           args:
-            - --provisioner=ebs.csi.aws.com
             - --csi-address=$(ADDRESS)
             - --feature-gates=Topology=true
             - --v=${LOG_LEVEL}
