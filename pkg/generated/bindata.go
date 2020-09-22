@@ -301,6 +301,8 @@ spec:
       priorityClassName: system-node-critical
       tolerations:
         - operator: Exists
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
         - name: csi-driver
           securityContext:
