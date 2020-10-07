@@ -103,6 +103,7 @@ spec:
           image: ${DRIVER_IMAGE}
           args:
             - --endpoint=$(CSI_ENDPOINT)
+            - --k8s-tag-cluster-id=${CLUSTER_ID}
             - --logtostderr
             - --v=${LOG_LEVEL}
           env:
@@ -136,6 +137,7 @@ spec:
             - --csi-address=$(ADDRESS)
             - --default-fstype=ext4
             - --feature-gates=Topology=true
+            - --extra-create-metadata=true
             - --v=${LOG_LEVEL}
           env:
             - name: ADDRESS
