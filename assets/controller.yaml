@@ -41,17 +41,29 @@ spec:
                 secretKeyRef:
                   name: ebs-cloud-credentials
                   key: aws_access_key_id
+                  optional: true
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: ebs-cloud-credentials
                   key: aws_secret_access_key
+                  optional: true
+            - name: AWS_SDK_LOAD_CONFIG
+              value: '1'
+            - name: AWS_CONFIG_FILE
+              value: /var/run/secrets/aws/credentials
           ports:
             - name: healthz
               # Due to hostNetwork, this port is open on a node!
               containerPort: 10301
               protocol: TCP
           volumeMounts:
+            - name: aws-credentials
+              mountPath: /var/run/secrets/aws
+              readOnly: true
+            - name: bound-sa-token
+              mountPath: /var/run/secrets/openshift/serviceaccount
+              readOnly: true
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
           resources:
@@ -136,5 +148,16 @@ spec:
               memory: 50Mi
               cpu: 10m
       volumes:
+        - name: aws-credentials
+          secret:
+            secretName: ebs-cloud-credentials
+        # This service account token can be used to provide identity outside the cluster.
+        # For example, this token can be used with AssumeRoleWithWebIdentity to authenticate with AWS using IAM OIDC provider and STS.
+        - name: bound-sa-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+                audience: openshift
         - name: socket-dir
           emptyDir: {}
