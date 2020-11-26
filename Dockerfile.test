@@ -1,5 +1,12 @@
+# Image from where we copy openshift-tests.
+FROM registry.svc.ci.openshift.org/ocp/4.5:tests AS test-builder
+
+
 # "src" is build by a prow job when building final images.
 # It contains full repository sources + jq + pyhon with yaml module.
 # Use it as test image for the operator.
 
 FROM src
+
+# Copy openshift-tests into the operator test image - it contains CSI certification tests.
+COPY --from=test-builder /usr/bin/openshift-tests /usr/bin/openshift-tests
