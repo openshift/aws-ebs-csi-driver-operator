@@ -1,10 +1,8 @@
 package operator
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"text/template"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -83,13 +81,14 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"rbac/snapshotter_role.yaml",
 			"rbac/snapshotter_binding.yaml",
 		},
-	).WithCSIDriverControllerService(
+	).WithCSIDriverControllerServiceWithExtraReplaces(
 		"AWSEBSDriverControllerServiceController",
-		withCustomCABundle(generated.MustAsset, kubeClient),
+		generated.MustAsset,
 		"controller.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 		configInformers,
+		replacementsForCustomCABundle(kubeClient),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
 		generated.MustAsset,
@@ -126,29 +125,22 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	return fmt.Errorf("stopped")
 }
 
-type controllerTemplateData struct {
-	CABundleConfigMap string
-}
-
-// withCustomCABundle executes the asset as a template to fill out the parts required when using a custom CA bundle.
-// The `caBundleConfigMap` parameter specifies the name of the ConfigMap containing the custom CA bundle. If the
-// argument supplied is empty, then no custom CA bundle will be used.
-func withCustomCABundle(assetFunc func(string) []byte, kubeClient kubeclient.Interface) func(string) []byte {
-	templateData := controllerTemplateData{}
-	switch used, err := isCustomCABundleUsed(kubeClient); {
-	case err != nil:
-		klog.Fatalf("could not determine if a custom CA bundle is in use: %v", err)
-	case used:
-		templateData.CABundleConfigMap = cloudConfigName
-	}
-	return func(name string) []byte {
-		asset := assetFunc(name)
-		template := template.Must(template.New("template").Parse(string(asset)))
-		buf := &bytes.Buffer{}
-		if err := template.Execute(buf, templateData); err != nil {
-			klog.Fatalf("Failed to execute ")
+func replacementsForCustomCABundle(kubeClient kubeclient.Interface) func() (map[string]string, error) {
+	return func() (map[string]string, error) {
+		customCABundleUsed, err := isCustomCABundleUsed(kubeClient)
+		if err != nil {
+			return nil, fmt.Errorf("could not determine if a custom CA bundle is in use: %w", err)
 		}
-		return buf.Bytes()
+		if customCABundleUsed {
+			return map[string]string{
+				"AWS_CA_BUNDLE_ENV_VAR": "AWS_CA_BUNDLE",
+				"CA_BUNDLE_OPTIONAL":    "false",
+			}, nil
+		}
+		return map[string]string{
+			"AWS_CA_BUNDLE_ENV_VAR": "UNUSED_AWS_CA_BUNDLE",
+			"CA_BUNDLE_OPTIONAL":    "true",
+		}, nil
 	}
 }
 
