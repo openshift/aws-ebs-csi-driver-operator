@@ -9,6 +9,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclient "k8s.io/client-go/kubernetes"
@@ -21,6 +22,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcehash"
 	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
@@ -33,6 +35,7 @@ const (
 	operatorName     = "aws-ebs-csi-driver-operator"
 	operandName      = "aws-ebs-csi-driver"
 	instanceName     = "ebs.csi.aws.com"
+	secretName       = "ebs-cloud-credentials"
 
 	cloudConfigNamespace = "openshift-config-managed"
 	cloudConfigName      = "kube-cloud-config"
@@ -90,6 +93,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 		configInformers,
+		withSecretHashAnnotation(kubeInformersForNamespaces, defaultNamespace, secretName),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
 		generated.MustAsset,
@@ -195,4 +199,29 @@ func isCustomCABundleUsed(kubeClient kubeclient.Interface) (bool, error) {
 	}
 	_, exists := cloudConfigCM.Data[caBundleKey]
 	return exists, nil
+}
+
+func withSecretHashAnnotation(kubeInformersForNamespaces v1helpers.KubeInformersForNamespaces, namespace, secret string) func(*appsv1.Deployment) error {
+	return func(deployment *appsv1.Deployment) error {
+		inputHashes, err := resourcehash.MultipleObjectHashStringMapForObjectReferenceFromLister(
+			kubeInformersForNamespaces.InformersFor(namespace).Core().V1().ConfigMaps().Lister(),
+			kubeInformersForNamespaces.InformersFor(namespace).Core().V1().Secrets().Lister(),
+			resourcehash.NewObjectRef().ForSecret().InNamespace(namespace).Named(secret),
+		)
+		if err != nil {
+			return fmt.Errorf("invalid dependency reference: %w", err)
+		}
+		if deployment.Annotations == nil {
+			deployment.Annotations = map[string]string{}
+		}
+		if deployment.Spec.Template.Annotations == nil {
+			deployment.Spec.Template.Annotations = map[string]string{}
+		}
+		for k, v := range inputHashes {
+			annotationKey := fmt.Sprintf("operator.openshift.io/dep-%s", k)
+			deployment.Annotations[annotationKey] = v
+			deployment.Spec.Template.Annotations[annotationKey] = v
+		}
+		return nil
+	}
 }
