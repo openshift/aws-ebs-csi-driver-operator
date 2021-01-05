@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
+	"github.com/openshift/library-go/pkg/operator/staleconditions"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated"
@@ -79,9 +80,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 	)
 
-	if err != nil {
-		return err
-	}
+	staleController := staleconditions.NewRemoveStaleConditionsController(
+		[]string{"ResourceSyncControllerDegraded"}, // ResourceSyncController + condition was added in 4.7
+		operatorClient,
+		controllerConfig.EventRecorder,
+	)
 
 	klog.Info("Starting the informers")
 	go kubeInformersForNamespaces.Start(ctx.Done())
@@ -89,6 +92,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	klog.Info("Starting controllerset")
 	go csiControllerSet.Run(ctx, 1)
+	go staleController.Run(ctx, 1)
 
 	<-ctx.Done()
 
