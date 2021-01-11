@@ -168,7 +168,7 @@ github.com/openshift/client-go/config/informers/externalversions/config
 github.com/openshift/client-go/config/informers/externalversions/config/v1
 github.com/openshift/client-go/config/informers/externalversions/internalinterfaces
 github.com/openshift/client-go/config/listers/config/v1
-# github.com/openshift/library-go v0.0.0-20210106214821-c4d0b9c8d55f
+# github.com/openshift/library-go v0.0.0-20210113192829-cfbb3f4c80c2
 ## explicit
 github.com/openshift/library-go/pkg/config/client
 github.com/openshift/library-go/pkg/config/configdefaults
@@ -181,7 +181,10 @@ github.com/openshift/library-go/pkg/controller/metrics
 github.com/openshift/library-go/pkg/crypto
 github.com/openshift/library-go/pkg/network
 github.com/openshift/library-go/pkg/operator/condition
+github.com/openshift/library-go/pkg/operator/configobserver
+github.com/openshift/library-go/pkg/operator/configobserver/proxy
 github.com/openshift/library-go/pkg/operator/csi/credentialsrequestcontroller
+github.com/openshift/library-go/pkg/operator/csi/csiconfigobservercontroller
 github.com/openshift/library-go/pkg/operator/csi/csicontrollerset
 github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller
 github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller
@@ -229,8 +232,6 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 ## explicit
 github.com/spf13/pflag
-# github.com/ugorji/go v1.1.4
-## explicit
 # go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 go.etcd.io/etcd/auth/authpb
 go.etcd.io/etcd/clientv3
