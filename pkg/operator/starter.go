@@ -11,6 +11,7 @@ import (
 	opv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
+	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
 	"github.com/openshift/library-go/pkg/operator/staleconditions"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -24,12 +25,14 @@ const (
 	operatorName     = "aws-ebs-csi-driver-operator"
 	operandName      = "aws-ebs-csi-driver"
 	instanceName     = "ebs.csi.aws.com"
+	secretName       = "ebs-cloud-credentials"
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
 	// Create clientsets and informers
 	kubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, defaultNamespace, "")
+	secretInformer := kubeInformersForNamespaces.InformersFor(defaultNamespace).Core().V1().Secrets()
 
 	// Create GenericOperatorclient. This is used by the library-go controllers created down below
 	gvr := opv1.SchemeGroupVersion.WithResource("clustercsidrivers")
@@ -72,13 +75,15 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		"controller.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
+		nil,
+		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(defaultNamespace, secretName, secretInformer),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
 		generated.MustAsset,
 		"node.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
-	)
+	).WithExtraInformers(secretInformer.Informer())
 
 	staleController := staleconditions.NewRemoveStaleConditionsController(
 		[]string{"ResourceSyncControllerDegraded"}, // ResourceSyncController + condition was added in 4.7
