@@ -21,6 +21,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
+	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
 	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -86,6 +87,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"rbac/snapshotter_role.yaml",
 			"rbac/snapshotter_binding.yaml",
 		},
+	).WithCSIConfigObserverController(
+		"AWSEBSDriverCSIConfigObserverController",
+		configInformers,
 	).WithCSIDriverControllerService(
 		"AWSEBSDriverControllerServiceController",
 		withCustomCABundle(generated.MustAsset, kubeClient),
@@ -94,12 +98,14 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 		configInformers,
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(defaultNamespace, secretName, secretInformer),
+		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
 		generated.MustAsset,
 		"node.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
+		csidrivernodeservicecontroller.WithObservedProxyDaemonSetHook(),
 	).WithExtraInformers(secretInformer.Informer())
 
 	if err != nil {

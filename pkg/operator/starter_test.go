@@ -16,6 +16,8 @@ apiVersion: apps/v1
 metadata:
   name: aws-ebs-csi-driver-controller
   namespace: openshift-cluster-csi-drivers
+  annotations:
+    config.openshift.io/inject-proxy: csi-driver
 spec:
   selector:
     matchLabels:
@@ -181,6 +183,8 @@ apiVersion: apps/v1
 metadata:
   name: aws-ebs-csi-driver-controller
   namespace: openshift-cluster-csi-drivers
+  annotations:
+    config.openshift.io/inject-proxy: csi-driver
 spec:
   selector:
     matchLabels:
