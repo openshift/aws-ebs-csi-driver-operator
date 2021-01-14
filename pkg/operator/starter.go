@@ -9,7 +9,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclient "k8s.io/client-go/kubernetes"
@@ -21,8 +20,8 @@ import (
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
+	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcehash"
 	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
@@ -46,6 +45,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Create core clientset and informer
 	kubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, defaultNamespace, cloudConfigNamespace, "")
+	secretInformer := kubeInformersForNamespaces.InformersFor(defaultNamespace).Core().V1().Secrets()
 
 	// Create config clientset and informer. This is used to get the cluster ID
 	configClient := configclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
@@ -93,14 +93,14 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 		configInformers,
-		withSecretHashAnnotation(kubeInformersForNamespaces, defaultNamespace, secretName),
+		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(defaultNamespace, secretName, secretInformer),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
 		generated.MustAsset,
 		"node.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
-	)
+	).WithExtraInformers(secretInformer.Informer())
 
 	if err != nil {
 		return err
@@ -199,29 +199,4 @@ func isCustomCABundleUsed(kubeClient kubeclient.Interface) (bool, error) {
 	}
 	_, exists := cloudConfigCM.Data[caBundleKey]
 	return exists, nil
-}
-
-func withSecretHashAnnotation(kubeInformersForNamespaces v1helpers.KubeInformersForNamespaces, namespace, secret string) func(*appsv1.Deployment) error {
-	return func(deployment *appsv1.Deployment) error {
-		inputHashes, err := resourcehash.MultipleObjectHashStringMapForObjectReferenceFromLister(
-			kubeInformersForNamespaces.InformersFor(namespace).Core().V1().ConfigMaps().Lister(),
-			kubeInformersForNamespaces.InformersFor(namespace).Core().V1().Secrets().Lister(),
-			resourcehash.NewObjectRef().ForSecret().InNamespace(namespace).Named(secret),
-		)
-		if err != nil {
-			return fmt.Errorf("invalid dependency reference: %w", err)
-		}
-		if deployment.Annotations == nil {
-			deployment.Annotations = map[string]string{}
-		}
-		if deployment.Spec.Template.Annotations == nil {
-			deployment.Spec.Template.Annotations = map[string]string{}
-		}
-		for k, v := range inputHashes {
-			annotationKey := fmt.Sprintf("operator.openshift.io/dep-%s", k)
-			deployment.Annotations[annotationKey] = v
-			deployment.Spec.Template.Annotations[annotationKey] = v
-		}
-		return nil
-	}
 }
