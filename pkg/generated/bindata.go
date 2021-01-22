@@ -127,10 +127,6 @@ spec:
               value: '1'
             - name: AWS_CONFIG_FILE
               value: /var/run/secrets/aws/credentials
-            {{- if .CABundleConfigMap}}
-            - name: AWS_CA_BUNDLE
-              value: /etc/ca/ca-bundle.pem
-            {{- end}}
           ports:
             - name: healthz
               # Due to hostNetwork, this port is open on a node!
@@ -143,11 +139,6 @@ spec:
             - name: bound-sa-token
               mountPath: /var/run/secrets/openshift/serviceaccount
               readOnly: true
-            {{- if .CABundleConfigMap}}
-            - name: ca-bundle
-              mountPath: /etc/ca
-              readOnly: true
-            {{- end}}
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
           resources:
@@ -243,11 +234,6 @@ spec:
             - serviceAccountToken:
                 path: token
                 audience: openshift
-        {{- if .CABundleConfigMap}}
-        - name: ca-bundle
-          configMap:
-            name: {{.CABundleConfigMap}}
-        {{- end}}
         - name: socket-dir
           emptyDir: {}
 `)

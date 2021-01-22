@@ -1,17 +1,17 @@
 package operator
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"text/template"
 	"time"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeclient "k8s.io/client-go/kubernetes"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
@@ -51,6 +51,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Create config clientset and informer. This is used to get the cluster ID
 	configClient := configclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	configInformers := configinformers.NewSharedInformerFactory(configClient, 20*time.Minute)
+
+	// Create informer for the ConfigMaps in the openshift-config-managed namespace. This is used to get the custom CA
+	// bundle to use when accessing the AWS API.
+	cloudConfigInformer := kubeInformersForNamespaces.InformersFor(cloudConfigNamespace).Core().V1().ConfigMaps()
+	cloudConfigLister := cloudConfigInformer.Lister().ConfigMaps(cloudConfigNamespace)
 
 	// Create GenericOperatorclient. This is used by the library-go controllers created down below
 	gvr := opv1.SchemeGroupVersion.WithResource("clustercsidrivers")
@@ -92,13 +97,14 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		configInformers,
 	).WithCSIDriverControllerService(
 		"AWSEBSDriverControllerServiceController",
-		withCustomCABundle(generated.MustAsset, kubeClient),
+		generated.MustAsset,
 		"controller.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 		configInformers,
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(defaultNamespace, secretName, secretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
+		withCustomCABundle(cloudConfigLister),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
 		generated.MustAsset,
@@ -106,7 +112,10 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 		csidrivernodeservicecontroller.WithObservedProxyDaemonSetHook(),
-	).WithExtraInformers(secretInformer.Informer())
+	).WithExtraInformers(
+		secretInformer.Informer(),
+		cloudConfigInformer.Informer(),
+	)
 
 	if err != nil {
 		return err
@@ -143,22 +152,39 @@ type controllerTemplateData struct {
 // withCustomCABundle executes the asset as a template to fill out the parts required when using a custom CA bundle.
 // The `caBundleConfigMap` parameter specifies the name of the ConfigMap containing the custom CA bundle. If the
 // argument supplied is empty, then no custom CA bundle will be used.
-func withCustomCABundle(assetFunc func(string) []byte, kubeClient kubeclient.Interface) func(string) []byte {
-	templateData := controllerTemplateData{}
-	switch used, err := isCustomCABundleUsed(kubeClient); {
-	case err != nil:
-		klog.Fatalf("could not determine if a custom CA bundle is in use: %v", err)
-	case used:
-		templateData.CABundleConfigMap = cloudConfigName
-	}
-	return func(name string) []byte {
-		asset := assetFunc(name)
-		template := template.Must(template.New("template").Parse(string(asset)))
-		buf := &bytes.Buffer{}
-		if err := template.Execute(buf, templateData); err != nil {
-			klog.Fatalf("Failed to execute ")
+func withCustomCABundle(cloudConfigLister corev1listers.ConfigMapNamespaceLister) csidrivercontrollerservicecontroller.DeploymentHookFunc {
+	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		switch used, err := isCustomCABundleUsed(cloudConfigLister); {
+		case err != nil:
+			return fmt.Errorf("could not determine if a custom CA bundle is in use: %w", err)
+		case !used:
+			return nil
 		}
-		return buf.Bytes()
+		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "ca-bundle",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: cloudConfigName},
+				},
+			},
+		})
+		for i := range deployment.Spec.Template.Spec.Containers {
+			container := &deployment.Spec.Template.Spec.Containers[i]
+			if container.Name != "csi-driver" {
+				continue
+			}
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:  "AWS_CA_BUNDLE",
+				Value: "/etc/ca/ca-bundle.pem",
+			})
+			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+				Name:      "ca-bundle",
+				MountPath: "/etc/ca",
+				ReadOnly:  true,
+			})
+			return nil
+		}
+		return fmt.Errorf("could not use custom CA bundle because the csi-driver container is missing from the deployment")
 	}
 }
 
@@ -192,10 +218,8 @@ func newCustomCABundleSyncer(
 }
 
 // isCustomCABundleUsed returns true if the cloud config ConfigMap exists and contains a custom CA bundle.
-func isCustomCABundleUsed(kubeClient kubeclient.Interface) (bool, error) {
-	cloudConfigCM, err := kubeClient.CoreV1().
-		ConfigMaps(cloudConfigNamespace).
-		Get(context.Background(), cloudConfigName, metav1.GetOptions{})
+func isCustomCABundleUsed(cloudConfigLister corev1listers.ConfigMapNamespaceLister) (bool, error) {
+	cloudConfigCM, err := cloudConfigLister.Get(cloudConfigName)
 	if errors.IsNotFound(err) {
 		// no cloud config ConfigMap so there is no CA bundle
 		return false, nil
