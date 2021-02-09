@@ -9,7 +9,6 @@ spec:
   selector:
     matchLabels:
       app: aws-ebs-csi-driver-controller
-  serviceName: aws-ebs-csi-driver-controller
   replicas: 1
   template:
     metadata:
