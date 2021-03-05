@@ -333,6 +333,10 @@ spec:
   selector:
     matchLabels:
       app: aws-ebs-csi-driver-node
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
   template:
     metadata:
       labels:
