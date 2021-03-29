@@ -3,8 +3,10 @@ package operator
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	v1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	appsv1 "k8s.io/api/apps/v1"
@@ -41,6 +43,8 @@ const (
 	cloudConfigNamespace = "openshift-config-managed"
 	cloudConfigName      = "kube-cloud-config"
 	caBundleKey          = "ca-bundle.pem"
+
+	infrastructureName = "cluster"
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
@@ -116,6 +120,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(defaultNamespace, secretName, secretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
 		withCustomCABundle(cloudConfigLister),
+		withCustomTags(configInformers.Config().V1().Infrastructures().Lister()),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
 		generated.MustAsset,
@@ -131,6 +136,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	).WithExtraInformers(
 		secretInformer.Informer(),
 		cloudConfigInformer.Informer(),
+		configInformers.Config().V1().Infrastructures().Informer(),
 	)
 
 	if err != nil {
@@ -245,4 +251,40 @@ func isCustomCABundleUsed(cloudConfigLister corev1listers.ConfigMapNamespaceList
 	}
 	_, exists := cloudConfigCM.Data[caBundleKey]
 	return exists, nil
+}
+
+// withCustomTags add tags from Infrastructure.Status.PlatformStatus.AWS.ResourceTags to the driver command line as
+//  --extra-tags=<key1>=<value1>,<key2>=<value2>,...
+func withCustomTags(infraLister v1.InfrastructureLister) csidrivercontrollerservicecontroller.DeploymentHookFunc {
+	return func(spec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		infra, err := infraLister.Get(infrastructureName)
+		if err != nil {
+			return err
+		}
+		if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.AWS == nil {
+			return nil
+		}
+
+		userTags := infra.Status.PlatformStatus.AWS.ResourceTags
+		if len(userTags) == 0 {
+			return nil
+		}
+
+		tagPairs := make([]string, 0, len(userTags))
+		for _, userTag := range userTags {
+			pair := fmt.Sprintf("%s=%s", userTag.Key, userTag.Value)
+			tagPairs = append(tagPairs, pair)
+		}
+		tags := strings.Join(tagPairs, ",")
+		tagsArgument := fmt.Sprintf("--extra-tags=%s", tags)
+
+		for i := range deployment.Spec.Template.Spec.Containers {
+			container := &deployment.Spec.Template.Spec.Containers[i]
+			if container.Name != "csi-driver" {
+				continue
+			}
+			container.Args = append(container.Args, tagsArgument)
+		}
+		return nil
+	}
 }
