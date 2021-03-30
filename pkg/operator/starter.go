@@ -10,6 +10,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
@@ -64,6 +65,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
+	dynamicClient, err := dynamic.NewForConfig(controllerConfig.KubeConfig)
+	if err != nil {
+		return err
+	}
+
 	csiControllerSet := csicontrollerset.NewCSIControllerSet(
 		operatorClient,
 		controllerConfig.EventRecorder,
@@ -81,7 +87,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"controller_sa.yaml",
 			"node_sa.yaml",
 			"service.yaml",
-			"servicemonitor.yaml",
 			"rbac/attacher_role.yaml",
 			"rbac/attacher_binding.yaml",
 			"rbac/privileged_role.yaml",
@@ -118,6 +123,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 		csidrivernodeservicecontroller.WithObservedProxyDaemonSetHook(),
+	).WithServiceMonitorController(
+		"AWSEBSDriverServiceMonitorController",
+		dynamicClient,
+		generated.Asset,
+		"servicemonitor.yaml",
 	).WithExtraInformers(
 		secretInformer.Informer(),
 		cloudConfigInformer.Informer(),
