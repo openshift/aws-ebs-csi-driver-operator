@@ -410,6 +410,8 @@ github.com/openshift/client-go v0.0.0-20210331195552-cf6c2669e01f h1:MAFVN4yW6pP
 github.com/openshift/client-go v0.0.0-20210331195552-cf6c2669e01f/go.mod h1:hHaRJ6vp2MRd/CpuZ1oJkqnMGy5eEnoAkQmKPZKcUPI=
 github.com/openshift/library-go v0.0.0-20210407130542-7b14f5aa606e h1:7r386mTUjSTgRItIshy2wcTM2po/2j3FZBOCJb1n7NQ=
 github.com/openshift/library-go v0.0.0-20210407130542-7b14f5aa606e/go.mod h1:pnz961veImKsbn7pQcuFbcVpCQosYiC1fUOjzEDeOLU=
+github.com/openshift/library-go v0.0.0-20210408164723-7a65fdb398e2 h1:eYdrmOSwRqHhfuPK8bhCSkBRUmCNYkgkOLgnImnz3Rs=
+github.com/openshift/library-go v0.0.0-20210408164723-7a65fdb398e2/go.mod h1:pnz961veImKsbn7pQcuFbcVpCQosYiC1fUOjzEDeOLU=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pborman/uuid v1.2.0/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtPdI/k=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
