@@ -108,6 +108,7 @@ spec:
           # CSI driver container
         - name: csi-driver
           image: ${DRIVER_IMAGE}
+          imagePullPolicy: IfNotPresent
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --k8s-tag-cluster-id=${CLUSTER_ID}
@@ -153,6 +154,7 @@ spec:
           # external-provisioner container
         - name: csi-provisioner
           image: ${PROVISIONER_IMAGE}
+          imagePullPolicy: IfNotPresent
           args:
             - --csi-address=$(ADDRESS)
             - --default-fstype=ext4
@@ -195,6 +197,7 @@ spec:
           # external-attacher container
         - name: csi-attacher
           image: ${ATTACHER_IMAGE}
+          imagePullPolicy: IfNotPresent
           args:
             - --csi-address=$(ADDRESS)
             - --http-endpoint=localhost:8203
@@ -232,6 +235,7 @@ spec:
           # external-resizer container
         - name: csi-resizer
           image: ${RESIZER_IMAGE}
+          imagePullPolicy: IfNotPresent
           args:
             - --csi-address=$(ADDRESS)
             - --timeout=300s
@@ -270,6 +274,7 @@ spec:
           # external-snapshotter container
         - name: csi-snapshotter
           image: ${SNAPSHOTTER_IMAGE}
+          imagePullPolicy: IfNotPresent
           args:
             - --csi-address=$(ADDRESS)
             - --metrics-address=localhost:8205
@@ -306,6 +311,7 @@ spec:
             name: metrics-serving-cert
         - name: csi-liveness-probe
           image: ${LIVENESS_PROBE_IMAGE}
+          imagePullPolicy: IfNotPresent
           args:
             - --csi-address=/csi/csi.sock
             - --probe-timeout=3s
@@ -432,6 +438,7 @@ spec:
           securityContext:
             privileged: true
           image: ${DRIVER_IMAGE}
+          imagePullPolicy: IfNotPresent
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr
@@ -468,6 +475,7 @@ spec:
           securityContext:
             privileged: true
           image: ${NODE_DRIVER_REGISTRAR_IMAGE}
+          imagePullPolicy: IfNotPresent
           args:
             - --csi-address=$(ADDRESS)
             - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
@@ -492,6 +500,7 @@ spec:
               cpu: 10m
         - name: csi-liveness-probe
           image: ${LIVENESS_PROBE_IMAGE}
+          imagePullPolicy: IfNotPresent
           args:
             - --csi-address=/csi/csi.sock
             - --probe-timeout=3s
