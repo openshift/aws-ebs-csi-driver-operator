@@ -4,6 +4,9 @@ import (
 	"testing"
 	"time"
 
+	v1 "github.com/openshift/api/config/v1"
+	fakeconfig "github.com/openshift/client-go/config/clientset/versioned/fake"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -154,6 +157,120 @@ func TestWithCustomCABundle(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if e, a := tc.expected, deployment; !equality.Semantic.DeepEqual(e, a) {
+				t.Errorf("unexpected deployment\nwant=%#v\ngot= %#v", e, a)
+			}
+		})
+	}
+}
+
+func TestWithCustomTags(t *testing.T) {
+	tests := []struct {
+		name         string
+		userTags     []v1.AWSResourceTag
+		inDeployment *appsv1.Deployment
+		expected     *appsv1.Deployment
+	}{
+		{
+			name:     "no tags",
+			userTags: []v1.AWSResourceTag{},
+			inDeployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+							}},
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+							}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "tags",
+			userTags: []v1.AWSResourceTag{
+				{
+					Key:   "key1",
+					Value: "value1",
+				},
+				{
+					Key:   "key2",
+					Value: "value2",
+				},
+				{
+					Key:   "key3",
+					Value: "value3",
+				},
+			},
+			inDeployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Args: []string{"--existing-options", "foo"},
+							}},
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Args: []string{
+									"--existing-options", "foo",
+									"--extra-tags=key1=value1,key2=value2,key3=value3",
+								},
+							}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			infra := &v1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: v1.InfrastructureStatus{
+					PlatformStatus: &v1.PlatformStatus{
+						AWS: &v1.AWSPlatformStatus{
+							ResourceTags: test.userTags,
+						},
+					},
+				},
+			}
+			configClient := fakeconfig.NewSimpleClientset(infra)
+			configInformerFactory := configinformers.NewSharedInformerFactory(configClient, 0)
+			configInformerFactory.Config().V1().Infrastructures().Informer().GetIndexer().Add(infra)
+			stopCh := make(chan struct{})
+			go configInformerFactory.Start(stopCh)
+			defer close(stopCh)
+			wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+				return configInformerFactory.Config().V1().Infrastructures().Informer().HasSynced(), nil
+			})
+			deployment := test.inDeployment.DeepCopy()
+			err := withCustomTags(configInformerFactory.Config().V1().Infrastructures().Lister())(nil, deployment)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if e, a := test.expected, deployment; !equality.Semantic.DeepEqual(e, a) {
 				t.Errorf("unexpected deployment\nwant=%#v\ngot= %#v", e, a)
 			}
 		})
