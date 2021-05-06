@@ -22,3 +22,5 @@ require (
 	k8s.io/klog/v2 v2.8.0
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.1 // indirect
 )
+
+replace github.com/openshift/library-go => ../library-go

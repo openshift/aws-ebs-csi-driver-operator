@@ -212,30 +212,33 @@ func (c *CSIDriverControllerServiceController) sync(ctx context.Context, syncCon
 
 	_, _, err = v1helpers.UpdateStatus(
 		c.operatorClient,
-		updateStatusFn,
 		v1helpers.UpdateConditionFn(availableCondition),
 		v1helpers.UpdateConditionFn(progressingCondition),
+		updateStatusFn,
 	)
 
 	return err
 }
 
 func isProgressing(status *opv1.OperatorStatus, deployment *appsv1.Deployment) (bool, string) {
-	var deploymentExpectedReplicas int32
-	if deployment.Spec.Replicas != nil {
-		deploymentExpectedReplicas = *deployment.Spec.Replicas
+	if deployment.Generation != deployment.Status.ObservedGeneration {
+		return true, "Waiting for Deployment to act on changes"
 	}
 
-	switch {
-	case deployment.Generation != deployment.Status.ObservedGeneration:
-		return true, "Waiting for Deployment to act on changes"
-	case deployment.Status.UnavailableReplicas > 0:
-		return true, "Waiting for Deployment to deploy pods"
-	case deployment.Status.UpdatedReplicas < deploymentExpectedReplicas:
-		return true, "Waiting for Deployment to update pods"
-	case deployment.Status.AvailableReplicas < deploymentExpectedReplicas:
-		return true, "Waiting for Deployment to deploy pods"
+	// The current deployment generation might not the same as the one that this controller dealt
+	// with in the previous sync. This means that a new config is being rolled out in this cycle.
+	// 	As a result, we need to verify if the rolling out is still progressing.
+	lastGeneration := resourcemerge.ExpectedDeploymentGeneration(deployment, status.Generations)
+	if deployment.Generation != lastGeneration {
+		var deploymentExpectedReplicas int32
+		if deployment.Spec.Replicas != nil {
+			deploymentExpectedReplicas = *deployment.Spec.Replicas
+		}
+		if deployment.Status.AvailableReplicas < deploymentExpectedReplicas {
+			return true, "Waiting for Deployment to deploy pods"
+		}
 	}
+
 	return false, ""
 }
 

@@ -177,20 +177,27 @@ func (c *CSIDriverNodeServiceController) sync(ctx context.Context, syncContext f
 
 	_, _, err = v1helpers.UpdateStatus(
 		c.operatorClient,
-		updateStatusFn,
 		v1helpers.UpdateConditionFn(availableCondition),
 		v1helpers.UpdateConditionFn(progressingCondition),
+		updateStatusFn,
 	)
 
 	return err
 }
 
 func isProgressing(status *opv1.OperatorStatus, daemonSet *appsv1.DaemonSet) (bool, string) {
-	switch {
-	case daemonSet.Generation != daemonSet.Status.ObservedGeneration:
+	if daemonSet.Generation != daemonSet.Status.ObservedGeneration {
 		return true, "Waiting for DaemonSet to act on changes"
-	case daemonSet.Status.NumberUnavailable > 0:
-		return true, "Waiting for DaemonSet to deploy node pods"
+	}
+
+	// The current daemonSet generation is not the same as the one that this controller dealt
+	// with in the previous sync. This means that a new config is being rolled out in this cycle.
+	// 	As a result, we need to verify if the rolling out is still progressing.
+	lastGeneration := resourcemerge.ExpectedDaemonSetGeneration(daemonSet, status.Generations)
+	if daemonSet.Generation != lastGeneration {
+		if daemonSet.Status.NumberUnavailable > 0 {
+			return true, "Waiting for DaemonSet to deploy node pods"
+		}
 	}
 	return false, ""
 }
