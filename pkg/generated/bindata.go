@@ -113,6 +113,7 @@ spec:
             - --endpoint=$(CSI_ENDPOINT)
             - --k8s-tag-cluster-id=${CLUSTER_ID}
             - --logtostderr
+            - --http-endpoint=localhost:8206
             - --v=${LOG_LEVEL}
           env:
             - name: CSI_ENDPOINT
@@ -151,6 +152,28 @@ spec:
             requests:
               memory: 50Mi
               cpu: 10m
+          # kube-rbac-proxy for csi-driver container.
+          # Provides https proxy for http-based csi-driver metrics.
+        - name: driver-kube-rbac-proxy
+          args:
+          - --secure-listen-address=0.0.0.0:9206
+          - --upstream=http://127.0.0.1:8206/
+          - --tls-cert-file=/etc/tls/private/tls.crt
+          - --tls-private-key-file=/etc/tls/private/tls.key
+          - --logtostderr=true
+          image: ${KUBE_RBAC_PROXY_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 9206
+            name: driver-m
+            protocol: TCP
+          resources:
+            requests:
+              memory: 20Mi
+              cpu: 10m
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: metrics-serving-cert
           # external-provisioner container
         - name: csi-provisioner
           image: ${PROVISIONER_IMAGE}
@@ -1100,6 +1123,10 @@ spec:
     port: 446
     protocol: TCP
     targetPort: snapshotter-m
+  - name: driver-m
+    port: 447
+    protocol: TCP
+    targetPort: driver-m
   selector:
     app: aws-ebs-csi-driver-controller
   sessionAffinity: None
@@ -1156,6 +1183,14 @@ spec:
     interval: 30s
     path: /metrics
     port: snapshotter-m
+    scheme: https
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: aws-ebs-csi-driver-controller-metrics.openshift-cluster-csi-drivers.svc
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    interval: 30s
+    path: /metrics
+    port: driver-m
     scheme: https
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt

@@ -25,6 +25,10 @@ spec:
     port: 446
     protocol: TCP
     targetPort: snapshotter-m
+  - name: driver-m
+    port: 447
+    protocol: TCP
+    targetPort: driver-m
   selector:
     app: aws-ebs-csi-driver-controller
   sessionAffinity: None
