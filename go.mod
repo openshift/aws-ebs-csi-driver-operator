@@ -22,3 +22,6 @@ require (
 	k8s.io/klog/v2 v2.8.0
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.1 // indirect
 )
+
+// points to temporary-watch-reduction-patch-1.21 to pick up k/k/pull/101102 - please remove it once the pr merges and a new Z release is cut
+replace k8s.io/apiserver => github.com/openshift/kubernetes-apiserver v0.0.0-20210419140141-620426e63a99
