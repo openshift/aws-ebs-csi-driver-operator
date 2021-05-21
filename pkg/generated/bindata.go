@@ -87,7 +87,11 @@ spec:
   selector:
     matchLabels:
       app: aws-ebs-csi-driver-controller
-  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
   template:
     metadata:
       labels:
@@ -104,6 +108,15 @@ spec:
         - key: node-role.kubernetes.io/master
           operator: Exists
           effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: aws-ebs-csi-driver-controller
+                topologyKey: kubernetes.io/hostname
       containers:
           # CSI driver container
         - name: csi-driver
@@ -184,6 +197,7 @@ spec:
             - --feature-gates=Topology=true
             - --extra-create-metadata=true
             - --http-endpoint=localhost:8202
+            - --leader-election
             - --v=${LOG_LEVEL}
           env:
             - name: ADDRESS
@@ -224,6 +238,7 @@ spec:
           args:
             - --csi-address=$(ADDRESS)
             - --http-endpoint=localhost:8203
+            - --leader-election
             - --v=${LOG_LEVEL}
           env:
             - name: ADDRESS
@@ -263,6 +278,7 @@ spec:
             - --csi-address=$(ADDRESS)
             - --timeout=300s
             - --http-endpoint=localhost:8204
+            - --leader-election
             - --v=${LOG_LEVEL}
           env:
             - name: ADDRESS
@@ -301,6 +317,7 @@ spec:
           args:
             - --csi-address=$(ADDRESS)
             - --metrics-address=localhost:8205
+            - --leader-election
             - --v=${LOG_LEVEL}
           env:
           - name: ADDRESS
