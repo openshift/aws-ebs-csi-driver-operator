@@ -83,6 +83,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	).WithStaticResourcesController(
 		"AWSEBSDriverStaticResourcesController",
 		kubeClient,
+		dynamicClient,
 		kubeInformersForNamespaces,
 		generated.Asset,
 		[]string{
