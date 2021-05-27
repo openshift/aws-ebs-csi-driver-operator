@@ -4,6 +4,8 @@ An operator to deploy the [AWS EBS CSI driver](https://github.com/openshift/aws-
 
 This operator is installed by the [cluster-storage-operator](https://github.com/openshift/cluster-storage-operator).
 
+#### Note: authoritative YAML files to deploy the driver are in github.com/openshift/cluster-storage-operator/tree/master/assets/csidriveroperators/aws-ebs
+
 # Quick start
 
 Before running the operator manually, you must remove the operator installed by CSO/CVO
