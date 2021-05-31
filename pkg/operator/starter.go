@@ -93,6 +93,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"storageclass.yaml",
 			"csidriver.yaml",
 			"controller_sa.yaml",
+			"controller_pdb.yaml",
 			"node_sa.yaml",
 			"service.yaml",
 			"rbac/attacher_role.yaml",
