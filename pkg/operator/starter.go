@@ -39,6 +39,7 @@ const (
 	operandName      = "aws-ebs-csi-driver"
 	instanceName     = "ebs.csi.aws.com"
 	secretName       = "ebs-cloud-credentials"
+	infraConfigName  = "cluster"
 
 	cloudConfigNamespace = "openshift-config-managed"
 	cloudConfigName      = "kube-cloud-config"
@@ -52,10 +53,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	kubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, defaultNamespace, cloudConfigNamespace, "")
 	secretInformer := kubeInformersForNamespaces.InformersFor(defaultNamespace).Core().V1().Secrets()
+	nodeInformer := kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
 
 	// Create config clientset and informer. This is used to get the cluster ID
 	configClient := configclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	configInformers := configinformers.NewSharedInformerFactory(configClient, 20*time.Minute)
+	infraInformer := configInformers.Config().V1().Infrastructures()
 
 	// Create informer for the ConfigMaps in the openshift-config-managed namespace. This is used to get the custom CA
 	// bundle to use when accessing the AWS API.
@@ -83,12 +86,14 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	).WithStaticResourcesController(
 		"AWSEBSDriverStaticResourcesController",
 		kubeClient,
+		dynamicClient,
 		kubeInformersForNamespaces,
 		generated.Asset,
 		[]string{
 			"storageclass.yaml",
 			"csidriver.yaml",
 			"controller_sa.yaml",
+			"controller_pdb.yaml",
 			"node_sa.yaml",
 			"service.yaml",
 			"rbac/attacher_role.yaml",
@@ -117,28 +122,31 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 		configInformers,
+		[]factory.Informer{
+			secretInformer.Informer(),
+			nodeInformer.Informer(),
+			cloudConfigInformer.Informer(),
+			infraInformer.Informer(),
+		},
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(defaultNamespace, secretName, secretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
+		csidrivercontrollerservicecontroller.WithReplicasHook(nodeInformer.Lister()),
 		withCustomCABundle(cloudConfigLister),
-		withCustomTags(configInformers.Config().V1().Infrastructures().Lister()),
+		withCustomTags(infraInformer.Lister()),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
 		generated.MustAsset,
 		"node.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
+		nil, // Node doesn't need to react to any changes
 		csidrivernodeservicecontroller.WithObservedProxyDaemonSetHook(),
 	).WithServiceMonitorController(
 		"AWSEBSDriverServiceMonitorController",
 		dynamicClient,
 		generated.Asset,
 		"servicemonitor.yaml",
-	).WithExtraInformers(
-		secretInformer.Informer(),
-		cloudConfigInformer.Informer(),
-		configInformers.Config().V1().Infrastructures().Informer(),
 	)
-
 	if err != nil {
 		return err
 	}
