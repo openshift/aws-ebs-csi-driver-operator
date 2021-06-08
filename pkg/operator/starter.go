@@ -91,6 +91,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		generated.Asset,
 		[]string{
 			"storageclass.yaml",
+			"volumesnapshotclass.yaml",
 			"csidriver.yaml",
 			"controller_sa.yaml",
 			"controller_pdb.yaml",
