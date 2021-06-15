@@ -118,7 +118,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		configInformers,
 	).WithCSIDriverControllerService(
 		"AWSEBSDriverControllerServiceController",
-		generated.MustAsset,
+		generated.Asset,
 		"controller.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
@@ -136,7 +136,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		withCustomTags(infraInformer.Lister()),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
-		generated.MustAsset,
+		generated.Asset,
 		"node.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
