@@ -29,7 +29,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated"
+	"github.com/openshift/aws-ebs-csi-driver-operator/assets"
 )
 
 const (
@@ -88,7 +88,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		kubeClient,
 		dynamicClient,
 		kubeInformersForNamespaces,
-		generated.Asset,
+		assets.ReadFile,
 		[]string{
 			"storageclass.yaml",
 			"volumesnapshotclass.yaml",
@@ -118,7 +118,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		configInformers,
 	).WithCSIDriverControllerService(
 		"AWSEBSDriverControllerServiceController",
-		generated.Asset,
+		assets.ReadFile,
 		"controller.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
@@ -136,7 +136,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		withCustomTags(infraInformer.Lister()),
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
-		generated.Asset,
+		assets.ReadFile,
 		"node.yaml",
 		kubeClient,
 		kubeInformersForNamespaces.InformersFor(defaultNamespace),
@@ -145,7 +145,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	).WithServiceMonitorController(
 		"AWSEBSDriverServiceMonitorController",
 		dynamicClient,
-		generated.Asset,
+		assets.ReadFile,
 		"servicemonitor.yaml",
 	)
 	if err != nil {
