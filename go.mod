@@ -3,14 +3,13 @@ module github.com/openshift/aws-ebs-csi-driver-operator
 go 1.16
 
 require (
-	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/google/go-cmp v0.5.5 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/openshift/api v0.0.0-20210521075222-e273a339932a
 	github.com/openshift/build-machinery-go v0.0.0-20210423112049-9415d7ebd33e
 	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142
-	github.com/openshift/library-go v0.0.0-20210531121234-77bbf31ff978
+	github.com/openshift/library-go v0.0.0-20210615193812-4a361189f3da
 	github.com/prometheus/client_golang v1.7.1
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
