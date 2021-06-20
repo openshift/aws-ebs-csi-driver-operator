@@ -25,6 +25,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
+	"github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
 	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -183,7 +184,7 @@ type controllerTemplateData struct {
 // withCustomCABundle executes the asset as a template to fill out the parts required when using a custom CA bundle.
 // The `caBundleConfigMap` parameter specifies the name of the ConfigMap containing the custom CA bundle. If the
 // argument supplied is empty, then no custom CA bundle will be used.
-func withCustomCABundle(cloudConfigLister corev1listers.ConfigMapNamespaceLister) csidrivercontrollerservicecontroller.DeploymentHookFunc {
+func withCustomCABundle(cloudConfigLister corev1listers.ConfigMapNamespaceLister) deploymentcontroller.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		switch used, err := isCustomCABundleUsed(cloudConfigLister); {
 		case err != nil:
@@ -264,7 +265,7 @@ func isCustomCABundleUsed(cloudConfigLister corev1listers.ConfigMapNamespaceList
 
 // withCustomTags add tags from Infrastructure.Status.PlatformStatus.AWS.ResourceTags to the driver command line as
 //  --extra-tags=<key1>=<value1>,<key2>=<value2>,...
-func withCustomTags(infraLister v1.InfrastructureLister) csidrivercontrollerservicecontroller.DeploymentHookFunc {
+func withCustomTags(infraLister v1.InfrastructureLister) deploymentcontroller.DeploymentHookFunc {
 	return func(spec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		infra, err := infraLister.Get(infrastructureName)
 		if err != nil {
