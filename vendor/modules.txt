@@ -170,7 +170,7 @@ github.com/openshift/client-go/config/informers/externalversions/config
 github.com/openshift/client-go/config/informers/externalversions/config/v1
 github.com/openshift/client-go/config/informers/externalversions/internalinterfaces
 github.com/openshift/client-go/config/listers/config/v1
-# github.com/openshift/library-go v0.0.0-20210615193812-4a361189f3da
+# github.com/openshift/library-go v0.0.0-20210628070212-357bf4e8be6a
 ## explicit
 github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer
 github.com/openshift/library-go/pkg/config/client
@@ -191,6 +191,7 @@ github.com/openshift/library-go/pkg/operator/csi/csiconfigobservercontroller
 github.com/openshift/library-go/pkg/operator/csi/csicontrollerset
 github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller
 github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller
+github.com/openshift/library-go/pkg/operator/deploymentcontroller
 github.com/openshift/library-go/pkg/operator/events
 github.com/openshift/library-go/pkg/operator/genericoperatorclient
 github.com/openshift/library-go/pkg/operator/loglevel
