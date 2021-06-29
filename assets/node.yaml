@@ -34,7 +34,7 @@ spec:
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr
-            - --v=${LOG_LEVEL}
+            - --v=5
           env:
             - name: CSI_ENDPOINT
               value: unix:/csi/csi.sock
@@ -71,7 +71,7 @@ spec:
           args:
             - --csi-address=$(ADDRESS)
             - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
-            - --v=${LOG_LEVEL}
+            - --v=5
           lifecycle:
             preStop:
               exec:
