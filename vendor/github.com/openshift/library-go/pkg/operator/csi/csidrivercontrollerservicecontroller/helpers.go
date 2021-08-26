@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -15,6 +16,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	opv1 "github.com/openshift/api/operator/v1"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	leaderelection "github.com/openshift/library-go/pkg/config/leaderelection"
 	"github.com/openshift/library-go/pkg/operator/csi/csiconfigobservercontroller"
 	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
@@ -177,5 +179,20 @@ func WithControlPlaneTopologyHook(configInformer configinformers.SharedInformerF
 			deployment.Spec.Template.Spec.NodeSelector = map[string]string{}
 		}
 		return nil
+	}
+}
+
+// WithLeaderElectionReplacerHook modifies ${LEADER_ELECTION_*} parameters in a yaml file with
+// OpenShift's recommended values.
+func WithLeaderElectionReplacerHook() dc.ManifestHookFunc {
+	return func(spec *opv1.OperatorSpec, manifest []byte) ([]byte, error) {
+		le := leaderelection.LeaderElectionDefaulting(configv1.LeaderElection{}, "default", "default")
+		pairs := []string{
+			"${LEADER_ELECTION_LEASE_DURATION}", fmt.Sprintf("%fs", le.LeaseDuration.Round(time.Second).Seconds()),
+			"${LEADER_ELECTION_RENEW_DEADLINE}", fmt.Sprintf("%fs", le.RenewDeadline.Round(time.Second).Seconds()),
+			"${LEADER_ELECTION_RETRY_PERIOD}", fmt.Sprintf("%fs", le.RetryPeriod.Round(time.Second).Seconds()),
+		}
+		replaced := strings.NewReplacer(pairs...).Replace(string(manifest))
+		return []byte(replaced), nil
 	}
 }

@@ -17,3 +17,5 @@ require (
 	k8s.io/component-base v0.22.1
 	k8s.io/klog/v2 v2.9.0
 )
+
+replace github.com/openshift/library-go => ../library-go
