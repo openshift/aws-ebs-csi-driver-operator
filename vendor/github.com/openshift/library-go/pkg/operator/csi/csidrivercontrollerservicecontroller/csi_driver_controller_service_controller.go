@@ -5,11 +5,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
 	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"github.com/openshift/library-go/pkg/operator/events"
-
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
@@ -46,6 +44,8 @@ import (
 // The placeholder ${CLUSTER_ID} specified in the static file is replaced with the cluster ID (sometimes referred as infra ID).
 // This is mostly used by CSI drivers to tag volumes and snapshots so that those resources can be cleaned up on cluster deletion.
 //
+// This controller supports removable operands, as configured in pkg/operator/management.
+//
 // This controller produces the following conditions:
 //
 // <name>Available: indicates that the CSI Controller Service was successfully deployed and at least one Deployment replica is available.
@@ -56,7 +56,7 @@ func NewCSIDriverControllerServiceController(
 	name string,
 	manifest []byte,
 	recorder events.Recorder,
-	operatorClient v1helpers.OperatorClient,
+	operatorClient v1helpers.OperatorClientWithFinalizers,
 	kubeClient kubernetes.Interface,
 	deployInformer appsinformersv1.DeploymentInformer,
 	configInformer configinformers.SharedInformerFactory,
@@ -66,6 +66,8 @@ func NewCSIDriverControllerServiceController(
 	optionalInformers = append(optionalInformers, configInformer.Config().V1().Infrastructures().Informer())
 	var optionalManifestHooks []dc.ManifestHookFunc
 	optionalManifestHooks = append(optionalManifestHooks, WithPlaceholdersHook(configInformer))
-	return dc.NewDeploymentController(name, manifest, recorder, operatorClient, kubeClient, deployInformer, optionalInformers, optionalManifestHooks, optionalDeploymentHooks...)
-
+	var deploymentHooks []dc.DeploymentHookFunc
+	deploymentHooks = append(deploymentHooks, optionalDeploymentHooks...)
+	deploymentHooks = append(deploymentHooks, WithControlPlaneTopologyHook(configInformer))
+	return dc.NewDeploymentController(name, manifest, recorder, operatorClient, kubeClient, deployInformer, optionalInformers, optionalManifestHooks, deploymentHooks...)
 }
