@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	v1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -276,7 +277,14 @@ func withCustomTags(infraLister v1.InfrastructureLister) deploymentcontroller.De
 			return nil
 		}
 
-		userTags := infra.Status.PlatformStatus.AWS.ResourceTags
+		// The ResourceTags field would be migrated from the Status field to the Spec field.
+		// Till the field is deprecated, the ResourceTags present in the Spec field takes the priority
+		var userTags []configv1.AWSResourceTag
+		if len(infra.Spec.PlatformSpec.AWS.ResourceTags) == 0 {
+			userTags = infra.Status.PlatformStatus.AWS.ResourceTags
+		} else {
+			userTags = infra.Spec.PlatformSpec.AWS.ResourceTags
+		}
 		if len(userTags) == 0 {
 			return nil
 		}

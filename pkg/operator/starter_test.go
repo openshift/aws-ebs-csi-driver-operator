@@ -248,9 +248,17 @@ func TestWithCustomTags(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 				},
+				// The ResourceTags would be migrated to the Spec field and hence this step would be deprecated in the future
 				Status: v1.InfrastructureStatus{
 					PlatformStatus: &v1.PlatformStatus{
 						AWS: &v1.AWSPlatformStatus{
+							ResourceTags: test.userTags,
+						},
+					},
+				},
+				Spec: v1.InfrastructureSpec{
+					PlatformSpec: v1.PlatformSpec{
+						AWS: &v1.AWSPlatformSpec{
 							ResourceTags: test.userTags,
 						},
 					},
