@@ -1,38 +1,20 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"math/rand"
 	"os"
-	"time"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
-	k8sflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/spf13/cobra"
+	"k8s.io/component-base/cli"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/operator"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/version"
 )
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	pflag.CommandLine.SetNormalizeFunc(k8sflag.WordSepNormalizeFunc)
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
 	command := NewOperatorCommand()
-	if err := command.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
+	code := cli.Run(command)
+	os.Exit(code)
 }
 
 func NewOperatorCommand() *cobra.Command {
