@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	v1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -139,7 +140,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
 		csidrivercontrollerservicecontroller.WithReplicasHook(nodeInformer.Lister()),
 		withCustomCABundle(cloudConfigLister),
-		withCustomTags(infraInformer.Lister()),
+		withCustomTags(infraInformer.Lister(), controllerConfig.EventRecorder),
 		csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
 			defaultNamespace,
 			trustedCAConfigMap,
@@ -280,21 +281,42 @@ func isCustomCABundleUsed(cloudConfigLister corev1listers.ConfigMapNamespaceList
 
 // withCustomTags add tags from Infrastructure.Status.PlatformStatus.AWS.ResourceTags to the driver command line as
 //  --extra-tags=<key1>=<value1>,<key2>=<value2>,...
-func withCustomTags(infraLister v1.InfrastructureLister) deploymentcontroller.DeploymentHookFunc {
+func withCustomTags(infraLister v1.InfrastructureLister, recorder events.Recorder) deploymentcontroller.DeploymentHookFunc {
 	return func(spec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		infra, err := infraLister.Get(infrastructureName)
 		if err != nil {
+			recorder.Eventf("Failed to update the user tags", "failed to fetch the infrastructure object, Error: %v", err)
 			return err
 		}
-		if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.AWS == nil {
+
+		var userTags []configv1.AWSResourceTag
+		var mergedTags = make(map[string]string)
+		statusTags := fetchTagsFromStatus(infra)
+		specTags := fetchTagsFromSpec(infra)
+
+		if len(specTags) == 0 && len(statusTags) == 0 {
 			return nil
 		}
 
-		userTags := infra.Status.PlatformStatus.AWS.ResourceTags
-		if len(userTags) == 0 {
-			return nil
+		// merging the tags and prioritizing the tags present in the Spec field over the Status field.
+		for key, value := range statusTags {
+			mergedTags[key] = value
+		}
+		for key, value := range specTags {
+			mergedTags[key] = value
 		}
 
+		if len(mergedTags) == 0 {
+			recorder.Eventf("Failed to update the user tags", "No tags found in the infrastructure object, Name: %s", infrastructureName)
+			return nil
+		}
+		for key, value := range mergedTags {
+			userTag := configv1.AWSResourceTag{
+				Key:   key,
+				Value: value,
+			}
+			userTags = append(userTags, userTag)
+		}
 		tagPairs := make([]string, 0, len(userTags))
 		for _, userTag := range userTags {
 			pair := fmt.Sprintf("%s=%s", userTag.Key, userTag.Value)
@@ -312,4 +334,26 @@ func withCustomTags(infraLister v1.InfrastructureLister) deploymentcontroller.De
 		}
 		return nil
 	}
+}
+
+// fetchTagsFromStatus returns the tags present in the Infrastructure object's PlatformStatus.
+func fetchTagsFromStatus(infra *configv1.Infrastructure) map[string]string {
+	var tags = make(map[string]string)
+	if infra.Status.PlatformStatus != nil && infra.Status.PlatformStatus.AWS != nil {
+		for _, tag := range infra.Status.PlatformStatus.AWS.ResourceTags {
+			tags[tag.Key] = tag.Value
+		}
+	}
+	return tags
+}
+
+// fetchTagsFromSpec returns the tags present in the Infrastructure object's PlatformSpec.
+func fetchTagsFromSpec(infra *configv1.Infrastructure) map[string]string {
+	var tags = make(map[string]string)
+	if infra.Spec.PlatformSpec.AWS != nil {
+		for _, tag := range infra.Spec.PlatformSpec.AWS.ResourceTags {
+			tags[tag.Key] = tag.Value
+		}
+	}
+	return tags
 }

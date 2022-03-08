@@ -7,6 +7,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 	fakeconfig "github.com/openshift/client-go/config/clientset/versioned/fake"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -166,13 +167,15 @@ func TestWithCustomCABundle(t *testing.T) {
 func TestWithCustomTags(t *testing.T) {
 	tests := []struct {
 		name         string
-		userTags     []v1.AWSResourceTag
+		specTags     []v1.AWSResourceTag
+		statusTags   []v1.AWSResourceTag
 		inDeployment *appsv1.Deployment
 		expected     *appsv1.Deployment
 	}{
 		{
-			name:     "no tags",
-			userTags: []v1.AWSResourceTag{},
+			name:       "no tags",
+			specTags:   []v1.AWSResourceTag{},
+			statusTags: []v1.AWSResourceTag{},
 			inDeployment: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
 					Template: corev1.PodTemplateSpec{
@@ -197,19 +200,11 @@ func TestWithCustomTags(t *testing.T) {
 			},
 		},
 		{
-			name: "tags",
-			userTags: []v1.AWSResourceTag{
+			name: "tags defined in the platform spec field",
+			specTags: []v1.AWSResourceTag{
 				{
 					Key:   "key1",
 					Value: "value1",
-				},
-				{
-					Key:   "key2",
-					Value: "value2",
-				},
-				{
-					Key:   "key3",
-					Value: "value3",
 				},
 			},
 			inDeployment: &appsv1.Deployment{
@@ -232,7 +227,85 @@ func TestWithCustomTags(t *testing.T) {
 								Name: "csi-driver",
 								Args: []string{
 									"--existing-options", "foo",
-									"--extra-tags=key1=value1,key2=value2,key3=value3",
+									"--extra-tags=key1=value1",
+								},
+							}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "tags defined in the platform status field",
+			statusTags: []v1.AWSResourceTag{
+				{
+					Key:   "key1",
+					Value: "value1",
+				},
+			},
+			inDeployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Args: []string{"--existing-options", "foo"},
+							}},
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Args: []string{
+									"--existing-options", "foo",
+									"--extra-tags=key1=value1",
+								},
+							}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "tags defined in both the platform spec and the status fields",
+			specTags: []v1.AWSResourceTag{
+				{
+					Key:   "key1",
+					Value: "specValue",
+				},
+			},
+			statusTags: []v1.AWSResourceTag{
+				{
+					Key:   "key1",
+					Value: "statusValue",
+				},
+			},
+			inDeployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Args: []string{"--existing-options", "foo"},
+							}},
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Args: []string{
+									"--existing-options", "foo",
+									"--extra-tags=key1=specValue",
 								},
 							}},
 						},
@@ -251,7 +324,14 @@ func TestWithCustomTags(t *testing.T) {
 				Status: v1.InfrastructureStatus{
 					PlatformStatus: &v1.PlatformStatus{
 						AWS: &v1.AWSPlatformStatus{
-							ResourceTags: test.userTags,
+							ResourceTags: test.statusTags,
+						},
+					},
+				},
+				Spec: v1.InfrastructureSpec{
+					PlatformSpec: v1.PlatformSpec{
+						AWS: &v1.AWSPlatformSpec{
+							ResourceTags: test.specTags,
 						},
 					},
 				},
@@ -266,7 +346,7 @@ func TestWithCustomTags(t *testing.T) {
 				return configInformerFactory.Config().V1().Infrastructures().Informer().HasSynced(), nil
 			})
 			deployment := test.inDeployment.DeepCopy()
-			err := withCustomTags(configInformerFactory.Config().V1().Infrastructures().Lister())(nil, deployment)
+			err := withCustomTags(configInformerFactory.Config().V1().Infrastructures().Lister(), events.NewInMemoryRecorder("aws-ebs-csi-driver"))(nil, deployment)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
