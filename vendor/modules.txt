@@ -132,7 +132,7 @@ github.com/modern-go/reflect2
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
-# github.com/openshift/api v0.0.0-20220114150019-2499da51153e
+# github.com/openshift/api v0.0.0-20220114150019-2499da51153e => github.com/josefkarasek/api-1 v0.0.0-20220308084908-a40e5e138277
 ## explicit; go 1.16
 github.com/openshift/api
 github.com/openshift/api/apiserver
@@ -1155,3 +1155,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# github.com/openshift/api => github.com/josefkarasek/api-1 v0.0.0-20220308084908-a40e5e138277
