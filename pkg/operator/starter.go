@@ -163,6 +163,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		dynamicClient,
 		assets.ReadFile,
 		"servicemonitor.yaml",
+	).WithDefaultStorageClassController(
+		"AWSEBSDriverCSIDefaultStorageClassController",
+		assets.ReadFile,
+		"storageclass_gp2.yaml",
+		kubeClient,
+		kubeInformersForNamespaces.InformersFor(defaultNamespace),
 	)
 	if err != nil {
 		return err
