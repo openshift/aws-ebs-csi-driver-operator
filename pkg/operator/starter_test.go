@@ -276,3 +276,132 @@ func TestWithCustomTags(t *testing.T) {
 		})
 	}
 }
+
+func TestWithCustomEndPoint(t *testing.T) {
+	tests := []struct {
+		name            string
+		customEndPoints []v1.AWSServiceEndpoint
+		inDeployment    *appsv1.Deployment
+		expected        *appsv1.Deployment
+	}{
+		{
+			name:            "when no service end point is set",
+			customEndPoints: []v1.AWSServiceEndpoint{},
+			inDeployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "AWS_SECRET",
+										Value: "SECRET",
+									},
+								},
+							}},
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "AWS_SECRET",
+										Value: "SECRET",
+									},
+								},
+							}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "when a custom ec2 end point is specified",
+			customEndPoints: []v1.AWSServiceEndpoint{
+				{
+					Name: "ec2",
+					URL:  "https://example.com",
+				},
+			},
+			inDeployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "AWS_SECRET",
+										Value: "SECRET",
+									},
+								},
+							}},
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name: "csi-driver",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "AWS_SECRET",
+										Value: "SECRET",
+									},
+									{
+										Name:  "AWS_EC2_ENDPOINT",
+										Value: "https://example.com",
+									},
+								},
+							}},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			infra := &v1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: v1.InfrastructureStatus{
+					PlatformStatus: &v1.PlatformStatus{
+						AWS: &v1.AWSPlatformStatus{
+							ServiceEndpoints: test.customEndPoints,
+						},
+					},
+				},
+			}
+			configClient := fakeconfig.NewSimpleClientset(infra)
+			configInformerFactory := configinformers.NewSharedInformerFactory(configClient, 0)
+			configInformerFactory.Config().V1().Infrastructures().Informer().GetIndexer().Add(infra)
+			stopCh := make(chan struct{})
+			go configInformerFactory.Start(stopCh)
+			defer close(stopCh)
+			wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+				return configInformerFactory.Config().V1().Infrastructures().Informer().HasSynced(), nil
+			})
+			deployment := test.inDeployment.DeepCopy()
+			err := withCustomEndPoint(configInformerFactory.Config().V1().Infrastructures().Lister())(nil, deployment)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if e, a := test.expected, deployment; !equality.Semantic.DeepEqual(e, a) {
+				t.Errorf("unexpected deployment\nwant=%#v\ngot= %#v", e, a)
+			}
+		})
+	}
+
+}

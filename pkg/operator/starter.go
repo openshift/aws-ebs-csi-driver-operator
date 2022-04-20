@@ -140,6 +140,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		csidrivercontrollerservicecontroller.WithReplicasHook(nodeInformer.Lister()),
 		withCustomCABundle(cloudConfigLister),
 		withCustomTags(infraInformer.Lister()),
+		withCustomEndPoint(infraInformer.Lister()),
 		csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
 			defaultNamespace,
 			trustedCAConfigMap,
@@ -232,6 +233,41 @@ func withCustomCABundle(cloudConfigLister corev1listers.ConfigMapNamespaceLister
 			return nil
 		}
 		return fmt.Errorf("could not use custom CA bundle because the csi-driver container is missing from the deployment")
+	}
+}
+
+func withCustomEndPoint(infraLister v1.InfrastructureLister) deploymentcontroller.DeploymentHookFunc {
+	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		infra, err := infraLister.Get(infrastructureName)
+		if err != nil {
+			return err
+		}
+		if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.AWS == nil {
+			return nil
+		}
+		serviceEndPoints := infra.Status.PlatformStatus.AWS.ServiceEndpoints
+		ec2EndPoint := ""
+		for _, serviceEndPoint := range serviceEndPoints {
+			if serviceEndPoint.Name == "ec2" {
+				ec2EndPoint = serviceEndPoint.URL
+			}
+		}
+		if ec2EndPoint == "" {
+			return nil
+		}
+
+		for i := range deployment.Spec.Template.Spec.Containers {
+			container := &deployment.Spec.Template.Spec.Containers[i]
+			if container.Name != "csi-driver" {
+				continue
+			}
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:  "AWS_EC2_ENDPOINT",
+				Value: ec2EndPoint,
+			})
+			return nil
+		}
+		return nil
 	}
 }
 
