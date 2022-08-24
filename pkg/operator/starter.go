@@ -1,14 +1,17 @@
 package operator
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	"github.com/openshift/library-go/pkg/config/client"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -37,10 +40,9 @@ import (
 
 const (
 	// Operand and operator run in the same namespace
-	defaultNamespace   = "openshift-cluster-csi-drivers"
-	operatorName       = "aws-ebs-csi-driver-operator"
-	operandName        = "aws-ebs-csi-driver"
-	instanceName       = "ebs.csi.aws.com"
+	operatorName = "aws-ebs-csi-driver-operator"
+	operandName  = "aws-ebs-csi-driver"
+	// operandNamespace   = "openshift-cluster-csi-drivers"
 	secretName         = "ebs-cloud-credentials"
 	infraConfigName    = "cluster"
 	trustedCAConfigMap = "aws-ebs-csi-driver-trusted-ca-bundle"
@@ -52,44 +54,70 @@ const (
 	infrastructureName = "cluster"
 )
 
-func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
+func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigString *string) error {
 	// Create core clientset and informer
+	controlPlaneNamespace := controllerConfig.OperatorNamespace
+	controlPlaneEventRecorder := controllerConfig.EventRecorder
 	kubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
-	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, defaultNamespace, cloudConfigNamespace, "")
-	secretInformer := kubeInformersForNamespaces.InformersFor(defaultNamespace).Core().V1().Secrets()
+	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, controlPlaneNamespace, cloudConfigNamespace, "") // FIXME: do we really need to watch all namespaces in the management cluster?
+	secretInformer := kubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
 	nodeInformer := kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
-	configMapInformer := kubeInformersForNamespaces.InformersFor(defaultNamespace).Core().V1().ConfigMaps()
+	configMapInformer := kubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
 
-	apiExtClient, err := apiextclient.NewForConfig(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
-	if err != nil {
-		return err
-	}
-
-	// Create config clientset and informer. This is used to get the cluster ID
-	configClient := configclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
-	configInformers := configinformers.NewSharedInformerFactory(configClient, 20*time.Minute)
-	infraInformer := configInformers.Config().V1().Infrastructures()
-
-	// Create informer for the ConfigMaps in the openshift-config-managed namespace. This is used to get the custom CA
-	// bundle to use when accessing the AWS API.
-	cloudConfigInformer := kubeInformersForNamespaces.InformersFor(cloudConfigNamespace).Core().V1().ConfigMaps()
-	cloudConfigLister := cloudConfigInformer.Lister().ConfigMaps(cloudConfigNamespace)
-
-	// Create GenericOperatorclient. This is used by the library-go controllers created down below
-	gvr := opv1.SchemeGroupVersion.WithResource("clustercsidrivers")
-	operatorClient, dynamicInformers, err := goc.NewClusterScopedOperatorClientWithConfigName(controllerConfig.KubeConfig, gvr, instanceName)
-	if err != nil {
-		return err
-	}
+	// Create informer for the ConfigMaps in the openshift-config-managed namespace.
+	// This is used to get the custom CA bundle to use when accessing the AWS API.
+	cloudConfigInformer := kubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
+	cloudConfigLister := cloudConfigInformer.Lister().ConfigMaps(controlPlaneNamespace)
 
 	dynamicClient, err := dynamic.NewForConfig(controllerConfig.KubeConfig)
 	if err != nil {
 		return err
 	}
 
-	csiControllerSet := csicontrollerset.NewCSIControllerSet(
-		operatorClient,
-		controllerConfig.EventRecorder,
+	// Guest
+	guestNamespace := "openshift-cluster-csi-drivers"
+	guestKubeConfig := controllerConfig.KubeConfig
+	if guestKubeConfigString != nil {
+		guestKubeConfig, err = client.GetKubeConfigOrInClusterConfig(*guestKubeConfigString, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	guestAPIExtClient, err := apiextclient.NewForConfig(rest.AddUserAgent(guestKubeConfig, operatorName))
+	if err != nil {
+		return err
+	}
+
+	guestDynamicClient, err := dynamic.NewForConfig(guestKubeConfig)
+	if err != nil {
+		return err
+	}
+
+	// Create config clientset and informer. This is used to get the cluster ID from the GUEST.
+	guestKubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, operatorName))
+	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient, guestNamespace, "")
+	guestConfigMapInformer := guestKubeInformersForNamespaces.InformersFor(guestNamespace).Core().V1().ConfigMaps()
+
+	guestConfigClient := configclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, operatorName))
+	guestConfigInformers := configinformers.NewSharedInformerFactory(guestConfigClient, 20*time.Minute)
+	guestInfraInformer := guestConfigInformers.Config().V1().Infrastructures()
+
+	// FIXME(bertinatto): need a valid recorder for the guest cluster
+	// guestEventRecorder := events.NewKubeRecorder(guestKubeClient.CoreV1().Events(guestNamespace), operandName, nil)
+	guestEventRecorder := controllerConfig.EventRecorder
+
+	// Create client and informers for our ClusterCSIDriver CR
+	gvr := opv1.SchemeGroupVersion.WithResource("clustercsidrivers")
+	guestOperatorClient, guestDynamicInformers, err := goc.NewClusterScopedOperatorClientWithConfigName(guestKubeConfig, gvr, string(opv1.AWSEBSCSIDriver))
+	if err != nil {
+		return err
+	}
+
+	// Start control plane controllers
+	controlPlaneCSIControllerSet := csicontrollerset.NewCSIControllerSet(
+		guestOperatorClient,
+		controlPlaneEventRecorder,
 	).WithLogLevelController().WithManagementStateController(
 		operandName,
 		false,
@@ -98,20 +126,18 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		kubeClient,
 		dynamicClient,
 		kubeInformersForNamespaces,
-		assets.ReadFile,
+		assetWithNamespaceFunc(controlPlaneNamespace),
 		[]string{
 			"storageclass_gp2.yaml",
 			"csidriver.yaml",
 			"controller_sa.yaml",
 			"controller_pdb.yaml",
-			"node_sa.yaml",
 			"service.yaml",
 			"cabundle_cm.yaml",
 			"rbac/attacher_role.yaml",
 			"rbac/attacher_binding.yaml",
 			"rbac/privileged_role.yaml",
 			"rbac/controller_privileged_binding.yaml",
-			"rbac/node_privileged_binding.yaml",
 			"rbac/provisioner_role.yaml",
 			"rbac/provisioner_binding.yaml",
 			"rbac/resizer_role.yaml",
@@ -135,7 +161,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		// Only install when CRD exists.
 		func() bool {
 			name := "volumesnapshotclasses.snapshot.storage.k8s.io"
-			_, err := apiExtClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+			_, err := guestAPIExtClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 			return err == nil
 		},
 		// Don't ever remove.
@@ -144,49 +170,37 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		},
 	).WithCSIConfigObserverController(
 		"AWSEBSDriverCSIConfigObserverController",
-		configInformers,
+		guestConfigInformers,
 	).WithCSIDriverControllerService(
 		"AWSEBSDriverControllerServiceController",
 		assets.ReadFile,
 		"controller.yaml",
 		kubeClient,
-		kubeInformersForNamespaces.InformersFor(defaultNamespace),
-		configInformers,
+		kubeInformersForNamespaces.InformersFor(controlPlaneNamespace),
+		guestConfigInformers,
 		[]factory.Informer{
 			secretInformer.Informer(),
 			nodeInformer.Informer(),
 			cloudConfigInformer.Informer(),
-			infraInformer.Informer(),
+			guestInfraInformer.Informer(),
 			configMapInformer.Informer(),
 		},
-		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(defaultNamespace, secretName, secretInformer),
+		withNamespaceDeploymentHook(controlPlaneNamespace),
+		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, secretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
 		csidrivercontrollerservicecontroller.WithReplicasHook(nodeInformer.Lister()),
 		withCustomCABundle(cloudConfigLister),
-		withCustomTags(infraInformer.Lister()),
-		withCustomEndPoint(infraInformer.Lister()),
+		withCustomTags(guestInfraInformer.Lister()),
+		withCustomEndPoint(guestInfraInformer.Lister()),
 		csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
-			defaultNamespace,
-			trustedCAConfigMap,
-			configMapInformer,
-		),
-	).WithCSIDriverNodeService(
-		"AWSEBSDriverNodeServiceController",
-		assets.ReadFile,
-		"node.yaml",
-		kubeClient,
-		kubeInformersForNamespaces.InformersFor(defaultNamespace),
-		[]factory.Informer{configMapInformer.Informer()},
-		csidrivernodeservicecontroller.WithObservedProxyDaemonSetHook(),
-		csidrivernodeservicecontroller.WithCABundleDaemonSetHook(
-			defaultNamespace,
+			controlPlaneNamespace,
 			trustedCAConfigMap,
 			configMapInformer,
 		),
 	).WithServiceMonitorController(
 		"AWSEBSDriverServiceMonitorController",
 		dynamicClient,
-		assets.ReadFile,
+		assetWithNamespaceFunc(controlPlaneNamespace),
 		"servicemonitor.yaml",
 	).WithStorageClassController(
 		"AWSEBSDriverStorageClassController",
@@ -199,24 +213,70 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
+	guestCSIControllerSet := csicontrollerset.NewCSIControllerSet(
+		guestOperatorClient,
+		guestEventRecorder,
+	).WithStaticResourcesController(
+		"AWSEBSDriverGuestStaticResourcesController",
+		guestKubeClient,
+		guestDynamicClient,
+		guestKubeInformersForNamespaces,
+		assetWithNamespaceFunc(guestNamespace),
+		[]string{
+			"storageclass_gp2.yaml",
+			"storageclass_gp3.yaml",
+			"volumesnapshotclass.yaml",
+			"csidriver.yaml",
+			"node_sa.yaml",
+			"rbac/node_privileged_binding.yaml",
+		},
+	).WithCSIDriverNodeService(
+		"AWSEBSDriverNodeServiceController",
+		assets.ReadFile,
+		"node.yaml",
+		guestKubeClient,
+		guestKubeInformersForNamespaces.InformersFor(guestNamespace),
+		[]factory.Informer{guestConfigMapInformer.Informer()},
+		withNamespaceDaemonSetHook(guestNamespace),
+		csidrivernodeservicecontroller.WithObservedProxyDaemonSetHook(),
+		csidrivernodeservicecontroller.WithCABundleDaemonSetHook(
+			guestNamespace,
+			trustedCAConfigMap,
+			guestConfigMapInformer,
+		),
+	)
+
 	caSyncController, err := newCustomCABundleSyncer(
-		operatorClient,
+		guestOperatorClient,
 		kubeInformersForNamespaces,
 		kubeClient,
-		controllerConfig.EventRecorder,
+		cloudConfigNamespace,
+		controlPlaneNamespace,
+		controlPlaneEventRecorder,
 	)
 	if err != nil {
 		return fmt.Errorf("could not create the custom CA bundle syncer: %w", err)
 	}
 
-	klog.Info("Starting the informers")
+	klog.Info("Starting the control plane informers")
 	go kubeInformersForNamespaces.Start(ctx.Done())
-	go dynamicInformers.Start(ctx.Done())
-	go configInformers.Start(ctx.Done())
 
-	klog.Info("Starting controllerset")
-	go csiControllerSet.Run(ctx, 1)
-	go caSyncController.Run(ctx, 1)
+	klog.Info("Starting control plane controllerset")
+	// Only start caSyncController in standalone clusters because in Hypershift
+	// the ConfigMap is already available in the correct namespace.
+	// FIXME(bertinatto): this depends on https://issues.redhat.com/browse/HOSTEDCP-544
+	if controlPlaneNamespace == guestNamespace {
+		go caSyncController.Run(ctx, 1)
+	}
+	go controlPlaneCSIControllerSet.Run(ctx, 1)
+
+	klog.Info("Starting the guest cluster informers")
+	go guestKubeInformersForNamespaces.Start(ctx.Done())
+	go guestDynamicInformers.Start(ctx.Done())
+	go guestConfigInformers.Start(ctx.Done())
+
+	klog.Info("Starting guest cluster controllerset")
+	go guestCSIControllerSet.Run(ctx, 1)
 
 	<-ctx.Done()
 
@@ -305,16 +365,18 @@ func newCustomCABundleSyncer(
 	operatorClient v1helpers.OperatorClient,
 	kubeInformers v1helpers.KubeInformersForNamespaces,
 	kubeClient kubeclient.Interface,
+	sourceNamespace string,
+	destinationNamespace string,
 	eventRecorder events.Recorder,
 ) (factory.Controller, error) {
 	// sync config map with additional trust bundle to the operator namespace,
 	// so the operator can get it as a ConfigMap volume.
 	srcConfigMap := resourcesynccontroller.ResourceLocation{
-		Namespace: cloudConfigNamespace,
+		Namespace: sourceNamespace,
 		Name:      cloudConfigName,
 	}
 	dstConfigMap := resourcesynccontroller.ResourceLocation{
-		Namespace: defaultNamespace,
+		Namespace: destinationNamespace,
 		Name:      cloudConfigName,
 	}
 	certController := resourcesynccontroller.NewResourceSyncController(
@@ -376,6 +438,30 @@ func withCustomTags(infraLister v1.InfrastructureLister) deploymentcontroller.De
 			}
 			container.Args = append(container.Args, tagsArgument)
 		}
+		return nil
+	}
+}
+
+func assetWithNamespaceFunc(namespace string) resourceapply.AssetFunc {
+	return func(name string) ([]byte, error) {
+		content, err := assets.ReadFile(name)
+		if err != nil {
+			panic(err)
+		}
+		return bytes.ReplaceAll(content, []byte("${NAMESPACE}"), []byte(namespace)), nil
+	}
+}
+
+func withNamespaceDeploymentHook(namespace string) deploymentcontroller.DeploymentHookFunc {
+	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		deployment.Namespace = namespace
+		return nil
+	}
+}
+
+func withNamespaceDaemonSetHook(namespace string) csidrivernodeservicecontroller.DaemonSetHookFunc {
+	return func(_ *opv1.OperatorSpec, ds *appsv1.DaemonSet) error {
+		ds.Namespace = namespace
 		return nil
 	}
 }
