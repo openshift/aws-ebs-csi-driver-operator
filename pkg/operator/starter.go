@@ -7,11 +7,6 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
-	"github.com/openshift/library-go/pkg/config/client"
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -23,15 +18,21 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
+	configv1 "github.com/openshift/api/config/v1"
 	opv1 "github.com/openshift/api/operator/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	"github.com/openshift/library-go/pkg/config/client"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
 	"github.com/openshift/library-go/pkg/operator/deploymentcontroller"
+	"github.com/openshift/library-go/pkg/operator/events"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
@@ -59,7 +60,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
 	controlPlaneEventRecorder := controllerConfig.EventRecorder
 	kubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
-	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, controlPlaneNamespace, cloudConfigNamespace, "") // FIXME: do we really need to watch all namespaces in the management cluster?
+	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, controlPlaneNamespace, cloudConfigNamespace, "")
 	secretInformer := kubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
 	nodeInformer := kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
 	configMapInformer := kubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
@@ -77,7 +78,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Guest
 	guestNamespace := "openshift-cluster-csi-drivers"
 	guestKubeConfig := controllerConfig.KubeConfig
-	if guestKubeConfigString != nil {
+	if *guestKubeConfigString != "" {
 		guestKubeConfig, err = client.GetKubeConfigOrInClusterConfig(*guestKubeConfigString, nil)
 		if err != nil {
 			return err
@@ -103,9 +104,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	guestConfigInformers := configinformers.NewSharedInformerFactory(guestConfigClient, 20*time.Minute)
 	guestInfraInformer := guestConfigInformers.Config().V1().Infrastructures()
 
-	// FIXME(bertinatto): need a valid recorder for the guest cluster
-	// guestEventRecorder := events.NewKubeRecorder(guestKubeClient.CoreV1().Events(guestNamespace), operandName, nil)
-	guestEventRecorder := controllerConfig.EventRecorder
+	// Create an event recorder for the guest cluster
+	controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, kubeClient, guestNamespace, nil)
+	if err != nil {
+		klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
+	}
+	guestEventRecorder := events.NewKubeRecorder(guestKubeClient.CoreV1().Events(guestNamespace), operandName, controllerRef)
 
 	// Create client and informers for our ClusterCSIDriver CR
 	gvr := opv1.SchemeGroupVersion.WithResource("clustercsidrivers")
@@ -185,7 +189,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			guestInfraInformer.Informer(),
 			configMapInformer.Informer(),
 		},
-		withHypershiftDeploymentHook(),
+		withHypershiftDeploymentHook(guestInfraInformer.Lister()),
 		withNamespaceDeploymentHook(controlPlaneNamespace),
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, secretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
@@ -467,9 +471,16 @@ func withNamespaceDaemonSetHook(namespace string) csidrivernodeservicecontroller
 	}
 }
 
-func withHypershiftDeploymentHook() deploymentcontroller.DeploymentHookFunc {
+func withHypershiftDeploymentHook(infraLister v1.InfrastructureLister) deploymentcontroller.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		// TODO: quit if not hypershift
+		infra, err := infraLister.Get(infrastructureName)
+		if err != nil {
+			return err
+		}
+		// This hook only applies to Hypershift.
+		if infra.Status.ControlPlaneTopology != configv1.ExternalTopologyMode {
+			return nil
+		}
 		kubeConfigEnvVar := corev1.EnvVar{
 			Name:  "KUBECONFIG",
 			Value: "/etc/hosted-kubernetes/kubeconfig",
@@ -483,20 +494,25 @@ func withHypershiftDeploymentHook() deploymentcontroller.DeploymentHookFunc {
 			Name: "hosted-kubeconfig",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "service-network-admin-kubeconfig",
+					// FIXME: use a ServiceAccount from the guest cluster
+					SecretName: "admin-kubeconfig",
 				},
 			},
 		}
 		podSpec := &deployment.Spec.Template.Spec
-		for i := range podSpec.InitContainers {
-			container := &podSpec.InitContainers[i]
-			container.Env = append(container.Env, kubeConfigEnvVar)
-			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-		}
 		for i := range podSpec.Containers {
-			container := &podSpec.InitContainers[i]
-			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+			container := &podSpec.Containers[i]
+			switch container.Name {
+			case "csi-provisioner":
+			case "csi-attacher":
+			case "csi-snapshotter":
+			case "csi-resizer":
+			default:
+				continue
+			}
+			container.Args = append(container.Args, "--kubeconfig=$(KUBECONFIG)")
 			container.Env = append(container.Env, kubeConfigEnvVar)
+			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 		}
 		podSpec.Volumes = append(podSpec.Volumes, volume)
 		return nil
