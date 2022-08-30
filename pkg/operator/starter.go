@@ -185,6 +185,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			guestInfraInformer.Informer(),
 			configMapInformer.Informer(),
 		},
+		withHypershiftDeploymentHook(),
 		withNamespaceDeploymentHook(controlPlaneNamespace),
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, secretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
@@ -462,6 +463,42 @@ func withNamespaceDeploymentHook(namespace string) deploymentcontroller.Deployme
 func withNamespaceDaemonSetHook(namespace string) csidrivernodeservicecontroller.DaemonSetHookFunc {
 	return func(_ *opv1.OperatorSpec, ds *appsv1.DaemonSet) error {
 		ds.Namespace = namespace
+		return nil
+	}
+}
+
+func withHypershiftDeploymentHook() deploymentcontroller.DeploymentHookFunc {
+	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		// TODO: quit if not hypershift
+		kubeConfigEnvVar := corev1.EnvVar{
+			Name:  "KUBECONFIG",
+			Value: "/etc/hosted-kubernetes/kubeconfig",
+		}
+		volumeMount := corev1.VolumeMount{
+			Name:      "hosted-kubeconfig",
+			MountPath: "/etc/hosted-kubernetes",
+			ReadOnly:  true,
+		}
+		volume := corev1.Volume{
+			Name: "hosted-kubeconfig",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "service-network-admin-kubeconfig",
+				},
+			},
+		}
+		podSpec := &deployment.Spec.Template.Spec
+		for i := range podSpec.InitContainers {
+			container := &podSpec.InitContainers[i]
+			container.Env = append(container.Env, kubeConfigEnvVar)
+			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+		}
+		for i := range podSpec.Containers {
+			container := &podSpec.InitContainers[i]
+			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+			container.Env = append(container.Env, kubeConfigEnvVar)
+		}
+		podSpec.Volumes = append(podSpec.Volumes, volume)
 		return nil
 	}
 }
