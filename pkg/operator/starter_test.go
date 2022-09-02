@@ -152,7 +152,18 @@ func TestWithCustomCABundle(t *testing.T) {
 				return cloudConfigInformer.Informer().HasSynced(), nil
 			})
 			deployment := tc.inDeployment.DeepCopy()
-			err := withCustomCABundle(cloudConfigLister)(nil, deployment)
+			// Infra
+			infra := &v1.Infrastructure{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
+			configClient := fakeconfig.NewSimpleClientset(infra)
+			configInformerFactory := configinformers.NewSharedInformerFactory(configClient, 0)
+			configInformerFactory.Config().V1().Infrastructures().Informer().GetIndexer().Add(infra)
+			stopCh2 := make(chan struct{})
+			go configInformerFactory.Start(stopCh2)
+			defer close(stopCh2)
+			wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+				return configInformerFactory.Config().V1().Infrastructures().Informer().HasSynced(), nil
+			})
+			err := withCustomAWSCABundle(configInformerFactory.Config().V1().Infrastructures().Lister(), cloudConfigLister)(nil, deployment)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

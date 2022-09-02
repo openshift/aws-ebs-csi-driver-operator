@@ -10,7 +10,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
@@ -29,7 +29,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
-	"github.com/openshift/library-go/pkg/operator/deploymentcontroller"
+	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"github.com/openshift/library-go/pkg/operator/events"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -194,7 +194,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, secretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
 		csidrivercontrollerservicecontroller.WithReplicasHook(nodeInformer.Lister()),
-		withCustomCABundle(cloudConfigLister),
+		withCustomAWSCABundle(guestInfraInformer.Lister(), cloudConfigLister),
 		withCustomTags(guestInfraInformer.Lister()),
 		withCustomEndPoint(guestInfraInformer.Lister()),
 		csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
@@ -251,11 +251,10 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		),
 	)
 
-	caSyncController, err := newCustomCABundleSyncer(
+	caSyncController, err := newCustomAWSBundleSyncer(
 		guestOperatorClient,
 		kubeInformersForNamespaces,
 		kubeClient,
-		cloudConfigNamespace,
 		controlPlaneNamespace,
 		controlPlaneEventRecorder,
 	)
@@ -267,13 +266,14 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	go kubeInformersForNamespaces.Start(ctx.Done())
 
 	klog.Info("Starting control plane controllerset")
+	go controlPlaneCSIControllerSet.Run(ctx, 1)
+
 	// Only start caSyncController in standalone clusters because in Hypershift
 	// the ConfigMap is already available in the correct namespace.
-	// FIXME(bertinatto): this depends on https://issues.redhat.com/browse/HOSTEDCP-544
-	if controlPlaneNamespace == guestNamespace {
+	if *guestKubeConfigString == "" {
+		klog.Info("Starting custom CA bundle sync controller")
 		go caSyncController.Run(ctx, 1)
 	}
-	go controlPlaneCSIControllerSet.Run(ctx, 1)
 
 	klog.Info("Starting the guest cluster informers")
 	go guestKubeInformersForNamespaces.Start(ctx.Done())
@@ -292,22 +292,24 @@ type controllerTemplateData struct {
 	CABundleConfigMap string
 }
 
-// withCustomCABundle executes the asset as a template to fill out the parts required when using a custom CA bundle.
+// withCustomAWSCABundle executes the asset as a template to fill out the parts required when using a custom CA bundle.
 // The `caBundleConfigMap` parameter specifies the name of the ConfigMap containing the custom CA bundle. If the
 // argument supplied is empty, then no custom CA bundle will be used.
-func withCustomCABundle(cloudConfigLister corev1listers.ConfigMapNamespaceLister) deploymentcontroller.DeploymentHookFunc {
+func withCustomAWSCABundle(infraLister v1.InfrastructureLister, cloudConfigLister corev1listers.ConfigMapNamespaceLister) dc.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		switch used, err := isCustomCABundleUsed(cloudConfigLister); {
-		case err != nil:
+		configName, err := customAWSCABundle(infraLister, cloudConfigLister)
+		if err != nil {
 			return fmt.Errorf("could not determine if a custom CA bundle is in use: %w", err)
-		case !used:
+		}
+		if configName == "" {
 			return nil
 		}
+
 		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{
 			Name: "ca-bundle",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: cloudConfigName},
+					LocalObjectReference: corev1.LocalObjectReference{Name: configName},
 				},
 			},
 		})
@@ -331,7 +333,7 @@ func withCustomCABundle(cloudConfigLister corev1listers.ConfigMapNamespaceLister
 	}
 }
 
-func withCustomEndPoint(infraLister v1.InfrastructureLister) deploymentcontroller.DeploymentHookFunc {
+func withCustomEndPoint(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		infra, err := infraLister.Get(infrastructureName)
 		if err != nil {
@@ -366,18 +368,17 @@ func withCustomEndPoint(infraLister v1.InfrastructureLister) deploymentcontrolle
 	}
 }
 
-func newCustomCABundleSyncer(
+func newCustomAWSBundleSyncer(
 	operatorClient v1helpers.OperatorClient,
 	kubeInformers v1helpers.KubeInformersForNamespaces,
 	kubeClient kubeclient.Interface,
-	sourceNamespace string,
 	destinationNamespace string,
 	eventRecorder events.Recorder,
 ) (factory.Controller, error) {
 	// sync config map with additional trust bundle to the operator namespace,
 	// so the operator can get it as a ConfigMap volume.
 	srcConfigMap := resourcesynccontroller.ResourceLocation{
-		Namespace: sourceNamespace,
+		Namespace: cloudConfigNamespace,
 		Name:      cloudConfigName,
 	}
 	dstConfigMap := resourcesynccontroller.ResourceLocation{
@@ -397,23 +398,35 @@ func newCustomCABundleSyncer(
 	return certController, nil
 }
 
-// isCustomCABundleUsed returns true if the cloud config ConfigMap exists and contains a custom CA bundle.
-func isCustomCABundleUsed(cloudConfigLister corev1listers.ConfigMapNamespaceLister) (bool, error) {
-	cloudConfigCM, err := cloudConfigLister.Get(cloudConfigName)
-	if errors.IsNotFound(err) {
-		// no cloud config ConfigMap so there is no CA bundle
-		return false, nil
+// customAWSCABundle returns true if the cloud config ConfigMap exists and contains a custom CA bundle.
+func customAWSCABundle(infraLister v1.InfrastructureLister, cloudConfigLister corev1listers.ConfigMapNamespaceLister) (string, error) {
+	infra, err := infraLister.Get(infrastructureName)
+	if err != nil {
+		return "", err
+	}
+
+	configName := cloudConfigName
+	if infra.Status.ControlPlaneTopology == configv1.ExternalTopologyMode {
+		configName = "user-ca-bundle"
+	}
+
+	cloudConfigCM, err := cloudConfigLister.Get(configName)
+	if apierrors.IsNotFound(err) {
+		return "", nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("failed to get the %s/%s ConfigMap: %w", cloudConfigNamespace, cloudConfigName, err)
+		return "", fmt.Errorf("failed to get the %s ConfigMap: %w", configName, err)
 	}
-	_, exists := cloudConfigCM.Data[caBundleKey]
-	return exists, nil
+
+	if _, ok := cloudConfigCM.Data[caBundleKey]; !ok {
+		return "", nil
+	}
+	return configName, nil
 }
 
 // withCustomTags add tags from Infrastructure.Status.PlatformStatus.AWS.ResourceTags to the driver command line as
 // --extra-tags=<key1>=<value1>,<key2>=<value2>,...
-func withCustomTags(infraLister v1.InfrastructureLister) deploymentcontroller.DeploymentHookFunc {
+func withCustomTags(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
 	return func(spec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		infra, err := infraLister.Get(infrastructureName)
 		if err != nil {
@@ -457,7 +470,7 @@ func assetWithNamespaceFunc(namespace string) resourceapply.AssetFunc {
 	}
 }
 
-func withNamespaceDeploymentHook(namespace string) deploymentcontroller.DeploymentHookFunc {
+func withNamespaceDeploymentHook(namespace string) dc.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		deployment.Namespace = namespace
 		return nil
@@ -471,7 +484,7 @@ func withNamespaceDaemonSetHook(namespace string) csidrivernodeservicecontroller
 	}
 }
 
-func withHypershiftDeploymentHook(infraLister v1.InfrastructureLister) deploymentcontroller.DeploymentHookFunc {
+func withHypershiftDeploymentHook(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		infra, err := infraLister.Get(infrastructureName)
 		if err != nil {
