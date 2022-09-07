@@ -94,7 +94,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		assets.ReadFile,
 		[]string{
 			"storageclass_gp2.yaml",
-			"storageclass_gp3.yaml",
 			"volumesnapshotclass.yaml",
 			"csidriver.yaml",
 			"controller_sa.yaml",
@@ -164,6 +163,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		dynamicClient,
 		assets.ReadFile,
 		"servicemonitor.yaml",
+	).WithStorageClassController(
+		"AWSEBSDriverStorageClassController",
+		assets.ReadFile,
+		"storageclass_gp3.yaml",
+		kubeClient,
+		kubeInformersForNamespaces.InformersFor(""),
 	)
 	if err != nil {
 		return err
