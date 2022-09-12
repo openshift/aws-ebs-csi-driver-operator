@@ -2,7 +2,7 @@ kind: DaemonSet
 apiVersion: apps/v1
 metadata:
   name: aws-ebs-csi-driver-node
-  namespace: ${NAMESPACE}
+  namespace: openshift-cluster-csi-drivers
   annotations:
     config.openshift.io/inject-proxy: csi-driver
     config.openshift.io/inject-proxy-cabundle: csi-driver

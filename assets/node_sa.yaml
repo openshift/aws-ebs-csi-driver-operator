@@ -2,4 +2,4 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: aws-ebs-csi-driver-node-sa
-  namespace: ${NAMESPACE}
+  namespace: openshift-cluster-csi-drivers

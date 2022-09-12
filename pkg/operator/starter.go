@@ -226,7 +226,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestKubeClient,
 		guestDynamicClient,
 		guestKubeInformersForNamespaces,
-		assetWithNamespaceFunc(guestNamespace),
+		assets.ReadFile,
 		[]string{
 			"storageclass_gp2.yaml",
 			"storageclass_gp3.yaml",
@@ -242,7 +242,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestKubeClient,
 		guestKubeInformersForNamespaces.InformersFor(guestNamespace),
 		[]factory.Informer{guestConfigMapInformer.Informer()},
-		withNamespaceDaemonSetHook(guestNamespace),
 		csidrivernodeservicecontroller.WithObservedProxyDaemonSetHook(),
 		csidrivernodeservicecontroller.WithCABundleDaemonSetHook(
 			guestNamespace,
@@ -473,13 +472,6 @@ func assetWithNamespaceFunc(namespace string) resourceapply.AssetFunc {
 func withNamespaceDeploymentHook(namespace string) dc.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		deployment.Namespace = namespace
-		return nil
-	}
-}
-
-func withNamespaceDaemonSetHook(namespace string) csidrivernodeservicecontroller.DaemonSetHookFunc {
-	return func(_ *opv1.OperatorSpec, ds *appsv1.DaemonSet) error {
-		ds.Namespace = namespace
 		return nil
 	}
 }
