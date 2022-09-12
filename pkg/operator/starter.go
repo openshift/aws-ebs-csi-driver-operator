@@ -59,18 +59,18 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Create core clientset and informer
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
 	controlPlaneEventRecorder := controllerConfig.EventRecorder
-	kubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
-	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, controlPlaneNamespace, cloudConfigNamespace, "")
-	secretInformer := kubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
-	nodeInformer := kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
-	configMapInformer := kubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
+	controlPlaneKubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
+	controlPlaneKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controlPlaneNamespace, cloudConfigNamespace, "")
+	controlPlaneSecretInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
+	controlPlaneNodeInformer := controlPlaneKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
+	controlPlaneConfigMapInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
 
 	// Create informer for the ConfigMaps in the openshift-config-managed namespace.
 	// This is used to get the custom CA bundle to use when accessing the AWS API.
-	cloudConfigInformer := kubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
-	cloudConfigLister := cloudConfigInformer.Lister().ConfigMaps(controlPlaneNamespace)
+	controlPlaneCloudConfigInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
+	controlPlaneCloudConfigLister := controlPlaneCloudConfigInformer.Lister().ConfigMaps(controlPlaneNamespace)
 
-	dynamicClient, err := dynamic.NewForConfig(controllerConfig.KubeConfig)
+	controlPlaneDynamicClient, err := dynamic.NewForConfig(controllerConfig.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	guestInfraInformer := guestConfigInformers.Config().V1().Infrastructures()
 
 	// Create an event recorder for the guest cluster
-	controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, kubeClient, guestNamespace, nil)
+	controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, controlPlaneKubeClient, guestNamespace, nil)
 	if err != nil {
 		klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
 	}
@@ -127,9 +127,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		false,
 	).WithStaticResourcesController(
 		"AWSEBSDriverStaticResourcesController",
-		kubeClient,
-		dynamicClient,
-		kubeInformersForNamespaces,
+		controlPlaneKubeClient,
+		controlPlaneDynamicClient,
+		controlPlaneKubeInformersForNamespaces,
 		assetWithNamespaceFunc(controlPlaneNamespace),
 		[]string{
 			"storageclass_gp2.yaml",
@@ -179,40 +179,40 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		"AWSEBSDriverControllerServiceController",
 		assets.ReadFile,
 		"controller.yaml",
-		kubeClient,
-		kubeInformersForNamespaces.InformersFor(controlPlaneNamespace),
+		controlPlaneKubeClient,
+		controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace),
 		guestConfigInformers,
 		[]factory.Informer{
-			secretInformer.Informer(),
-			nodeInformer.Informer(),
-			cloudConfigInformer.Informer(),
+			controlPlaneSecretInformer.Informer(),
+			controlPlaneNodeInformer.Informer(),
+			controlPlaneCloudConfigInformer.Informer(),
 			guestInfraInformer.Informer(),
-			configMapInformer.Informer(),
+			controlPlaneConfigMapInformer.Informer(),
 		},
 		withHypershiftDeploymentHook(guestInfraInformer.Lister()),
 		withNamespaceDeploymentHook(controlPlaneNamespace),
-		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, secretInformer),
+		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, controlPlaneSecretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
-		csidrivercontrollerservicecontroller.WithReplicasHook(nodeInformer.Lister()),
-		withCustomAWSCABundle(guestInfraInformer.Lister(), cloudConfigLister),
+		csidrivercontrollerservicecontroller.WithReplicasHook(controlPlaneNodeInformer.Lister()),
+		withCustomAWSCABundle(guestInfraInformer.Lister(), controlPlaneCloudConfigLister),
 		withCustomTags(guestInfraInformer.Lister()),
 		withCustomEndPoint(guestInfraInformer.Lister()),
 		csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
 			controlPlaneNamespace,
 			trustedCAConfigMap,
-			configMapInformer,
+			controlPlaneConfigMapInformer,
 		),
 	).WithServiceMonitorController(
 		"AWSEBSDriverServiceMonitorController",
-		dynamicClient,
+		controlPlaneDynamicClient,
 		assetWithNamespaceFunc(controlPlaneNamespace),
 		"servicemonitor.yaml",
 	).WithStorageClassController(
 		"AWSEBSDriverStorageClassController",
 		assets.ReadFile,
 		"storageclass_gp3.yaml",
-		kubeClient,
-		kubeInformersForNamespaces.InformersFor(""),
+		controlPlaneKubeClient,
+		controlPlaneKubeInformersForNamespaces.InformersFor(""),
 	)
 	if err != nil {
 		return err
@@ -253,8 +253,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	caSyncController, err := newCustomAWSBundleSyncer(
 		guestOperatorClient,
-		kubeInformersForNamespaces,
-		kubeClient,
+		controlPlaneKubeInformersForNamespaces,
+		controlPlaneKubeClient,
 		controlPlaneNamespace,
 		controlPlaneEventRecorder,
 	)
@@ -263,7 +263,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}
 
 	klog.Info("Starting the control plane informers")
-	go kubeInformersForNamespaces.Start(ctx.Done())
+	go controlPlaneKubeInformersForNamespaces.Start(ctx.Done())
 
 	klog.Info("Starting control plane controllerset")
 	go controlPlaneCSIControllerSet.Run(ctx, 1)
