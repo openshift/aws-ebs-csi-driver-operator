@@ -62,7 +62,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	controlPlaneKubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	controlPlaneKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controlPlaneNamespace, cloudConfigNamespace, "")
 	controlPlaneSecretInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
-	controlPlaneNodeInformer := controlPlaneKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
 	controlPlaneConfigMapInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
 
 	// Create informer for the ConfigMaps in the openshift-config-managed namespace.
@@ -99,6 +98,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	guestKubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, operatorName))
 	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient, guestNamespace, "")
 	guestConfigMapInformer := guestKubeInformersForNamespaces.InformersFor(guestNamespace).Core().V1().ConfigMaps()
+	guestNodeInformer := guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
 
 	guestConfigClient := configclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, operatorName))
 	guestConfigInformers := configinformers.NewSharedInformerFactory(guestConfigClient, 20*time.Minute)
@@ -184,7 +184,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestConfigInformers,
 		[]factory.Informer{
 			controlPlaneSecretInformer.Informer(),
-			controlPlaneNodeInformer.Informer(),
+			guestNodeInformer.Informer(),
 			controlPlaneCloudConfigInformer.Informer(),
 			guestInfraInformer.Informer(),
 			controlPlaneConfigMapInformer.Informer(),
@@ -193,7 +193,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		withNamespaceDeploymentHook(controlPlaneNamespace),
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, controlPlaneSecretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
-		csidrivercontrollerservicecontroller.WithReplicasHook(controlPlaneNodeInformer.Lister()),
+		csidrivercontrollerservicecontroller.WithReplicasHook(guestNodeInformer.Lister()),
 		withCustomAWSCABundle(guestInfraInformer.Lister(), controlPlaneCloudConfigLister),
 		withCustomTags(guestInfraInformer.Lister()),
 		withCustomEndPoint(guestInfraInformer.Lister()),
