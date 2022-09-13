@@ -105,6 +105,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	guestInfraInformer := guestConfigInformers.Config().V1().Infrastructures()
 
 	// Create an event recorder for the guest cluster
+	isHypershift := *guestKubeConfigString != ""
 	controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, controlPlaneKubeClient, guestNamespace, nil)
 	if err != nil {
 		klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
@@ -189,11 +190,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			guestInfraInformer.Informer(),
 			controlPlaneConfigMapInformer.Informer(),
 		},
-		withHypershiftDeploymentHook(guestInfraInformer.Lister()),
+		withHypershiftDeploymentHook(isHypershift),
+		withHypershiftReplicasHook(isHypershift, guestNodeInformer.Lister()),
 		withNamespaceDeploymentHook(controlPlaneNamespace),
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, controlPlaneSecretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
-		csidrivercontrollerservicecontroller.WithReplicasHook(guestNodeInformer.Lister()),
 		withCustomAWSCABundle(guestInfraInformer.Lister(), controlPlaneCloudConfigLister),
 		withCustomTags(guestInfraInformer.Lister()),
 		withCustomEndPoint(guestInfraInformer.Lister()),
@@ -269,7 +270,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// Only start caSyncController in standalone clusters because in Hypershift
 	// the ConfigMap is already available in the correct namespace.
-	if *guestKubeConfigString == "" {
+	if !isHypershift {
 		klog.Info("Starting custom CA bundle sync controller")
 		go caSyncController.Run(ctx, 1)
 	}
@@ -476,14 +477,22 @@ func withNamespaceDeploymentHook(namespace string) dc.DeploymentHookFunc {
 	}
 }
 
-func withHypershiftDeploymentHook(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
+func withHypershiftReplicasHook(isHypershift bool, guestNodeLister corev1listers.NodeLister) dc.DeploymentHookFunc {
+	if !isHypershift {
+		return csidrivercontrollerservicecontroller.WithReplicasHook(guestNodeLister)
+	}
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		infra, err := infraLister.Get(infrastructureName)
-		if err != nil {
-			return err
-		}
-		// This hook only applies to Hypershift.
-		if infra.Status.ControlPlaneTopology != configv1.ExternalTopologyMode {
+		// TODO: get this information from HostedControlPlane.Spec.AvailabilityPolicy
+		replicas := int32(1)
+		deployment.Spec.Replicas = &replicas
+		return nil
+	}
+
+}
+
+func withHypershiftDeploymentHook(isHypershift bool) dc.DeploymentHookFunc {
+	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		if !isHypershift {
 			return nil
 		}
 		kubeConfigEnvVar := corev1.EnvVar{
