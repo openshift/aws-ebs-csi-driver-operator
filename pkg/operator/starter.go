@@ -86,7 +86,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		}
 		guestKubeClient = kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, operatorName))
 
-		// Create all events in the guest cluster.
+		// Create all events in the GUEST cluster.
 		// Use name of the operator Deployment in the management cluster + namespace
 		// in the guest cluster as the closest approximation of the real involvedObject.
 		controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, controlPlaneKubeClient, controlPlaneNamespace, nil)
@@ -291,10 +291,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	<-ctx.Done()
 
 	return fmt.Errorf("stopped")
-}
-
-type controllerTemplateData struct {
-	CABundleConfigMap string
 }
 
 // withCustomAWSCABundle executes the asset as a template to fill out the parts required when using a custom CA bundle.
