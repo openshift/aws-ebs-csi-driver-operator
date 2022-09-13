@@ -40,10 +40,9 @@ import (
 )
 
 const (
-	// Operand and operator run in the same namespace
-	operatorName = "aws-ebs-csi-driver-operator"
-	operandName  = "aws-ebs-csi-driver"
-	// operandNamespace   = "openshift-cluster-csi-drivers"
+	defaultNamespace   = "openshift-cluster-csi-drivers"
+	operatorName       = "aws-ebs-csi-driver-operator"
+	operandName        = "aws-ebs-csi-driver"
 	secretName         = "ebs-cloud-credentials"
 	infraConfigName    = "cluster"
 	trustedCAConfigMap = "aws-ebs-csi-driver-trusted-ca-bundle"
@@ -56,9 +55,9 @@ const (
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigString *string) error {
-	// Create core clientset and informer
+	// Create core clientset and informer for the MANAGEMENT cluster.
+	eventRecorder := controllerConfig.EventRecorder
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
-	controlPlaneEventRecorder := controllerConfig.EventRecorder
 	controlPlaneKubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	controlPlaneKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controlPlaneNamespace, cloudConfigNamespace, "")
 	controlPlaneSecretInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
@@ -66,6 +65,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// Create informer for the ConfigMaps in the openshift-config-managed namespace.
 	// This is used to get the custom CA bundle to use when accessing the AWS API.
+	// This is only used in standalone OCP clusters.
 	controlPlaneCloudConfigInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
 	controlPlaneCloudConfigLister := controlPlaneCloudConfigInformer.Lister().ConfigMaps(controlPlaneNamespace)
 
@@ -74,14 +74,27 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
-	// Guest
-	guestNamespace := "openshift-cluster-csi-drivers"
+	// Create core clientset for the GUEST cluster.
+	guestNamespace := defaultNamespace
 	guestKubeConfig := controllerConfig.KubeConfig
-	if *guestKubeConfigString != "" {
+	guestKubeClient := controlPlaneKubeClient
+	isHypershift := *guestKubeConfigString != ""
+	if isHypershift {
 		guestKubeConfig, err = client.GetKubeConfigOrInClusterConfig(*guestKubeConfigString, nil)
 		if err != nil {
 			return err
 		}
+		guestKubeClient = kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, operatorName))
+
+		// Create all events in the guest cluster.
+		// Use name of the operator Deployment in the management cluster + namespace
+		// in the guest cluster as the closest approximation of the real involvedObject.
+		controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, controlPlaneKubeClient, controlPlaneNamespace, nil)
+		controllerRef.Namespace = guestNamespace
+		if err != nil {
+			klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
+		}
+		eventRecorder = events.NewKubeRecorder(guestKubeClient.CoreV1().Events(guestNamespace), operandName, controllerRef)
 	}
 
 	guestAPIExtClient, err := apiextclient.NewForConfig(rest.AddUserAgent(guestKubeConfig, operatorName))
@@ -94,8 +107,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
-	// Create config clientset and informer. This is used to get the cluster ID from the GUEST.
-	guestKubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, operatorName))
+	// Client informers for the GUEST cluster.
 	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient, guestNamespace, "")
 	guestConfigMapInformer := guestKubeInformersForNamespaces.InformersFor(guestNamespace).Core().V1().ConfigMaps()
 	guestNodeInformer := guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
@@ -104,25 +116,17 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	guestConfigInformers := configinformers.NewSharedInformerFactory(guestConfigClient, 20*time.Minute)
 	guestInfraInformer := guestConfigInformers.Config().V1().Infrastructures()
 
-	// Create an event recorder for the guest cluster
-	isHypershift := *guestKubeConfigString != ""
-	controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, controlPlaneKubeClient, guestNamespace, nil)
-	if err != nil {
-		klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
-	}
-	guestEventRecorder := events.NewKubeRecorder(guestKubeClient.CoreV1().Events(guestNamespace), operandName, controllerRef)
-
-	// Create client and informers for our ClusterCSIDriver CR
+	// Create client and informers for our ClusterCSIDriver CR.
 	gvr := opv1.SchemeGroupVersion.WithResource("clustercsidrivers")
 	guestOperatorClient, guestDynamicInformers, err := goc.NewClusterScopedOperatorClientWithConfigName(guestKubeConfig, gvr, string(opv1.AWSEBSCSIDriver))
 	if err != nil {
 		return err
 	}
 
-	// Start control plane controllers
+	// Start controllers that manage resources in the MANAGEMENT cluster.
 	controlPlaneCSIControllerSet := csicontrollerset.NewCSIControllerSet(
 		guestOperatorClient,
-		controlPlaneEventRecorder,
+		eventRecorder,
 	).WithLogLevelController().WithManagementStateController(
 		operandName,
 		false,
@@ -219,9 +223,10 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
+	// Start controllers that manage resources in GUEST clusters.
 	guestCSIControllerSet := csicontrollerset.NewCSIControllerSet(
 		guestOperatorClient,
-		guestEventRecorder,
+		eventRecorder,
 	).WithStaticResourcesController(
 		"AWSEBSDriverGuestStaticResourcesController",
 		guestKubeClient,
@@ -256,7 +261,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controlPlaneKubeInformersForNamespaces,
 		controlPlaneKubeClient,
 		controlPlaneNamespace,
-		controlPlaneEventRecorder,
+		eventRecorder,
 	)
 	if err != nil {
 		return fmt.Errorf("could not create the custom CA bundle syncer: %w", err)
