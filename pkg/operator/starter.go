@@ -54,7 +54,7 @@ const (
 	infrastructureName = "cluster"
 )
 
-func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigString *string) error {
+func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigString string) error {
 	// Create core clientset and informer for the MANAGEMENT cluster.
 	eventRecorder := controllerConfig.EventRecorder
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
@@ -63,9 +63,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	controlPlaneSecretInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
 	controlPlaneConfigMapInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
 
-	// Create informer for the ConfigMaps in the openshift-config-managed namespace.
+	// Create informer for the ConfigMaps in the operator namespace.
 	// This is used to get the custom CA bundle to use when accessing the AWS API.
-	// This is only used in standalone OCP clusters.
 	controlPlaneCloudConfigInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
 	controlPlaneCloudConfigLister := controlPlaneCloudConfigInformer.Lister().ConfigMaps(controlPlaneNamespace)
 
@@ -78,9 +77,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	guestNamespace := defaultNamespace
 	guestKubeConfig := controllerConfig.KubeConfig
 	guestKubeClient := controlPlaneKubeClient
-	isHypershift := *guestKubeConfigString != ""
+	isHypershift := guestKubeConfigString != ""
 	if isHypershift {
-		guestKubeConfig, err = client.GetKubeConfigOrInClusterConfig(*guestKubeConfigString, nil)
+		guestKubeConfig, err = client.GetKubeConfigOrInClusterConfig(guestKubeConfigString, nil)
 		if err != nil {
 			return err
 		}

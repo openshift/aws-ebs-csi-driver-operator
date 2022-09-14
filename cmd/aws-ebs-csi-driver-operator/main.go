@@ -48,5 +48,5 @@ func NewOperatorCommand() *cobra.Command {
 }
 
 func runOperatorWithGuestKubeconfig(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
-	return operator.RunOperator(ctx, controllerConfig, guestKubeconfig)
+	return operator.RunOperator(ctx, controllerConfig, *guestKubeconfig)
 }
