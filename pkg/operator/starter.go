@@ -136,8 +136,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controlPlaneKubeInformersForNamespaces,
 		assetWithNamespaceFunc(controlPlaneNamespace),
 		[]string{
-			"storageclass_gp2.yaml",
-			"csidriver.yaml",
 			"controller_sa.yaml",
 			"controller_pdb.yaml",
 			"service.yaml",
@@ -211,12 +209,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controlPlaneDynamicClient,
 		assetWithNamespaceFunc(controlPlaneNamespace),
 		"servicemonitor.yaml",
-	).WithStorageClassController(
-		"AWSEBSDriverStorageClassController",
-		assets.ReadFile,
-		"storageclass_gp3.yaml",
-		controlPlaneKubeClient,
-		controlPlaneKubeInformersForNamespaces.InformersFor(""),
 	)
 	if err != nil {
 		return err
@@ -234,7 +226,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		assets.ReadFile,
 		[]string{
 			"storageclass_gp2.yaml",
-			"storageclass_gp3.yaml",
 			"volumesnapshotclass.yaml",
 			"csidriver.yaml",
 			"node_sa.yaml",
@@ -253,6 +244,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			trustedCAConfigMap,
 			guestConfigMapInformer,
 		),
+	).WithStorageClassController(
+		"AWSEBSDriverStorageClassController",
+		assets.ReadFile,
+		"storageclass_gp3.yaml",
+		guestKubeClient,
+		guestKubeInformersForNamespaces.InformersFor(""),
 	)
 
 	caSyncController, err := newCustomAWSBundleSyncer(
