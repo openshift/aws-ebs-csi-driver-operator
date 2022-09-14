@@ -252,17 +252,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestKubeInformersForNamespaces.InformersFor(""),
 	)
 
-	caSyncController, err := newCustomAWSBundleSyncer(
-		guestOperatorClient,
-		controlPlaneKubeInformersForNamespaces,
-		controlPlaneKubeClient,
-		controlPlaneNamespace,
-		eventRecorder,
-	)
-	if err != nil {
-		return fmt.Errorf("could not create the custom CA bundle syncer: %w", err)
-	}
-
 	klog.Info("Starting the control plane informers")
 	go controlPlaneKubeInformersForNamespaces.Start(ctx.Done())
 
@@ -272,6 +261,17 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Only start caSyncController in standalone clusters because in Hypershift
 	// the ConfigMap is already available in the correct namespace.
 	if !isHypershift {
+		caSyncController, err := newCustomAWSBundleSyncer(
+			guestOperatorClient,
+			controlPlaneKubeInformersForNamespaces,
+			controlPlaneKubeClient,
+			controlPlaneNamespace,
+			eventRecorder,
+		)
+		if err != nil {
+			return fmt.Errorf("could not create the custom CA bundle syncer: %w", err)
+		}
+
 		klog.Info("Starting custom CA bundle sync controller")
 		go caSyncController.Run(ctx, 1)
 	}
