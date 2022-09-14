@@ -18,7 +18,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
-	configv1 "github.com/openshift/api/config/v1"
 	opv1 "github.com/openshift/api/operator/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
@@ -196,7 +195,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		withNamespaceDeploymentHook(controlPlaneNamespace),
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, controlPlaneSecretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
-		withCustomAWSCABundle(guestInfraInformer.Lister(), controlPlaneCloudConfigLister),
+		withCustomAWSCABundle(isHypershift, controlPlaneCloudConfigLister),
 		withCustomTags(guestInfraInformer.Lister()),
 		withCustomEndPoint(guestInfraInformer.Lister()),
 		csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
@@ -292,9 +291,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 // withCustomAWSCABundle executes the asset as a template to fill out the parts required when using a custom CA bundle.
 // The `caBundleConfigMap` parameter specifies the name of the ConfigMap containing the custom CA bundle. If the
 // argument supplied is empty, then no custom CA bundle will be used.
-func withCustomAWSCABundle(infraLister v1.InfrastructureLister, cloudConfigLister corev1listers.ConfigMapNamespaceLister) dc.DeploymentHookFunc {
+func withCustomAWSCABundle(isHypershift bool, cloudConfigLister corev1listers.ConfigMapNamespaceLister) dc.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		configName, err := customAWSCABundle(infraLister, cloudConfigLister)
+		configName, err := customAWSCABundle(isHypershift, cloudConfigLister)
 		if err != nil {
 			return fmt.Errorf("could not determine if a custom CA bundle is in use: %w", err)
 		}
@@ -396,14 +395,9 @@ func newCustomAWSBundleSyncer(
 }
 
 // customAWSCABundle returns true if the cloud config ConfigMap exists and contains a custom CA bundle.
-func customAWSCABundle(infraLister v1.InfrastructureLister, cloudConfigLister corev1listers.ConfigMapNamespaceLister) (string, error) {
-	infra, err := infraLister.Get(infrastructureName)
-	if err != nil {
-		return "", err
-	}
-
+func customAWSCABundle(isHypershift bool, cloudConfigLister corev1listers.ConfigMapNamespaceLister) (string, error) {
 	configName := cloudConfigName
-	if infra.Status.ControlPlaneTopology == configv1.ExternalTopologyMode {
+	if isHypershift {
 		configName = "user-ca-bundle"
 	}
 
