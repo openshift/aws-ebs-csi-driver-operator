@@ -142,7 +142,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"rbac/attacher_role.yaml",
 			"rbac/attacher_binding.yaml",
 			"rbac/privileged_role.yaml",
-			"rbac/controller_privileged_binding.yaml",
 			"rbac/provisioner_role.yaml",
 			"rbac/provisioner_binding.yaml",
 			"rbac/resizer_role.yaml",

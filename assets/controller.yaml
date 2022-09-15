@@ -20,7 +20,6 @@ spec:
       labels:
         app: aws-ebs-csi-driver-controller
     spec:
-      hostNetwork: true
       serviceAccount: aws-ebs-csi-driver-controller-sa
       priorityClassName: system-cluster-critical
       nodeSelector:
@@ -46,6 +45,7 @@ spec:
           image: ${DRIVER_IMAGE}
           imagePullPolicy: IfNotPresent
           args:
+            - controller
             - --endpoint=$(CSI_ENDPOINT)
             - --k8s-tag-cluster-id=${CLUSTER_ID}
             - --logtostderr
