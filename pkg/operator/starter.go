@@ -195,6 +195,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, controlPlaneSecretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
 		withCustomAWSCABundle(isHypershift, controlPlaneCloudConfigLister),
+		withAWSRegion(guestInfraInformer.Lister()),
 		withCustomTags(guestInfraInformer.Lister()),
 		withCustomEndPoint(guestInfraInformer.Lister()),
 		csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
@@ -519,6 +520,36 @@ func withHypershiftDeploymentHook(isHypershift bool) dc.DeploymentHookFunc {
 			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 		}
 		podSpec.Volumes = append(podSpec.Volumes, volume)
+		return nil
+	}
+}
+
+func withAWSRegion(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
+	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		infra, err := infraLister.Get(infrastructureName)
+		if err != nil {
+			return err
+		}
+
+		if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.AWS == nil {
+			return nil
+		}
+
+		region := infra.Status.PlatformStatus.AWS.Region
+		if region == "" {
+			return nil
+		}
+
+		for i := range deployment.Spec.Template.Spec.Containers {
+			container := &deployment.Spec.Template.Spec.Containers[i]
+			if container.Name != "csi-driver" {
+				continue
+			}
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:  "AWS_REGION",
+				Value: region,
+			})
+		}
 		return nil
 	}
 }
