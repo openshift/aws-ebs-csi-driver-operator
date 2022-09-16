@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
@@ -45,6 +47,8 @@ const (
 	secretName         = "ebs-cloud-credentials"
 	infraConfigName    = "cluster"
 	trustedCAConfigMap = "aws-ebs-csi-driver-trusted-ca-bundle"
+
+	hypershiftImageEnvName = "HYPERSHIFT_IMAGE"
 
 	cloudConfigNamespace = "openshift-config-managed"
 	cloudConfigName      = "kube-cloud-config"
@@ -189,7 +193,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			guestInfraInformer.Informer(),
 			controlPlaneConfigMapInformer.Informer(),
 		},
-		withHypershiftDeploymentHook(isHypershift),
+		withHypershiftDeploymentHook(isHypershift, os.Getenv(hypershiftImageEnvName)),
 		withHypershiftReplicasHook(isHypershift, guestNodeInformer.Lister()),
 		withNamespaceDeploymentHook(controlPlaneNamespace),
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, controlPlaneSecretInformer),
@@ -481,30 +485,27 @@ func withHypershiftReplicasHook(isHypershift bool, guestNodeLister corev1listers
 
 }
 
-func withHypershiftDeploymentHook(isHypershift bool) dc.DeploymentHookFunc {
+func withHypershiftDeploymentHook(isHypershift bool, hypershiftImage string) dc.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		if !isHypershift {
 			return nil
 		}
-		kubeConfigEnvVar := corev1.EnvVar{
-			Name:  "KUBECONFIG",
-			Value: "/etc/hosted-kubernetes/kubeconfig",
-		}
-		volumeMount := corev1.VolumeMount{
-			Name:      "hosted-kubeconfig",
-			MountPath: "/etc/hosted-kubernetes",
-			ReadOnly:  true,
-		}
-		volume := corev1.Volume{
-			Name: "hosted-kubeconfig",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					// FIXME: use a ServiceAccount from the guest cluster
-					SecretName: "admin-kubeconfig",
+
+		// Inject into the pod the volumes used by CSI and token minter sidecars.
+		podSpec := &deployment.Spec.Template.Spec
+		podSpec.Volumes = append(podSpec.Volumes,
+			corev1.Volume{
+				Name: "hosted-kubeconfig",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						// FIXME: use a ServiceAccount from the guest cluster
+						SecretName: "admin-kubeconfig",
+					},
 				},
 			},
-		}
-		podSpec := &deployment.Spec.Template.Spec
+		)
+
+		// Inject into the CSI sidecars the hosted Kubeconfig.
 		for i := range podSpec.Containers {
 			container := &podSpec.Containers[i]
 			switch container.Name {
@@ -516,10 +517,49 @@ func withHypershiftDeploymentHook(isHypershift bool) dc.DeploymentHookFunc {
 				continue
 			}
 			container.Args = append(container.Args, "--kubeconfig=$(KUBECONFIG)")
-			container.Env = append(container.Env, kubeConfigEnvVar)
-			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:  "KUBECONFIG",
+				Value: "/etc/hosted-kubernetes/kubeconfig",
+			})
+			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+				Name:      "hosted-kubeconfig",
+				MountPath: "/etc/hosted-kubernetes",
+				ReadOnly:  true,
+			})
 		}
-		podSpec.Volumes = append(podSpec.Volumes, volume)
+
+		// Add the token minter sidecar into the pod.
+		podSpec.Containers = append(podSpec.Containers, corev1.Container{
+			Name:            "token-minter",
+			Image:           hypershiftImage,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command:         []string{"/usr/bin/control-plane-operator", "token-minter"},
+			Args: []string{
+				"--service-account-namespace=openshift-cluster-csi-drivers",
+				"--service-account-name=aws-ebs-csi-driver-controller-sa",
+				"--token-audience=openshift",
+				"--token-file=/var/run/secrets/openshift/serviceaccount/token",
+				"--kubeconfig=/etc/hosted-kubernetes/kubeconfig",
+			},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("10m"),
+					corev1.ResourceMemory: resource.MustParse("10Mi"),
+				},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "bound-sa-token",
+					MountPath: "/var/run/secrets/openshift/serviceaccount",
+				},
+				{
+					Name:      "hosted-kubeconfig",
+					MountPath: "/etc/hosted-kubernetes",
+					ReadOnly:  true,
+				},
+			},
+		})
+
 		return nil
 	}
 }
