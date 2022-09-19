@@ -62,13 +62,15 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	eventRecorder := controllerConfig.EventRecorder
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
 	controlPlaneKubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
-	controlPlaneKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controlPlaneNamespace, cloudConfigNamespace)
+	controlPlaneKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controlPlaneNamespace)
 	controlPlaneSecretInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
 	controlPlaneConfigMapInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
 
 	// Create informer for the ConfigMaps in the operator namespace.
 	// This is used to get the custom CA bundle to use when accessing the AWS API.
-	controlPlaneCloudConfigInformer := controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
+	// This is only synced on standalone OCP clusters.
+	controlPlaneCloudConfigInformers := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controlPlaneNamespace, cloudConfigNamespace)
+	controlPlaneCloudConfigInformer := controlPlaneCloudConfigInformers.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
 	controlPlaneCloudConfigLister := controlPlaneCloudConfigInformer.Lister().ConfigMaps(controlPlaneNamespace)
 
 	controlPlaneDynamicClient, err := dynamic.NewForConfig(controllerConfig.KubeConfig)
@@ -189,7 +191,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		[]factory.Informer{
 			controlPlaneSecretInformer.Informer(),
 			guestNodeInformer.Informer(),
-			controlPlaneCloudConfigInformer.Informer(),
+			controlPlaneCloudConfigInformer.Informer(), // This won't generate any events on Hypershift.
 			guestInfraInformer.Informer(),
 			controlPlaneConfigMapInformer.Informer(),
 		},
@@ -266,7 +268,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if !isHypershift {
 		caSyncController, err := newCustomAWSBundleSyncer(
 			guestOperatorClient,
-			controlPlaneKubeInformersForNamespaces,
+			controlPlaneCloudConfigInformers,
 			controlPlaneKubeClient,
 			controlPlaneNamespace,
 			eventRecorder,
@@ -274,6 +276,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		if err != nil {
 			return fmt.Errorf("could not create the custom CA bundle syncer: %w", err)
 		}
+
+		klog.Info("Starting custom CA bundle informers")
+		go controlPlaneCloudConfigInformers.Start(ctx.Done())
 
 		klog.Info("Starting custom CA bundle sync controller")
 		go caSyncController.Run(ctx, 1)
