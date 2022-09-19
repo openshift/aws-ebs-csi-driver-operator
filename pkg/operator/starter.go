@@ -127,6 +127,16 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
+	controlPlaneInformersForEvents := []factory.Informer{
+		controlPlaneSecretInformer.Informer(),
+		controlPlaneConfigMapInformer.Informer(),
+		guestNodeInformer.Informer(),
+		guestInfraInformer.Informer(),
+	}
+	if !isHypershift {
+		controlPlaneInformersForEvents = append(controlPlaneInformersForEvents, controlPlaneCloudConfigInformer.Informer())
+	}
+
 	// Start controllers that manage resources in the MANAGEMENT cluster.
 	controlPlaneCSIControllerSet := csicontrollerset.NewCSIControllerSet(
 		guestOperatorClient,
@@ -188,13 +198,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controlPlaneKubeClient,
 		controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace),
 		guestConfigInformers,
-		[]factory.Informer{
-			controlPlaneSecretInformer.Informer(),
-			guestNodeInformer.Informer(),
-			controlPlaneCloudConfigInformer.Informer(), // This won't generate any events on Hypershift.
-			guestInfraInformer.Informer(),
-			controlPlaneConfigMapInformer.Informer(),
-		},
+		controlPlaneInformersForEvents,
 		withHypershiftDeploymentHook(isHypershift, os.Getenv(hypershiftImageEnvName)),
 		withHypershiftReplicasHook(isHypershift, guestNodeInformer.Lister()),
 		withNamespaceDeploymentHook(controlPlaneNamespace),
