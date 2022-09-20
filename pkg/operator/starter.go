@@ -514,6 +514,18 @@ func withHypershiftDeploymentHook(isHypershift bool, hypershiftImage string) dc.
 			},
 		)
 
+		// The bound-sa-token volume must be a empty disk in Hypershift.
+		for i := range podSpec.Volumes {
+			if podSpec.Volumes[i].Name != "bound-sa-token" {
+				continue
+			}
+			podSpec.Volumes[i].VolumeSource = corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: corev1.StorageMediumMemory,
+				},
+			}
+		}
+
 		// Inject into the CSI sidecars the hosted Kubeconfig.
 		for i := range podSpec.Containers {
 			container := &podSpec.Containers[i]

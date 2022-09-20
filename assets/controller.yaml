@@ -314,12 +314,15 @@ spec:
       volumes:
         - name: aws-credentials
           secret:
-            # The operator overwrites this on Hypershift
             secretName: ebs-cloud-credentials
         # This service account token can be used to provide identity outside the cluster.
         # For example, this token can be used with AssumeRoleWithWebIdentity to authenticate with AWS using IAM OIDC provider and STS.
         - name: bound-sa-token
-          emptyDir: {}
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+                audience: openshift
         - name: socket-dir
           emptyDir: {}
         - name: metrics-serving-cert
