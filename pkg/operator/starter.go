@@ -35,6 +35,7 @@ import (
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
+	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/assets"
@@ -213,11 +214,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			trustedCAConfigMap,
 			controlPlaneConfigMapInformer,
 		),
-	).WithServiceMonitorController(
-		"AWSEBSDriverServiceMonitorController",
-		controlPlaneDynamicClient,
-		assetWithNamespaceFunc(controlPlaneNamespace),
-		"servicemonitor.yaml",
 	)
 	if err != nil {
 		return err
@@ -268,7 +264,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	go controlPlaneCSIControllerSet.Run(ctx, 1)
 
 	// Only start caSyncController in standalone clusters because in Hypershift
-	// the ConfigMap is already available in the correct namespace.
+	// the ConfigMap is alreadyavailable in the correct namespace.
+	// Also, for now we don't want serviceControllerMonitor in Hypershift.
 	if !isHypershift {
 		caSyncController, err := newCustomAWSBundleSyncer(
 			guestOperatorClient,
@@ -286,6 +283,18 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 		klog.Info("Starting custom CA bundle sync controller")
 		go caSyncController.Run(ctx, 1)
+
+		serviceMonitorController := staticresourcecontroller.NewStaticResourceController(
+			"AWSEBSDriverServiceMonitorController",
+			assetWithNamespaceFunc(controlPlaneNamespace),
+			[]string{"servicemonitor.yaml"},
+			(&resourceapply.ClientHolder{}).WithDynamicClient(controlPlaneDynamicClient),
+			guestOperatorClient,
+			eventRecorder,
+		).WithIgnoreNotFoundOnCreate()
+
+		klog.Info("Starting ServiceMonitor controller")
+		go serviceMonitorController.Run(ctx, 1)
 	}
 
 	klog.Info("Starting the guest cluster informers")
