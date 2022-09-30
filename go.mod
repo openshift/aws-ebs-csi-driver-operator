@@ -1,23 +1,23 @@
 module github.com/openshift/aws-ebs-csi-driver-operator
 
-go 1.17
+go 1.18
 
 require (
 	github.com/go-logr/logr v1.2.3 // indirect
-	github.com/google/go-cmp v0.5.6 // indirect
+	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/openshift/api v0.0.0-20220823120157-c434322cb7da
-	github.com/openshift/build-machinery-go v0.0.0-20220429084610-baff9f8d23b3
-	github.com/openshift/client-go v0.0.0-20220525160904-9e1acff93e4a
-	github.com/openshift/library-go v0.0.0-20220826132527-2b7a682a2de4
+	github.com/openshift/api v0.0.0-20220919112502-5eaf4250c423
+	github.com/openshift/build-machinery-go v0.0.0-20220913142420-e25cf57ea46d
+	github.com/openshift/client-go v0.0.0-20220915152853-9dfefb19db2e
+	github.com/openshift/library-go v0.0.0-20220915130036-73d5a4a82865
 	github.com/prometheus/client_golang v1.12.1
 	github.com/spf13/cobra v1.4.0
-	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b // indirect
-	k8s.io/api v0.25.0
-	k8s.io/apimachinery v0.25.0
-	k8s.io/client-go v0.25.0
-	k8s.io/component-base v0.25.0
-	k8s.io/klog/v2 v2.70.1
+	golang.org/x/net v0.0.0-20220909164309-bea034e7d591 // indirect
+	k8s.io/api v0.25.1
+	k8s.io/apimachinery v0.25.1
+	k8s.io/client-go v0.25.1
+	k8s.io/component-base v0.25.1
+	k8s.io/klog/v2 v2.80.1
 	k8s.io/utils v0.0.0-20220823124924-e9cbc92d1a73 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
