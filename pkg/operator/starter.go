@@ -146,7 +146,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		operandName,
 		false,
 	).WithStaticResourcesController(
-		"AWSEBSDriverStaticResourcesController",
+		"AWSEBSDriverControlPlaneStaticResourcesController",
 		controlPlaneKubeClient,
 		controlPlaneDynamicClient,
 		controlPlaneKubeInformersForNamespaces,
@@ -154,21 +154,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		[]string{
 			"controller_sa.yaml",
 			"controller_pdb.yaml",
-			"service.yaml",
 			"cabundle_cm.yaml",
-			"rbac/attacher_role.yaml",
-			"rbac/attacher_binding.yaml",
-			"rbac/privileged_role.yaml",
-			"rbac/provisioner_role.yaml",
-			"rbac/provisioner_binding.yaml",
-			"rbac/resizer_role.yaml",
-			"rbac/resizer_binding.yaml",
-			"rbac/snapshotter_role.yaml",
-			"rbac/snapshotter_binding.yaml",
-			"rbac/prometheus_role.yaml",
-			"rbac/prometheus_rolebinding.yaml",
-			"rbac/kube_rbac_proxy_role.yaml",
-			"rbac/kube_rbac_proxy_binding.yaml",
 		},
 	).WithConditionalStaticResourcesController(
 		"AWSEBSDriverConditionalStaticResourcesController",
@@ -234,6 +220,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"volumesnapshotclass.yaml",
 			"csidriver.yaml",
 			"node_sa.yaml",
+			"rbac/privileged_role.yaml",
 			"rbac/node_privileged_binding.yaml",
 		},
 	).WithCSIDriverNodeService(
@@ -257,15 +244,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestKubeInformersForNamespaces.InformersFor(""),
 	)
 
-	klog.Info("Starting the control plane informers")
-	go controlPlaneKubeInformersForNamespaces.Start(ctx.Done())
-
-	klog.Info("Starting control plane controllerset")
-	go controlPlaneCSIControllerSet.Run(ctx, 1)
-
-	// Only start caSyncController in standalone clusters because in Hypershift
-	// the ConfigMap is alreadyavailable in the correct namespace.
-	// Also, for now we don't want serviceControllerMonitor in Hypershift.
 	if !isHypershift {
 		caSyncController, err := newCustomAWSBundleSyncer(
 			guestOperatorClient,
@@ -284,9 +262,35 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		klog.Info("Starting custom CA bundle sync controller")
 		go caSyncController.Run(ctx, 1)
 
+		staticResourcesController := staticresourcecontroller.NewStaticResourceController(
+			"AWSEBSDriverStaticResourcesController",
+			assets.ReadFile,
+			[]string{
+				"rbac/attacher_role.yaml",
+				"rbac/attacher_binding.yaml",
+				"rbac/provisioner_role.yaml",
+				"rbac/provisioner_binding.yaml",
+				"rbac/resizer_role.yaml",
+				"rbac/resizer_binding.yaml",
+				"rbac/snapshotter_role.yaml",
+				"rbac/snapshotter_binding.yaml",
+				"service.yaml",
+				"rbac/prometheus_role.yaml",
+				"rbac/prometheus_rolebinding.yaml",
+				"rbac/kube_rbac_proxy_role.yaml",
+				"rbac/kube_rbac_proxy_binding.yaml",
+			},
+			(&resourceapply.ClientHolder{}).WithKubernetes(controlPlaneKubeClient).WithDynamicClient(controlPlaneDynamicClient),
+			guestOperatorClient,
+			eventRecorder,
+		).AddKubeInformers(controlPlaneKubeInformersForNamespaces)
+
+		klog.Info("Starting static resources controller")
+		go staticResourcesController.Run(ctx, 1)
+
 		serviceMonitorController := staticresourcecontroller.NewStaticResourceController(
 			"AWSEBSDriverServiceMonitorController",
-			assetWithNamespaceFunc(controlPlaneNamespace),
+			assets.ReadFile,
 			[]string{"servicemonitor.yaml"},
 			(&resourceapply.ClientHolder{}).WithDynamicClient(controlPlaneDynamicClient),
 			guestOperatorClient,
@@ -296,6 +300,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		klog.Info("Starting ServiceMonitor controller")
 		go serviceMonitorController.Run(ctx, 1)
 	}
+
+	klog.Info("Starting the control plane informers")
+	go controlPlaneKubeInformersForNamespaces.Start(ctx.Done())
+
+	klog.Info("Starting control plane controllerset")
+	go controlPlaneCSIControllerSet.Run(ctx, 1)
 
 	klog.Info("Starting the guest cluster informers")
 	go guestKubeInformersForNamespaces.Start(ctx.Done())
@@ -534,6 +544,28 @@ func withHypershiftDeploymentHook(isHypershift bool, hypershiftImage string) dc.
 				},
 			}
 		}
+
+		// The metrics-serving-cert volume is not used in Hypershift.
+		for i := range podSpec.Volumes {
+			if podSpec.Volumes[i].Name == "metrics-serving-cert" {
+				podSpec.Volumes = append(podSpec.Volumes[:i], podSpec.Volumes[i+1:]...)
+				break
+			}
+		}
+
+		filtered := []corev1.Container{}
+		for i := range podSpec.Containers {
+			switch podSpec.Containers[i].Name {
+			case "driver-kube-rbac-proxy":
+			case "provisioner-kube-rbac-proxy":
+			case "attacher-kube-rbac-proxy":
+			case "resizer-kube-rbac-proxy":
+			case "snapshotter-kube-rbac-proxy":
+			default:
+				filtered = append(filtered, podSpec.Containers[i])
+			}
+		}
+		podSpec.Containers = filtered
 
 		// Inject into the CSI sidecars the hosted Kubeconfig.
 		for i := range podSpec.Containers {

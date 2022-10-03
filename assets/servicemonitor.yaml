@@ -2,7 +2,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: aws-ebs-csi-driver-controller-monitor
-  namespace: ${NAMESPACE}
+  namespace: openshift-cluster-csi-drivers
 spec:
   endpoints:
   - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token

@@ -6,7 +6,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: aws-ebs-csi-driver-controller-sa
-    namespace: ${NAMESPACE}
+    namespace: openshift-cluster-csi-drivers
 roleRef:
   kind: ClusterRole
   name: ebs-kube-rbac-proxy-role
