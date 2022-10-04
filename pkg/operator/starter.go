@@ -320,7 +320,7 @@ func isCustomCABundleUsed(cloudConfigLister corev1listers.ConfigMapNamespaceList
 }
 
 // withCustomTags add tags from Infrastructure.Status.PlatformStatus.AWS.ResourceTags to the driver command line as
-//  --extra-tags=<key1>=<value1>,<key2>=<value2>,...
+// --extra-tags=<key1>=<value1>,<key2>=<value2>,...
 func withCustomTags(infraLister v1.InfrastructureLister) deploymentcontroller.DeploymentHookFunc {
 	return func(spec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		infra, err := infraLister.Get(infrastructureName)
