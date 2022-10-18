@@ -11,7 +11,9 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -58,6 +60,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	nodeInformer := kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
 	configMapInformer := kubeInformersForNamespaces.InformersFor(defaultNamespace).Core().V1().ConfigMaps()
 
+	apiExtClient, err := apiextclient.NewForConfig(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
+	if err != nil {
+		return err
+	}
+
 	// Create config clientset and informer. This is used to get the cluster ID
 	configClient := configclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	configInformers := configinformers.NewSharedInformerFactory(configClient, 20*time.Minute)
@@ -94,7 +101,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		assets.ReadFile,
 		[]string{
 			"storageclass_gp2.yaml",
-			"volumesnapshotclass.yaml",
 			"csidriver.yaml",
 			"controller_sa.yaml",
 			"controller_pdb.yaml",
@@ -116,6 +122,25 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"rbac/prometheus_rolebinding.yaml",
 			"rbac/kube_rbac_proxy_role.yaml",
 			"rbac/kube_rbac_proxy_binding.yaml",
+		},
+	).WithConditionalStaticResourcesController(
+		"AWSEBSDriverConditionalStaticResourcesController",
+		kubeClient,
+		dynamicClient,
+		kubeInformersForNamespaces,
+		assets.ReadFile,
+		[]string{
+			"volumesnapshotclass.yaml",
+		},
+		// Only install when CRD exists.
+		func() bool {
+			name := "volumesnapshotclasses.snapshot.storage.k8s.io"
+			_, err := apiExtClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+			return err == nil
+		},
+		// Don't ever remove.
+		func() bool {
+			return false
 		},
 	).WithCSIConfigObserverController(
 		"AWSEBSDriverCSIConfigObserverController",
