@@ -156,25 +156,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"controller_pdb.yaml",
 			"cabundle_cm.yaml",
 		},
-	).WithConditionalStaticResourcesController(
-		"AWSEBSDriverConditionalStaticResourcesController",
-		kubeClient,
-		dynamicClient,
-		kubeInformersForNamespaces,
-		assets.ReadFile,
-		[]string{
-			"volumesnapshotclass.yaml",
-		},
-		// Only install when CRD exists.
-		func() bool {
-			name := "volumesnapshotclasses.snapshot.storage.k8s.io"
-			_, err := guestAPIExtClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
-			return err == nil
-		},
-		// Don't ever remove.
-		func() bool {
-			return false
-		},
 	).WithCSIConfigObserverController(
 		"AWSEBSDriverCSIConfigObserverController",
 		guestConfigInformers,
@@ -222,6 +203,25 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"node_sa.yaml",
 			"rbac/privileged_role.yaml",
 			"rbac/node_privileged_binding.yaml",
+		},
+	).WithConditionalStaticResourcesController(
+		"AWSEBSDriverConditionalStaticResourcesController",
+		guestKubeClient,
+		guestDynamicClient,
+		guestKubeInformersForNamespaces,
+		assets.ReadFile,
+		[]string{
+			"volumesnapshotclass.yaml",
+		},
+		// Only install when CRD exists.
+		func() bool {
+			name := "volumesnapshotclasses.snapshot.storage.k8s.io"
+			_, err := guestAPIExtClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+			return err == nil
+		},
+		// Don't ever remove.
+		func() bool {
+			return false
 		},
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
