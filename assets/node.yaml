@@ -33,6 +33,7 @@ spec:
           image: ${DRIVER_IMAGE}
           imagePullPolicy: IfNotPresent
           args:
+            - node
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr
             - --v=${LOG_LEVEL}

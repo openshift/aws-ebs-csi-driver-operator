@@ -2,7 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: aws-ebs-csi-driver-controller
-  namespace: openshift-cluster-csi-drivers
+  namespace: ${NAMESPACE}
   annotations:
     config.openshift.io/inject-proxy: csi-driver
     config.openshift.io/inject-proxy-cabundle: csi-driver
@@ -20,7 +20,6 @@ spec:
       labels:
         app: aws-ebs-csi-driver-controller
     spec:
-      hostNetwork: true
       serviceAccount: aws-ebs-csi-driver-controller-sa
       priorityClassName: system-cluster-critical
       nodeSelector:
@@ -46,6 +45,7 @@ spec:
           image: ${DRIVER_IMAGE}
           imagePullPolicy: IfNotPresent
           args:
+            - controller
             - --endpoint=$(CSI_ENDPOINT)
             - --k8s-tag-cluster-id=${CLUSTER_ID}
             - --logtostderr
@@ -132,6 +132,7 @@ spec:
             - --leader-election-lease-duration=${LEADER_ELECTION_LEASE_DURATION}
             - --leader-election-renew-deadline=${LEADER_ELECTION_RENEW_DEADLINE}
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
+            - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
           env:
             - name: ADDRESS
@@ -176,6 +177,7 @@ spec:
             - --leader-election-lease-duration=${LEADER_ELECTION_LEASE_DURATION}
             - --leader-election-renew-deadline=${LEADER_ELECTION_RENEW_DEADLINE}
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
+            - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
           env:
             - name: ADDRESS
@@ -219,6 +221,7 @@ spec:
             - --leader-election-lease-duration=${LEADER_ELECTION_LEASE_DURATION}
             - --leader-election-renew-deadline=${LEADER_ELECTION_RENEW_DEADLINE}
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
+            - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
           env:
             - name: ADDRESS
@@ -261,6 +264,7 @@ spec:
             - --leader-election-lease-duration=${LEADER_ELECTION_LEASE_DURATION}
             - --leader-election-renew-deadline=${LEADER_ELECTION_RENEW_DEADLINE}
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
+            - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
           env:
           - name: ADDRESS

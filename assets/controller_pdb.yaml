@@ -2,7 +2,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: aws-ebs-csi-driver-controller-pdb
-  namespace: openshift-cluster-csi-drivers
+  namespace: ${NAMESPACE}
 spec:
   maxUnavailable: 1
   selector:

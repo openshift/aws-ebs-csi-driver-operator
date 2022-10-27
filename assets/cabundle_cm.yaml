@@ -4,4 +4,4 @@ metadata:
   labels:
     config.openshift.io/inject-trusted-cabundle: "true"
   name: aws-ebs-csi-driver-trusted-ca-bundle
-  namespace: openshift-cluster-csi-drivers
+  namespace: ${NAMESPACE}

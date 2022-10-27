@@ -152,7 +152,7 @@ func TestWithCustomCABundle(t *testing.T) {
 				return cloudConfigInformer.Informer().HasSynced(), nil
 			})
 			deployment := tc.inDeployment.DeepCopy()
-			err := withCustomCABundle(cloudConfigLister)(nil, deployment)
+			err := withCustomAWSCABundle(false, cloudConfigLister)(nil, deployment)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
