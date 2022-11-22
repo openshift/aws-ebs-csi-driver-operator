@@ -198,7 +198,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		assets.ReadFile,
 		[]string{
 			"storageclass_gp2.yaml",
-			"volumesnapshotclass.yaml",
 			"csidriver.yaml",
 			"node_sa.yaml",
 			"rbac/privileged_role.yaml",
