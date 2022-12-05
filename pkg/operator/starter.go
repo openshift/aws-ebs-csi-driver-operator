@@ -526,7 +526,7 @@ func withHypershiftDeploymentHook(isHypershift bool, hypershiftImage string) dc.
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
 						// FIXME: use a ServiceAccount from the guest cluster
-						SecretName: "admin-kubeconfig",
+						SecretName: "service-network-admin-kubeconfig",
 					},
 				},
 			},
