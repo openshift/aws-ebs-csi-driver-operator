@@ -56,6 +56,8 @@ const (
 	caBundleKey          = "ca-bundle.pem"
 
 	infrastructureName = "cluster"
+
+	hypershiftPriorityClass = "hypershift-control-plane"
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigString string) error {
@@ -517,6 +519,8 @@ func withHypershiftDeploymentHook(isHypershift bool, hypershiftImage string) dc.
 		if !isHypershift {
 			return nil
 		}
+
+		deployment.Spec.Template.Spec.PriorityClassName = hypershiftPriorityClass
 
 		// Inject into the pod the volumes used by CSI and token minter sidecars.
 		podSpec := &deployment.Spec.Template.Spec
