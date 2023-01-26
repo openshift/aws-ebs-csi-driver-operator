@@ -23,7 +23,7 @@ To build and run the operator locally:
 
 ```shell
 # Create only the resources the operator needs to run via CLI
-oc apply -f https://raw.githubusercontent.com/openshift/cluster-storage-operator/master/assets/csidriveroperators/aws-ebs/10_cr.yaml
+oc apply -f https://raw.githubusercontent.com/openshift/cluster-storage-operator/master/assets/csidriveroperators/aws-ebs/standalone/10_cr.yaml
 
 # Build the operator
 make
