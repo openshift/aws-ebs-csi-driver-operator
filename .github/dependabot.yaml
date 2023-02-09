@@ -1,0 +1,14 @@
+version: 2
+updates:
+- package-ecosystem: gomod
+  directory: "/"
+  schedule:
+    interval: "weekly"
+    day: "sunday"
+  labels:
+    - "docs-approved"
+    - "qe-approved"
+    - "px-approved"
+  reviewers:
+    - "openshift/storage"
+  open-pull-requests-limit: 10
