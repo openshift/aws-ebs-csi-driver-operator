@@ -137,24 +137,32 @@ func (c *CSIStorageClassController) syncStorageClass(ctx context.Context, opSpec
 		}
 	}
 
-	existingSCs, err := c.storageClassLister.List(labels.Everything())
+	err = SetDefaultStorageClass(c.storageClassLister, expectedSC)
 	if err != nil {
-		klog.V(2).Infof("could not list StorageClass objects")
+		return err
+	}
+
+	return c.scStateEvaluator.EvalAndApplyStorageClass(ctx, expectedSC)
+}
+
+func SetDefaultStorageClass(storageClassLister v1.StorageClassLister, storageClass *storagev1.StorageClass) error {
+	existingSCs, err := storageClassLister.List(labels.Everything())
+	if err != nil {
 		return err
 	}
 
 	defaultSCCount := 0
 	annotationKeyPresent := false
 	// Skip the default SC annotation check if it's not in the input/expectedSC.
-	if expectedSC.Annotations != nil && expectedSC.Annotations[defaultScAnnotationKey] != "" {
+	if storageClass.Annotations != nil && storageClass.Annotations[defaultScAnnotationKey] != "" {
 		for _, sc := range existingSCs {
-			if sc.Annotations[defaultScAnnotationKey] == "true" && sc.Name != expectedSC.Name {
+			if sc.Annotations[defaultScAnnotationKey] == "true" && sc.Name != storageClass.Name {
 				defaultSCCount++
 			}
-			if sc.Name == expectedSC.Name && sc.Annotations != nil {
+			if sc.Name == storageClass.Name && sc.Annotations != nil {
 				// There already is an SC with same name we intend to apply, copy its annotation.
 				if val, ok := sc.Annotations[defaultScAnnotationKey]; ok {
-					expectedSC.Annotations[defaultScAnnotationKey] = val
+					storageClass.Annotations[defaultScAnnotationKey] = val
 					annotationKeyPresent = true // If there is a key, we need to preserve it, whatever the value is.
 				} else {
 					annotationKeyPresent = false
@@ -164,11 +172,10 @@ func (c *CSIStorageClassController) syncStorageClass(ctx context.Context, opSpec
 		// There already is a default, and it's not set on the SC we intend to apply. Also, if there is any value for
 		// defaultScAnnotationKey do not overwrite it (empty string is a correct value).
 		if defaultSCCount > 0 && !annotationKeyPresent {
-			expectedSC.Annotations[defaultScAnnotationKey] = "false"
+			storageClass.Annotations[defaultScAnnotationKey] = "false"
 		}
 	}
-
-	return c.scStateEvaluator.EvalAndApplyStorageClass(ctx, expectedSC)
+	return nil
 }
 
 // UpdateConditionFunc returns a func to update a condition.
@@ -181,7 +188,6 @@ func removeConditionFn(condType string) v1helpers.UpdateStatusFunc {
 
 // StorageClassStateEvaluator evaluates the StorageClassState in the corresponding
 // ClusterCSIDriver and reconciles the StorageClass according to that policy.
-// If Managed, apply the SC. If Unmanaged, do nothing. If Removed, delete the SC.
 type StorageClassStateEvaluator struct {
 	kubeClient             kubernetes.Interface
 	clusterCSIDriverLister oplisters.ClusterCSIDriverLister
@@ -200,16 +206,23 @@ func NewStorageClassStateEvaluator(
 	}
 }
 
-func (e *StorageClassStateEvaluator) EvalAndApplyStorageClass(ctx context.Context, expectedSC *storagev1.StorageClass) error {
-	// Look for the corresponding ClusterCSIDriver, but if this fails
-	// then assume the default "Managed" policy.
+// GetStorageClassState accepts the name of a ClusterCSIDriver and returns the
+// StorageClassState associated with that object. If the ClusterCSIDriver is not
+// found, this function returns the default state (Managed).
+func (e *StorageClassStateEvaluator) GetStorageClassState(ccdName string) operatorapi.StorageClassStateName {
 	scState := operatorapi.ManagedStorageClass
-	clusterCSIDriver, err := e.clusterCSIDriverLister.Get(expectedSC.Provisioner)
+	clusterCSIDriver, err := e.clusterCSIDriverLister.Get(ccdName)
 	if err != nil {
-		klog.V(4).Infof("failed to get ClusterCSIDriver %s, assuming Managed StorageClassState: %w", expectedSC.Provisioner, err)
+		klog.V(4).Infof("failed to get ClusterCSIDriver %s, assuming Managed StorageClassState: %w", ccdName, err)
 	} else {
 		scState = clusterCSIDriver.Spec.StorageClassState
 	}
+	return scState
+}
+
+// ApplyStorageClass applies the provided SC according to the StorageClassState.
+// If Managed, apply the SC. If Unmanaged, do nothing. If Removed, delete the SC.
+func (e *StorageClassStateEvaluator) ApplyStorageClass(ctx context.Context, expectedSC *storagev1.StorageClass, scState operatorapi.StorageClassStateName) (err error) {
 	// StorageClassState determines how the SC is reconciled.
 	switch scState {
 	case operatorapi.ManagedStorageClass, "":
@@ -223,6 +236,14 @@ func (e *StorageClassStateEvaluator) EvalAndApplyStorageClass(ctx context.Contex
 	default:
 		err = fmt.Errorf("invalid StorageClassState %s", scState)
 	}
-
 	return err
+}
+
+func (e *StorageClassStateEvaluator) EvalAndApplyStorageClass(ctx context.Context, expectedSC *storagev1.StorageClass) error {
+	scState := e.GetStorageClassState(expectedSC.Provisioner)
+	return e.ApplyStorageClass(ctx, expectedSC, scState)
+}
+
+func (e *StorageClassStateEvaluator) IsManaged(scState operatorapi.StorageClassStateName) bool {
+	return (scState == operatorapi.ManagedStorageClass || scState == "")
 }
