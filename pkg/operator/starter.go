@@ -24,6 +24,8 @@ import (
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	opclient "github.com/openshift/client-go/operator/clientset/versioned"
+	opinformers "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/library-go/pkg/config/client"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -58,6 +60,8 @@ const (
 	infrastructureName = "cluster"
 
 	hypershiftPriorityClass = "hypershift-control-plane"
+
+	resync = 20 * time.Minute
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigString string) error {
@@ -120,8 +124,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	guestNodeInformer := guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
 
 	guestConfigClient := configclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, operatorName))
-	guestConfigInformers := configinformers.NewSharedInformerFactory(guestConfigClient, 20*time.Minute)
+	guestConfigInformers := configinformers.NewSharedInformerFactory(guestConfigClient, resync)
 	guestInfraInformer := guestConfigInformers.Config().V1().Infrastructures()
+
+	// operator.openshift.io client, used for ClusterCSIDriver
+	guestCCDClient := opclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, operatorName))
+	guestCCDInformers := opinformers.NewSharedInformerFactory(guestCCDClient, resync)
 
 	// Create client and informers for our ClusterCSIDriver CR.
 	gvr := opv1.SchemeGroupVersion.WithResource("clustercsidrivers")
@@ -199,7 +207,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestKubeInformersForNamespaces,
 		assets.ReadFile,
 		[]string{
-			"storageclass_gp2.yaml",
 			"csidriver.yaml",
 			"node_sa.yaml",
 			"rbac/privileged_role.yaml",
@@ -240,9 +247,13 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	).WithStorageClassController(
 		"AWSEBSDriverStorageClassController",
 		assets.ReadFile,
-		"storageclass_gp3.yaml",
+		[]string{
+			"storageclass_gp3.yaml",
+			"storageclass_gp2.yaml",
+		},
 		guestKubeClient,
 		guestKubeInformersForNamespaces.InformersFor(""),
+		guestCCDInformers,
 	)
 
 	if !isHypershift {
@@ -312,6 +323,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	go guestKubeInformersForNamespaces.Start(ctx.Done())
 	go guestDynamicInformers.Start(ctx.Done())
 	go guestConfigInformers.Start(ctx.Done())
+	go guestCCDInformers.Start(ctx.Done())
 
 	klog.Info("Starting guest cluster controllerset")
 	go guestCSIControllerSet.Run(ctx, 1)
