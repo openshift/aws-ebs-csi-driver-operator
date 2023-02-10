@@ -9,6 +9,7 @@ updates:
     - "docs-approved"
     - "qe-approved"
     - "px-approved"
+    - "ok-to-test"
   reviewers:
     - "openshift/storage"
   open-pull-requests-limit: 10
