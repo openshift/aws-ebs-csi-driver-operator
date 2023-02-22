@@ -532,6 +532,10 @@ func withHypershiftDeploymentHook(isHypershift bool, hypershiftImage string) dc.
 			return nil
 		}
 
+		// Remove inject-proxy annotations
+		delete(deployment.Annotations, "config.openshift.io/inject-proxy")
+		delete(deployment.Annotations, "config.openshift.io/inject-proxy-cabundle")
+
 		deployment.Spec.Template.Spec.PriorityClassName = hypershiftPriorityClass
 
 		// Inject into the pod the volumes used by CSI and token minter sidecars.
