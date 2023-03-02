@@ -58,6 +58,7 @@ const (
 	caBundleKey          = "ca-bundle.pem"
 
 	infrastructureName = "cluster"
+	kmsKeyID           = "kmsKeyId"
 
 	hypershiftPriorityClass = "hypershift-control-plane"
 
@@ -254,6 +255,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestKubeClient,
 		guestKubeInformersForNamespaces.InformersFor(""),
 		guestCCDInformers,
+		getKMSKeyHook(guestCCDInformers.Operator().V1().ClusterCSIDrivers().Lister()),
 	)
 
 	if !isHypershift {
