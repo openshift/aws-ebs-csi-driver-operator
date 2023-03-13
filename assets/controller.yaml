@@ -19,6 +19,8 @@ spec:
     metadata:
       labels:
         app: aws-ebs-csi-driver-controller
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
     spec:
       serviceAccount: aws-ebs-csi-driver-controller-sa
       priorityClassName: system-cluster-critical
