@@ -16,6 +16,14 @@ spec:
       maxUnavailable: 10%
   template:
     metadata:
+      annotation:
+        # This annotation allows the workload pinning feature to work when clusters are configured for it.
+        # An admission webhook will look for this annotation when Pod admission occurs to modify the
+        # memory and cpu resources to a custom resource name that the schedular will use to correctly 
+        # assign Pods in a workload pinned cluster. This annotation will be stripped from Pods when 
+        # the cluster is not configured for workload pinning.
+        # See (openshift/enhancements#1213) for more info.
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: aws-ebs-csi-driver-node
     spec:
