@@ -16,7 +16,7 @@ spec:
       maxUnavailable: 10%
   template:
     metadata:
-      annotation:
+      annotations:
         # This annotation allows the workload pinning feature to work when clusters are configured for it.
         # An admission webhook will look for this annotation when Pod admission occurs to modify the
         # memory and cpu resources to a custom resource name that the schedular will use to correctly 
