@@ -13,11 +13,11 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/spf13/cobra v1.6.1
 	golang.org/x/net v0.7.0 // indirect
-	k8s.io/api v0.26.2
+	k8s.io/api v0.26.3
 	k8s.io/apiextensions-apiserver v0.26.2
-	k8s.io/apimachinery v0.26.2
-	k8s.io/client-go v0.26.2
-	k8s.io/component-base v0.26.2
+	k8s.io/apimachinery v0.26.3
+	k8s.io/client-go v0.26.3
+	k8s.io/component-base v0.26.3
 	k8s.io/klog/v2 v2.90.1
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
