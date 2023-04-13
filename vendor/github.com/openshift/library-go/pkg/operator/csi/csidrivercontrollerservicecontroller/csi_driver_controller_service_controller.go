@@ -50,6 +50,12 @@ import (
 // The placeholders ${LEADER_ELECTION_LEASE_DURATION}, ${LEADER_ELECTION_RENEW_DEADLINE} and ${LEADER_ELECTION_RETRY_PERIOD}
 // are replaced with OpenShift's recommended parameters for leader election.
 //
+// 5. TLS Cipher Suites
+//
+// The placeholder ${TLS_CIPHER_SUITES} is replaced with recommended OCP defaults.
+// These are primarily meant for Kube RBAC sidecars, which may allow some insecure
+// ciphers unless the --tls-cipher-suites argument is explictly provided.
+//
 // This controller supports removable operands, as configured in pkg/operator/management.
 //
 // This controller produces the following conditions:
@@ -76,7 +82,7 @@ func NewCSIDriverControllerServiceController(
 	optionalManifestHooks = append(optionalManifestHooks, WithLeaderElectionReplacerHook(leConfig))
 
 	var deploymentHooks []dc.DeploymentHookFunc
-	deploymentHooks = append(deploymentHooks, optionalDeploymentHooks...)
 	deploymentHooks = append(deploymentHooks, WithControlPlaneTopologyHook(configInformer))
+	deploymentHooks = append(deploymentHooks, optionalDeploymentHooks...)
 	return dc.NewDeploymentController(name, manifest, recorder, operatorClient, kubeClient, deployInformer, optionalInformers, optionalManifestHooks, deploymentHooks...)
 }
