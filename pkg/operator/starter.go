@@ -52,9 +52,11 @@ const (
 	defaultNamespace   = "openshift-cluster-csi-drivers"
 	operatorName       = "aws-ebs-csi-driver-operator"
 	operandName        = "aws-ebs-csi-driver"
-	secretName         = "ebs-cloud-credentials"
 	infraConfigName    = "cluster"
 	trustedCAConfigMap = "aws-ebs-csi-driver-trusted-ca-bundle"
+
+	cloudCredSecretName   = "ebs-cloud-credentials"
+	metricsCertSecretName = "aws-ebs-csi-driver-controller-metrics-serving-cert"
 
 	hypershiftImageEnvName = "HYPERSHIFT_IMAGE"
 
@@ -204,7 +206,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		withHypershiftDeploymentHook(isHypershift, os.Getenv(hypershiftImageEnvName), controlPlaneNamespace, hostedControlPlaneLister),
 		withHypershiftReplicasHook(isHypershift, guestNodeInformer.Lister()),
 		withNamespaceDeploymentHook(controlPlaneNamespace),
-		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, controlPlaneSecretInformer),
+		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, cloudCredSecretName, controlPlaneSecretInformer),
+		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, metricsCertSecretName, controlPlaneSecretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
 		withCustomAWSCABundle(isHypershift, controlPlaneCloudConfigLister),
 		withAWSRegion(guestInfraInformer.Lister()),
