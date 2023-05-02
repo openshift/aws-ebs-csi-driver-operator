@@ -152,6 +152,15 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
+	staticResourceFiles := []string{
+		"controller_pdb.yaml",
+		"cabundle_cm.yaml",
+	}
+	if isHypershift {
+		staticResourceFiles = append(staticResourceFiles, "hypershift/controller_sa.yaml")
+	} else {
+		staticResourceFiles = append(staticResourceFiles, "controller_sa.yaml")
+	}
 
 	var hostedControlPlaneLister cache.GenericLister
 	var hostedControlPlaneInformer cache.SharedInformer
@@ -185,11 +194,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controlPlaneDynamicClient,
 		controlPlaneKubeInformersForNamespaces,
 		assetWithNamespaceFunc(controlPlaneNamespace),
-		[]string{
-			"controller_sa.yaml",
-			"controller_pdb.yaml",
-			"cabundle_cm.yaml",
-		},
+		staticResourceFiles,
 	).WithCSIConfigObserverController(
 		"AWSEBSDriverCSIConfigObserverController",
 		guestConfigInformers,
