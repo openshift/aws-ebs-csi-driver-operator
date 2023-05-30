@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -92,7 +91,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// This is only synced on standalone OCP clusters.
 	controlPlaneCloudConfigInformers := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controlPlaneNamespace, cloudConfigNamespace)
 	controlPlaneCloudConfigInformer := controlPlaneCloudConfigInformers.InformersFor(controlPlaneNamespace).Core().V1().ConfigMaps()
-	controlPlaneCloudConfigLister := controlPlaneCloudConfigInformer.Lister().ConfigMaps(controlPlaneNamespace)
 
 	controlPlaneDynamicClient, err := dynamic.NewForConfig(controllerConfig.KubeConfig)
 	if err != nil {
@@ -162,11 +160,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		staticResourceFiles = append(staticResourceFiles, "controller_sa.yaml")
 	}
 
-	var hostedControlPlaneLister cache.GenericLister
 	var hostedControlPlaneInformer cache.SharedInformer
 	if isHypershift {
 		hostedControlPlaneInformer = controlPlaneDynamicInformers.ForResource(hostedControlPlaneGVR).Informer()
-		hostedControlPlaneLister = controlPlaneDynamicInformers.ForResource(hostedControlPlaneGVR).Lister()
 	}
 
 	controlPlaneInformersForEvents := []factory.Informer{
@@ -180,6 +176,17 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	} else {
 		controlPlaneInformersForEvents = append(controlPlaneInformersForEvents, controlPlaneCloudConfigInformer.Informer())
 	}
+
+	observerController := NewObserverController(
+		"aws-ebs",
+		guestOperatorClient,
+		guestConfigInformers,
+		controlPlaneDynamicInformers.ForResource(hostedControlPlaneGVR),
+		controlPlaneCloudConfigInformer,
+		eventRecorder,
+		isHypershift,
+		controlPlaneNamespace)
+	go observerController.Run(ctx, 1)
 
 	// Start controllers that manage resources in the MANAGEMENT cluster.
 	controlPlaneCSIControllerSet := csicontrollerset.NewCSIControllerSet(
@@ -200,26 +207,26 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestConfigInformers,
 	).WithCSIDriverControllerService(
 		"AWSEBSDriverControllerServiceController",
-		assets.ReadFile,
+		templateReplacer(guestOperatorClient),
 		"controller.yaml",
 		controlPlaneKubeClient,
 		controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace),
 		guestConfigInformers,
 		controlPlaneInformersForEvents,
-		withHypershiftDeploymentHook(isHypershift, os.Getenv(hypershiftImageEnvName), controlPlaneNamespace, hostedControlPlaneLister),
-		withHypershiftReplicasHook(isHypershift, guestNodeInformer.Lister()),
-		withNamespaceDeploymentHook(controlPlaneNamespace),
+		//withHypershiftDeploymentHook(isHypershift, os.Getenv(hypershiftImageEnvName), controlPlaneNamespace, hostedControlPlaneLister),
+		//withHypershiftReplicasHook(isHypershift, guestNodeInformer.Lister()),
+		//withNamespaceDeploymentHook(controlPlaneNamespace),
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, secretName, controlPlaneSecretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
-		withCustomAWSCABundle(isHypershift, controlPlaneCloudConfigLister),
-		withAWSRegion(guestInfraInformer.Lister()),
-		withCustomTags(guestInfraInformer.Lister()),
-		withCustomEndPoint(guestInfraInformer.Lister()),
-		csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
-			controlPlaneNamespace,
-			trustedCAConfigMap,
-			controlPlaneConfigMapInformer,
-		),
+		//withCustomAWSCABundle(isHypershift, controlPlaneCloudConfigLister),
+		//withAWSRegion(guestInfraInformer.Lister()),
+		//withCustomTags(guestInfraInformer.Lister()),
+		//withCustomEndPoint(guestInfraInformer.Lister()),
+		//csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
+		//	controlPlaneNamespace,
+		//	trustedCAConfigMap,
+		//	controlPlaneConfigMapInformer,
+		//),
 	)
 	if err != nil {
 		return err
