@@ -1,0 +1,13 @@
+resources:
+- cabundle_cm.yaml
+- controller_pdb.yaml
+- controller_sa.yaml
+- controller.yaml
+- csidriver.yaml
+- node_sa.yaml
+- node.yaml
+- servicemonitor.yaml
+- service.yaml
+- storageclass_gp2.yaml
+- storageclass_gp3.yaml
+- volumesnapshotclass.yaml

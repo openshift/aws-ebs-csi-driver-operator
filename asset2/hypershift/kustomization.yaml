@@ -1,0 +1,8 @@
+resources:
+  - ../base
+
+patches:
+  # Change namespace: to $NAMESPACE in all objects marked with the following label
+  - path: namespace.yaml
+    target:
+      labelSelector: "control-plane=true"

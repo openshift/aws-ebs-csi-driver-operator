@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    control-plane: "true"
+  name: aws-ebs-csi-driver-controller-pdb
+  namespace: $NAMESPACE
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: aws-ebs-csi-driver-controller
