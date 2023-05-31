@@ -2,7 +2,11 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: aws-ebs-csi-driver-controller-pdb
-  namespace: ${NAMESPACE}
+  {{ if index . "hyperShiftConfig" }}
+  namespace: {{ .hyperShiftConfig.controlPlaneNamespace }}
+  {{ else }}
+  namespace: openshift-cluster-csi-drivers
+  {{ end }}
 spec:
   maxUnavailable: 1
   selector:

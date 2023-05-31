@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"encoding/json"
 	"os"
 	"reflect"
 
@@ -29,7 +30,6 @@ type hyperShiftObserver struct {
 
 type HyperShiftConfig struct {
 	HyperShiftImage       string            `json:"hyperShiftImage,omitempty"`
-	ClusterName           string            `json:"clusterName,omitempty"`
 	NodeSelector          map[string]string `json:"nodeSelector,omitempty"`
 	ControlPlaneNamespace string            `json:"controlPlaneNamespace,omitempty"`
 }
@@ -46,7 +46,6 @@ func (h *hyperShiftObserver) observe(genericListers configobserver.Listers, even
 
 	config := HyperShiftConfig{
 		ControlPlaneNamespace: h.namespace,
-		ClusterName:           hcp.GetName(),
 		HyperShiftImage:       os.Getenv(hypershiftImageEnvName),
 	}
 
@@ -58,10 +57,22 @@ func (h *hyperShiftObserver) observe(genericListers configobserver.Listers, even
 		config.NodeSelector = nodeSelector
 	}
 
-	if err := unstructured.SetNestedField(observedConfig, &config, h.path...); err != nil {
+	// Convert to unstructured, so  SetNestedField can call runtime.DeepCopyJSONValue() on it
+	j, err := json.Marshal(&config)
+	if err != nil {
+		return existingConfig, append(errs, err)
+	}
+	unstructuredConfig := map[string]interface{}{}
+	err = json.Unmarshal(j, &unstructuredConfig)
+	if err != nil {
 		return existingConfig, append(errs, err)
 	}
 
+	if err := unstructured.SetNestedField(observedConfig, unstructuredConfig, h.path...); err != nil {
+		return existingConfig, append(errs, err)
+	}
+
+	// Print any changes
 	newConfig, _, err := unstructured.NestedStringMap(observedConfig, h.path...)
 	if err != nil {
 		errs = append(errs, err)

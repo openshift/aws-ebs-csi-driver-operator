@@ -178,6 +178,7 @@ func (c *CSIControllerSet) WithCSIDriverControllerService(
 	namespacedInformerFactory informers.SharedInformerFactory,
 	configInformer configinformers.SharedInformerFactory,
 	optionalInformers []factory.Informer,
+	optionalManifestHooks []deploymentcontroller.ManifestHookFunc,
 	optionalDeploymentHooks ...deploymentcontroller.DeploymentHookFunc,
 ) *CSIControllerSet {
 	manifestFile, err := assetFunc(file)
@@ -193,6 +194,7 @@ func (c *CSIControllerSet) WithCSIDriverControllerService(
 		namespacedInformerFactory.Apps().V1().Deployments(),
 		configInformer,
 		optionalInformers,
+		optionalManifestHooks,
 		optionalDeploymentHooks...,
 	)
 	return c

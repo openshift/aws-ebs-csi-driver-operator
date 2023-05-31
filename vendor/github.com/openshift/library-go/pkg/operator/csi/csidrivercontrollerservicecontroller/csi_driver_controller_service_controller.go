@@ -73,14 +73,14 @@ func NewCSIDriverControllerServiceController(
 	deployInformer appsinformersv1.DeploymentInformer,
 	configInformer configinformers.SharedInformerFactory,
 	optionalInformers []factory.Informer,
+	optionalManifestHooks []dc.ManifestHookFunc,
 	optionalDeploymentHooks ...dc.DeploymentHookFunc,
 ) factory.Controller {
 	optionalInformers = append(optionalInformers, configInformer.Config().V1().Infrastructures().Informer())
-	var optionalManifestHooks []dc.ManifestHookFunc
 	optionalManifestHooks = append(optionalManifestHooks, WithPlaceholdersHook(configInformer))
 	leConfig := leaderelection.LeaderElectionDefaulting(configv1.LeaderElection{}, "default", "default")
 	optionalManifestHooks = append(optionalManifestHooks, WithLeaderElectionReplacerHook(leConfig))
-
+	
 	var deploymentHooks []dc.DeploymentHookFunc
 	deploymentHooks = append(deploymentHooks, WithControlPlaneTopologyHook(configInformer))
 	deploymentHooks = append(deploymentHooks, optionalDeploymentHooks...)

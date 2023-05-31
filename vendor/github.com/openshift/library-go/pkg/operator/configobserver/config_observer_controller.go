@@ -236,13 +236,14 @@ func (c ConfigObserver) updateNestedConfigHelper(updatedNestedConfig map[string]
 func listersToInformer(l Listers) []factory.Informer {
 	result := make([]factory.Informer, len(l.PreRunHasSynced()))
 	for i := range l.PreRunHasSynced() {
-		result[i] = &listerInformer{cacheSynced: l.PreRunHasSynced()[i]}
+		result[i] = &listerInformer{cacheSynced: l.PreRunHasSynced()[i], index: i}
 	}
 	return result
 }
 
 type listerInformer struct {
 	cacheSynced cache.InformerSynced
+	index int
 }
 
 func (l *listerInformer) AddEventHandler(cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
@@ -250,7 +251,9 @@ func (l *listerInformer) AddEventHandler(cache.ResourceEventHandler) (cache.Reso
 }
 
 func (l *listerInformer) HasSynced() bool {
-	return l.cacheSynced()
+	out:= l.cacheSynced()
+	klog.Infof("JSAF: informer %d synced: %v", l.index, out)
+	return out
 }
 
 // WithPrefix adds a prefix to the path the input observer would otherwise observe into

@@ -2,6 +2,10 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: aws-ebs-csi-driver-controller-sa
-  namespace: ${NAMESPACE}
+  {{ if index . "hyperShiftConfig" }}
+  namespace: {{ .hyperShiftConfig.controlPlaneNamespace }}
+  {{ else }}
+  namespace: openshift-cluster-csi-drivers
+  {{ end }}
 imagePullSecrets:
 - name: pull-secret

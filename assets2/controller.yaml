@@ -1,16 +1,18 @@
+{{ $hyperShift := index . "hyperShiftConfig" }}
+
 kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: aws-ebs-csi-driver-controller
 
-  {{ if .HyperShiftConfig }}
-  namespace: {{ .HyperShiftConfig.ControlPlaneNamespace }}
+  {{ if $hyperShift }}
+  namespace: {{ .hyperShiftConfig.controlPlaneNamespace }}
   {{ else }}
   namespace: openshift-cluster-csi-drivers
   {{ end }}
 
   annotations:
-    {{ if not .HyperShiftConfig }}
+    {{ if not $hyperShift }}
     # Proxy is valid only on a standalone cluster
     config.openshift.io/inject-proxy: csi-driver
     config.openshift.io/inject-proxy-cabundle: csi-driver
@@ -37,38 +39,40 @@ spec:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: aws-ebs-csi-driver-controller
-        {{ if .HyperShiftConfig }}
-        hypershift.openshift.io/hosted-control-plane: {{ .HyperShiftConfig.ClusterName }}
+        {{ if $hyperShift }}
+        hypershift.openshift.io/hosted-control-plane: {{ .hyperShiftConfig.controlPlaneNamespace }}
         {{ end }}
 
     spec:
       serviceAccount: aws-ebs-csi-driver-controller-sa
 
-      {{ if .HyperShiftConfig }}
+      {{ if $hyperShift }}
       priorityClassName: hypershift-control-plane
       {{ else }}
       priorityClassName: system-cluster-critical
       {{ end }}
 
       nodeSelector:
-        {{ if .HyperShiftConfig }}
+        {{ if $hyperShift }}
+          {{ if index .hyperShiftConfig "nodeSelector" }}
           # TODO: find a better function to render a simple map.
-          {{ range $k, $v := .HyperShiftConfig.NodeSelector }}
+          {{ range $k, $v := .hyperShiftConfig.nodeSelector }}
           {{ $k }}: {{ $v }}
           {{ end }}
           {{ else }}
           node-role.kubernetes.io/master: ""
           {{ end }}
+        {{ end }}
 
       tolerations:
-        {{ if .HyperShiftConfig }}
+        {{ if $hyperShift }}
         - key: hypershift.openshift.io/control-plane
           operator: Equal
           value: "true"
           effect: "NoSchedule"
         - key: hypershift.openshift.io/cluster
           operator: Equal
-          value: "{{ .HyperShiftConfig.ClusterName }}"
+          value: "{{ .hyperShiftConfig.controlPlaneNamespace }}"
           effect: "NoSchedule"
         {{ else }}
         - key: CriticalAddonsOnly
@@ -88,31 +92,31 @@ spec:
                     app: aws-ebs-csi-driver-controller
                 topologyKey: kubernetes.io/hostname
 
-        {{ if .HyperShiftConfig }}
+        {{ if $hyperShift }}
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
               podAffinityTerm:
                 labelSelector:
                   matchLabels:
-                    hypershift.openshift.io/hosted-control-plane: {{ .HyperShiftConfig.ClusterName }}
+                    hypershift.openshift.io/hosted-control-plane: {{ .hyperShiftConfig.controlPlaneNamespace }}
                 topologyKey: kubernetes.io/hostname
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 50
               preference:
-                matchExpression:
-                  key: hypershift.openshift.io/control-plane
-                  operator: In
-                  values:
-                    - "true"
+                matchExpressions:
+                  - key: hypershift.openshift.io/control-plane
+                    operator: In
+                    values:
+                      - "true"
             - weight: 100
               preference:
-                matchExpression:
-                  key: hypershift.openshift.io/cluster
-                  operator: In
-                  values:
-                    - {{ .HyperShiftConfig.ClusterName }}
+                matchExpressions:
+                  - key: hypershift.openshift.io/cluster
+                    operator: In
+                    values:
+                      - {{ .hyperShiftConfig.controlPlaneNamespace }}
         {{ end }}
 
       containers:
@@ -127,8 +131,8 @@ spec:
             - --logtostderr
             - --http-endpoint=localhost:8206
             - --v=${LOG_LEVEL}
-            {{ if and .AWSConfig .AWSConfig.ExtraTags }}
-            - --extra-tags={{range $tag := .AWSConfig.ExtraTags }}{{ $tag.Key }}={{ $tag.Value }},{{ end }}
+            {{ if index .awsConfig "extraTags" }}
+            - --extra-tags={{range $key, $name := .awsConfig.extraTags }}{{ $key }}={{ $name }},{{ end }}
             {{ end }}
           env:
             - name: CSI_ENDPOINT
@@ -149,13 +153,15 @@ spec:
               value: '1'
             - name: AWS_CONFIG_FILE
               value: /var/run/secrets/aws/credentials
+            {{ if index .awsConfig "cloudCAConfigMapName" }}
             - name: AWS_CA_BUNDLE
               value: /etc/ca/ca-bundle.pem
+            {{ end }}
             - name: AWS_REGION
-              value: {{ .AWSConfig.Region }}
-            {{ if .AWSConfig.AWSEC2Endpoint }}
+              value: {{ .awsConfig.region }}
+            {{ if index .awsConfig "awsEC2Endpoint" }}
             - name: AWS_EC2_ENDPOINT
-              value: {{ .AWSConfig.AWSEC2Endpoint }}
+              value: {{ .awsConfig.awsEC2Endpoint }}
             {{ end }}
 
           ports:
@@ -180,15 +186,17 @@ spec:
               readOnly: true
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+            {{ if index .awsConfig "cloudCAConfigMapName" }}
             - name: ca-bundle
               mountPath: /etc/ca
               readOnly: true
+            {{ end }}
           resources:
             requests:
               memory: 50Mi
               cpu: 10m
 
-        {{ if not .HyperShiftConfig }}
+        {{ if not $hyperShift }}
         # kube-rbac-proxy for csi-driver container.
         # Provides https proxy for http-based csi-driver metrics.
         - name: driver-kube-rbac-proxy
@@ -230,7 +238,7 @@ spec:
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
             - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
-            {{ if .HyperShiftConfig }}
+            {{ if $hyperShift }}
             - --kubeconfig=/etc/hosted-kubernetes/kubeconfig
             {{ end }}
           env:
@@ -239,7 +247,7 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
-            {{ if .HyperShiftConfig }}
+            {{ if $hyperShift }}
             - name: hosted-kubeconfig
               mountPath: /etc/hosted-kubernetes
               readOnly: true
@@ -249,7 +257,7 @@ spec:
               memory: 50Mi
               cpu: 10m
 
-        {{ if not .HyperShiftConfig }}
+        {{ if not $hyperShift }}
         # kube-rbac-proxy for external-provisioner container.
         # Provides https proxy for http-based external-provisioner metrics.
         - name: provisioner-kube-rbac-proxy
@@ -288,7 +296,7 @@ spec:
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
             - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
-            {{ if .HyperShiftConfig }}
+            {{ if $hyperShift }}
             - --kubeconfig=/etc/hosted-kubernetes/kubeconfig
             {{ end }}
           env:
@@ -297,7 +305,7 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
-            {{ if .HyperShiftConfig }}
+            {{ if $hyperShift }}
             - name: hosted-kubeconfig
               mountPath: /etc/hosted-kubernetes
               readOnly: true
@@ -307,7 +315,7 @@ spec:
               memory: 50Mi
               cpu: 10m
 
-        {{ if not .HyperShiftConfig }}
+        {{ if not $hyperShift }}
         - name: attacher-kube-rbac-proxy
           args:
             - --secure-listen-address=0.0.0.0:9203
@@ -345,7 +353,7 @@ spec:
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
             - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
-            {{ if .HyperShiftConfig }}
+            {{ if $hyperShift }}
             - --kubeconfig=/etc/hosted-kubernetes/kubeconfig
             {{ end }}
           env:
@@ -354,7 +362,7 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
-            {{ if .HyperShiftConfig }}
+            {{ if $hyperShift }}
             - name: hosted-kubeconfig
               mountPath: /etc/hosted-kubernetes
               readOnly: true
@@ -364,7 +372,7 @@ spec:
               memory: 50Mi
               cpu: 10m
 
-        {{ if not .HyperShiftConfig }}
+        {{ if not $hyperShift }}
         - name: resizer-kube-rbac-proxy
           args:
             - --secure-listen-address=0.0.0.0:9204
@@ -401,7 +409,7 @@ spec:
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
             - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
-            {{ if .HyperShiftConfig }}
+            {{ if $hyperShift }}
             - --kubeconfig=/etc/hosted-kubernetes/kubeconfig
             {{ end }}
           env:
@@ -410,17 +418,17 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
-          {{ if .HyperShiftConfig }}
-          - name: hosted-kubeconfig
-            mountPath: /etc/hosted-kubernetes
-            readOnly: true
+          {{ if $hyperShift }}
+            - name: hosted-kubeconfig
+              mountPath: /etc/hosted-kubernetes
+              readOnly: true
           {{ end }}
           resources:
             requests:
               memory: 50Mi
               cpu: 10m
 
-        {{ if not .HyperShiftConfig }}
+        {{ if not $hyperShift }}
         - name: snapshotter-kube-rbac-proxy
           args:
             - --secure-listen-address=0.0.0.0:9205
@@ -460,9 +468,9 @@ spec:
               memory: 50Mi
               cpu: 10m
 
-        {{ if .HyperShiftConfig }}
+        {{ if $hyperShift }}
         - name: token-minter
-          image: {{ .HyperShiftConfig.HyperShiftImage }}
+          image: {{ .hyperShiftConfig.hyperShiftImage }}
           imagePullPolicy: IfNotPresent
           command:
             - /usr/bin/control-plane-operator
@@ -494,7 +502,7 @@ spec:
         # This service account token can be used to provide identity outside the cluster.
         # For example, this token can be used with AssumeRoleWithWebIdentity to authenticate with AWS using IAM OIDC provider and STS.
         - name: bound-sa-token
-          {{ if .HyperShiftConfig }}
+          {{ if $hyperShift }}
           emptyDir:
             medium: Memory
           {{ else }}
@@ -505,20 +513,22 @@ spec:
                   audience: openshift
           {{ end }}
 
+        {{ if index .awsConfig "cloudCAConfigMapName" }}
         - name: ca-bundle
           configMap:
-            name: {{ .AWSConfig.CloudCAConfigMapName }}
+            name: {{ .awsConfig.cloudCAConfigMapName }}
+        {{ end }}
 
         - name: socket-dir
           emptyDir: {}
 
-        {{ if not .HyperShiftConfig }}
+        {{ if not $hyperShift }}
         - name: metrics-serving-cert
           secret:
             secretName: aws-ebs-csi-driver-controller-metrics-serving-cert
         {{ end }}
 
-        {{ if .HyperShiftConfig }}
+        {{ if $hyperShift }}
         - name: hosted-kubeconfig
           secret:
             # TODO: use a better kubeconfig

@@ -1,9 +1,9 @@
 package operator
 
 import (
+	"encoding/json"
 	"reflect"
 
-	configv1 "github.com/openshift/api/config/v1"
 	configLister "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/library-go/pkg/operator/configobserver"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -31,10 +31,10 @@ type awsObserver struct {
 }
 
 type AWSConfig struct {
-	CloudCAConfigMapName string                    `json:"cloudCAConfigMapName,omitempty"`
-	AWSEC2Endpoint       string                    `json:"AWSEC2Endpoint,omitempty"`
-	ExtraTags            []configv1.AWSResourceTag `json:"extraTags,omitempty"`
-	Region               string                    `json:"region,omitempty"`
+	CloudCAConfigMapName string            `json:"cloudCAConfigMapName,omitempty"`
+	AWSEC2Endpoint       string            `json:"AWSEC2Endpoint,omitempty"`
+	ExtraTags            map[string]string `json:"extraTags,omitempty"`
+	Region               string            `json:"region,omitempty"`
 }
 
 func (h *awsObserver) observe(genericListers configobserver.Listers, eventRecorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
@@ -56,8 +56,10 @@ func (h *awsObserver) observe(genericListers configobserver.Listers, eventRecord
 	if err != nil {
 		return nil, append(errs, err)
 	}
-	if _, ok := cloudConfigCM.Data[caBundleKey]; ok {
-		config.CloudCAConfigMapName = configName
+	if cloudConfigCM != nil {
+		if _, ok := cloudConfigCM.Data[caBundleKey]; ok {
+			config.CloudCAConfigMapName = configName
+		}
 	}
 
 	infra, err := listers.InfraLister().Get("cluster")
@@ -77,24 +79,41 @@ func (h *awsObserver) observe(genericListers configobserver.Listers, eventRecord
 		}
 
 		config.Region = infra.Status.PlatformStatus.AWS.Region
-		config.ExtraTags = infra.Status.PlatformStatus.AWS.ResourceTags
+		if len(infra.Status.PlatformStatus.AWS.ResourceTags) > 0 {
+			config.ExtraTags = make(map[string]string)
+			for _, tag := range infra.Status.PlatformStatus.AWS.ResourceTags {
+				config.ExtraTags[tag.Key] = tag.Value
+			}
+		}
 	}
 
-	if err := unstructured.SetNestedField(observedConfig, &config, h.path...); err != nil {
+	// Convert to unstructured, so  SetNestedField can call runtime.DeepCopyJSONValue() on it
+	j, err := json.Marshal(&config)
+	if err != nil {
+		return existingConfig, append(errs, err)
+	}
+	unstructuredConfig := map[string]interface{}{}
+	err = json.Unmarshal(j, &unstructuredConfig)
+	if err != nil {
 		return existingConfig, append(errs, err)
 	}
 
-	newConfig, _, err := unstructured.NestedStringMap(observedConfig, h.path...)
+	if err := unstructured.SetNestedField(observedConfig, unstructuredConfig, h.path...); err != nil {
+		return existingConfig, append(errs, err)
+	}
+
+	// Print any changes
+	newConfig, _, err := unstructured.NestedFieldNoCopy(observedConfig, h.path...)
 	if err != nil {
 		errs = append(errs, err)
 	}
-	currentConfig, _, err := unstructured.NestedStringMap(existingConfig, h.path...)
+	currentConfig, _, err := unstructured.NestedFieldNoCopy(existingConfig, h.path...)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
 	if !reflect.DeepEqual(newConfig, currentConfig) {
-		eventRecorder.Eventf("ObserveProxyConfig", "AWS config changed to %q", newConfig)
+		eventRecorder.Eventf("ObserveAWSConfig", "AWS config changed to %q", newConfig)
 	}
 
 	return observedConfig, errs
