@@ -25,7 +25,7 @@ spec:
         # the cluster is not configured for workload pinning.
         # See (openshift/enhancements#1213) for more info.
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "socket-dir"
+        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "bound-sa-token,socket-dir"
       labels:
         app: aws-ebs-csi-driver-controller
     spec:
