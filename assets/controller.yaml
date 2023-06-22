@@ -279,6 +279,7 @@ spec:
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
             - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
+            - --extra-create-metadata
           env:
           - name: ADDRESS
             value: /var/lib/csi/sockets/pluginproxy/csi.sock
