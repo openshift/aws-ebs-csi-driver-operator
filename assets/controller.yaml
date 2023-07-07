@@ -138,6 +138,7 @@ spec:
             - --feature-gates=Topology=true
             - --extra-create-metadata=true
             - --http-endpoint=localhost:8202
+            - --timeout=60s
             - --leader-election
             - --leader-election-lease-duration=${LEADER_ELECTION_LEASE_DURATION}
             - --leader-election-renew-deadline=${LEADER_ELECTION_RENEW_DEADLINE}
@@ -184,6 +185,7 @@ spec:
           args:
             - --csi-address=$(ADDRESS)
             - --http-endpoint=localhost:8203
+            - --timeout=60s
             - --leader-election
             - --leader-election-lease-duration=${LEADER_ELECTION_LEASE_DURATION}
             - --leader-election-renew-deadline=${LEADER_ELECTION_RENEW_DEADLINE}
@@ -273,6 +275,7 @@ spec:
           args:
             - --csi-address=$(ADDRESS)
             - --metrics-address=localhost:8205
+            - --timeout=300s
             - --leader-election
             - --leader-election-lease-duration=${LEADER_ELECTION_LEASE_DURATION}
             - --leader-election-renew-deadline=${LEADER_ELECTION_RENEW_DEADLINE}
