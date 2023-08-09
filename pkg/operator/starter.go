@@ -223,6 +223,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			trustedCAConfigMap,
 			controlPlaneConfigMapInformer,
 		),
+		withHypershiftControlPlaneImages(isHypershift, os.Getenv("DRIVER_CONTROL_PLANE_IMAGE"), os.Getenv("LIVENESS_PROBE_CONTROL_PLANE_IMAGE")),
 	)
 	if err != nil {
 		return err
@@ -819,6 +820,24 @@ func withAWSRegion(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
 				Name:  "AWS_REGION",
 				Value: region,
 			})
+		}
+		return nil
+	}
+}
+
+func withHypershiftControlPlaneImages(isHypershift bool, driverControlPlaneImage, livenessProbeControlPlaneImage string) dc.DeploymentHookFunc {
+	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		if !isHypershift {
+			return nil
+		}
+		for i := range deployment.Spec.Template.Spec.Containers {
+			container := &deployment.Spec.Template.Spec.Containers[i]
+			if container.Name == "csi-driver" && driverControlPlaneImage != "" {
+				container.Image = driverControlPlaneImage
+			}
+			if container.Name == "csi-liveness-probe" && livenessProbeControlPlaneImage != "" {
+				container.Image = livenessProbeControlPlaneImage
+			}
 		}
 		return nil
 	}

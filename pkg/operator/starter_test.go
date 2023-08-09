@@ -405,3 +405,148 @@ func TestWithCustomEndPoint(t *testing.T) {
 	}
 
 }
+
+func TestWithHypershiftControlPlaneImages(t *testing.T) {
+	tests := []struct {
+		name                           string
+		isHypershift                   bool
+		driverControlPlaneImage        string
+		livenessProbeControlPlaneImage string
+		inDeployment                   *appsv1.Deployment
+		expected                       *appsv1.Deployment
+	}{
+		{
+			name:                           "not hypershift",
+			isHypershift:                   false,
+			driverControlPlaneImage:        "with-this",
+			livenessProbeControlPlaneImage: "with-this",
+			inDeployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "csi-driver",
+									Image: "no-replace-this",
+								}, {
+									Name:  "csi-liveness-probe",
+									Image: "no-replace-this",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "csi-driver",
+									Image: "no-replace-this",
+								}, {
+									Name:  "csi-liveness-probe",
+									Image: "no-replace-this",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                           "hypershift but CONTROL_PLANE_IMAGE envvars not set",
+			isHypershift:                   true,
+			driverControlPlaneImage:        "",
+			livenessProbeControlPlaneImage: "",
+			inDeployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "csi-driver",
+									Image: "no-replace-this",
+								}, {
+									Name:  "csi-liveness-probe",
+									Image: "no-replace-this",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "csi-driver",
+									Image: "no-replace-this",
+								}, {
+									Name:  "csi-liveness-probe",
+									Image: "no-replace-this",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                           "hypershift wiht CONTROL_PLANE_IMAGE envvars set",
+			isHypershift:                   true,
+			driverControlPlaneImage:        "with-this",
+			livenessProbeControlPlaneImage: "with-this",
+			inDeployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "csi-driver",
+									Image: "replace-this",
+								}, {
+									Name:  "csi-liveness-probe",
+									Image: "replace-this",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "csi-driver",
+									Image: "with-this",
+								}, {
+									Name:  "csi-liveness-probe",
+									Image: "with-this",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			deployment := test.inDeployment.DeepCopy()
+			err := withHypershiftControlPlaneImages(test.isHypershift, test.driverControlPlaneImage, test.livenessProbeControlPlaneImage)(nil, deployment)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if e, a := test.expected, deployment; !equality.Semantic.DeepEqual(e, a) {
+				t.Errorf("unexpected deployment\nwant=%#v\ngot= %#v", e, a)
+			}
+		})
+	}
+
+}
