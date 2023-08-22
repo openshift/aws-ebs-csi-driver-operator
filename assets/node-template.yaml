@@ -1,0 +1,29 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  annotations:
+    config.openshift.io/inject-proxy: csi-driver
+    config.openshift.io/inject-proxy-cabundle: csi-driver
+spec:
+  template:
+    metadata:
+    spec:
+      hostNetwork: true
+      containers:
+        - name: csi-driver
+          securityContext:
+            privileged: true
+          image: ${DRIVER_IMAGE}
+          imagePullPolicy: IfNotPresent
+          args:
+            - node
+            - --endpoint=$(CSI_ENDPOINT)
+            - --logtostderr
+            - --v=${LOG_LEVEL}
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:/csi/csi.sock
+          resources:
+            requests:
+              memory: 50Mi
+              cpu: 10m

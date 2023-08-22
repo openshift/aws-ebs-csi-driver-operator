@@ -1,0 +1,11 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ${ASSET_PREFIX}-controller-monitor
+  namespace: ${CONTROLLER_NAMESPACE}
+spec:
+  endpoints:
+  jobLabel: component
+  selector:
+    matchLabels:
+      app: ${ASSET_PREFIX}-controller-metrics
