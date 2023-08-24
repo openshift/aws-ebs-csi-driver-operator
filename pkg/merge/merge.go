@@ -2,6 +2,7 @@ package merge
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -10,6 +11,7 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	kjson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
 )
 
@@ -135,7 +137,7 @@ func GenerateMonitoringService(flavour ClusterFlavour, cfg *ControllerConfig, re
 		if err != nil {
 			return nil, nil, err
 		}
-		serviceMonitorJSON, err = applyAssetPatch(serviceMonitorJSON, "patches/metrics/service-monitor-port.yaml", replacements, &monitoringv1.ServiceMonitor{})
+		serviceMonitorJSON, err = prependEndpointToServiceMonitor(serviceMonitorJSON, mustReadAsset("patches/metrics/service-monitor-port.yaml", replacements))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -153,7 +155,7 @@ func GenerateMonitoringService(flavour ClusterFlavour, cfg *ControllerConfig, re
 		if err != nil {
 			return nil, nil, err
 		}
-		serviceMonitorJSON, err = applyAssetPatch(serviceMonitorJSON, "patches/metrics/service-monitor-port.yaml", replacements, &monitoringv1.ServiceMonitor{})
+		serviceMonitorJSON, err = prependEndpointToServiceMonitor(serviceMonitorJSON, mustReadAsset("patches/metrics/service-monitor-port.yaml", replacements))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -202,4 +204,23 @@ func replaceBytes(src []byte, replacements []string) []byte {
 		src = bytes.ReplaceAll(src, []byte(replacements[i]), []byte(replacements[i+1]))
 	}
 	return src
+}
+
+// prependEndpointToServiceMonitor prepends the given endpoint to the ServiceMonitor's list of endpoints.
+// Using manual path, because ServiceMonitor does not have strategic merge patch support.
+func prependEndpointToServiceMonitor(serviceMonitorJSON []byte, endpointYAML []byte) ([]byte, error) {
+	serviceMonitor := &monitoringv1.ServiceMonitor{}
+	if err := kjson.UnmarshalCaseSensitivePreserveInts(serviceMonitorJSON, serviceMonitor); err != nil {
+		return nil, err
+	}
+
+	endpointJSON := mustYAMLToJSON(endpointYAML)
+	endpoint := &monitoringv1.Endpoint{}
+	if err := kjson.UnmarshalCaseSensitivePreserveInts(endpointJSON, endpoint); err != nil {
+		return nil, err
+	}
+
+	// Do prepend, like strategic merge patch would do.
+	serviceMonitor.Spec.Endpoints = append([]monitoringv1.Endpoint{*endpoint}, serviceMonitor.Spec.Endpoints...)
+	return json.Marshal(serviceMonitor)
 }
