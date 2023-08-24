@@ -93,6 +93,14 @@ func GenerateDeployment(flavour ClusterFlavour, cfg *ControllPlaneConfig, replac
 		if err != nil {
 			return nil, err
 		}
+
+		// Ugly hack to add extra arguments to a sidecar.
+		jsonArgs := ""
+		for _, arg := range sidecar.ExtraArguments {
+			jsonArgs += fmt.Sprintf(`,"%s"`, arg)
+		}
+		// Match ${EXTRA_ARGUMENTS} with quotes and leading comma to replace it in the JSON array correctly.
+		deploymentJSON = bytes.Replace(deploymentJSON, []byte(`,"${EXTRA_ARGUMENTS}"`), []byte(jsonArgs), 1)
 	}
 
 	// Add kube-rbac-proxy to all containers in the original DeploymentTemplateAssetName
