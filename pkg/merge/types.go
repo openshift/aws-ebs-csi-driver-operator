@@ -4,11 +4,11 @@ type CSIDriverOperatorConfig struct {
 	AssetPrefix      string
 	AssetShortPrefix string
 	DriverName       string
-	ControllerConfig *ControllerConfig `json:"controllerConfig,omitempty"`
-	NodeConfig       *NodeConfig       `json:"nodeConfig,omitempty"`
+	ControllerConfig *ControllPlaneConfig `json:"controllerConfig,omitempty"`
+	NodeConfig       *GuestConfig         `json:"nodeConfig,omitempty"`
 }
 
-type ControllerConfig struct {
+type ControllPlaneConfig struct {
 	DeploymentTemplateAssetName    string
 	MetricsPorts                   []MetricsPort
 	SidecarLocalMetricsPortStart   uint16
@@ -44,11 +44,12 @@ type LivenessProbeConfig struct {
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 }
 
-type NodeConfig struct {
+type GuestConfig struct {
 	DaemonSetTemplateAssetName string
 	MetricsPorts               []MetricsPort
 	LivenessProbePort          uint16
 	StaticAssetNames           []string
+	StorageClassAssetNames     []string
 }
 
 type ClusterFlavour string
@@ -64,20 +65,3 @@ type CSIDriverAssets struct {
 	NodeTemplate              []byte
 	NodeStaticResources       map[string][]byte
 }
-
-var (
-	DefaultControllerAssetNames = []string{
-		"base/controller_sa.yaml",
-		"base/rbac/kube_rbac_proxy_role.yaml",
-		"base/rbac/kube_rbac_proxy_binding.yaml",
-		"base/rbac/lease_leader_election_role.yaml",
-		"base/rbac/lease_leader_election_binding.yaml",
-		"base/rbac/prometheus_role.yaml",
-		"base/rbac/prometheus_binding.yaml",
-	}
-	DefaultNodeAssetNames = []string{
-		"base/node_sa.yaml",
-		"base/rbac/privileged_role.yaml",
-		"base/rbac/privileged_role_binding.yaml",
-	}
-)

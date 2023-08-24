@@ -8,8 +8,8 @@ func GetAWSEBSConfig() (*merge.CSIDriverOperatorConfig, error) {
 	cfg := &merge.CSIDriverOperatorConfig{
 		AssetPrefix:      "aws-ebs-csi-driver",
 		AssetShortPrefix: "ebs",
-		ControllerConfig: &merge.ControllerConfig{
-			DeploymentTemplateAssetName: "controller-template.yaml",
+		ControllerConfig: &merge.ControllPlaneConfig{
+			DeploymentTemplateAssetName: "drivers/aws-ebs/controller.yaml",
 			LivenessProbePort:           10301,
 			MetricsPorts: []merge.MetricsPort{
 				{
@@ -44,11 +44,18 @@ func GetAWSEBSConfig() (*merge.CSIDriverOperatorConfig, error) {
 			},
 			StaticAssetNames: merge.DefaultControllerAssetNames,
 		},
-		NodeConfig: &merge.NodeConfig{
+		NodeConfig: &merge.GuestConfig{
 			MetricsPorts:               nil,
 			LivenessProbePort:          10301,
-			DaemonSetTemplateAssetName: "node-template.yaml",
-			StaticAssetNames:           merge.DefaultNodeAssetNames,
+			DaemonSetTemplateAssetName: "drivers/aws-ebs/node.yaml",
+			StaticAssetNames: append([]string{
+				"drivers/aws-ebs/csidriver.yaml",
+				"drivers/aws-ebs/volumesnapshotclass.yaml",
+			}, merge.DefaultNodeAssetNames...),
+			StorageClassAssetNames: []string{
+				"drivers/aws-ebs/storageclass_gp2.yaml",
+				"drivers/aws-ebs/storageclass_gp3.yaml",
+			},
 		},
 	}
 	return cfg, nil

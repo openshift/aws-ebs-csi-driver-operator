@@ -29,7 +29,7 @@ func GenerateAssets(flavour ClusterFlavour, cfg *CSIDriverOperatorConfig) (*CSID
 	return a, nil
 }
 
-func GenerateController(a *CSIDriverAssets, flavour ClusterFlavour, cfg *ControllerConfig, replacements []string) error {
+func GenerateController(a *CSIDriverAssets, flavour ClusterFlavour, cfg *ControllPlaneConfig, replacements []string) error {
 	var err error
 	a.ControllerTemplate, err = GenerateDeployment(flavour, cfg, replacements)
 	if err != nil {
@@ -45,7 +45,7 @@ func GenerateController(a *CSIDriverAssets, flavour ClusterFlavour, cfg *Control
 		a.ControllerStaticResources = make(map[string][]byte)
 	}
 	a.ControllerStaticResources["service.yaml"] = service
-	a.ControllerStaticResources["service-monitor.yaml"] = serviceMonitor
+	a.ControllerStaticResources["servicemonitor.yaml"] = serviceMonitor
 
 	staticAssets, err := CollectControllerStaticAssets(flavour, cfg, replacements)
 	if err != nil {
@@ -58,7 +58,7 @@ func GenerateController(a *CSIDriverAssets, flavour ClusterFlavour, cfg *Control
 	return nil
 }
 
-func GenerateDeployment(flavour ClusterFlavour, cfg *ControllerConfig, replacements []string) ([]byte, error) {
+func GenerateDeployment(flavour ClusterFlavour, cfg *ControllPlaneConfig, replacements []string) ([]byte, error) {
 	deploymentJSON := mustYAMLToJSON(mustReadAsset("base/controller.yaml", replacements))
 	var err error
 
@@ -124,9 +124,9 @@ func GenerateDeployment(flavour ClusterFlavour, cfg *ControllerConfig, replaceme
 	return yaml.JSONToYAML(deploymentJSON)
 }
 
-func GenerateMonitoringService(flavour ClusterFlavour, cfg *ControllerConfig, replacements []string) ([]byte, []byte, error) {
-	serviceJSON := mustYAMLToJSON(mustReadAsset("base/controller-metrics-service.yaml", replacements))
-	serviceMonitorJSON := mustYAMLToJSON(mustReadAsset("base/controller-metrics-servicemonitor.yaml", replacements))
+func GenerateMonitoringService(flavour ClusterFlavour, cfg *ControllPlaneConfig, replacements []string) ([]byte, []byte, error) {
+	serviceJSON := mustYAMLToJSON(mustReadAsset("base/controller_metrics_service.yaml", replacements))
+	serviceMonitorJSON := mustYAMLToJSON(mustReadAsset("base/controller_metrics_servicemonitor.yaml", replacements))
 
 	localPortIndex := int(cfg.SidecarLocalMetricsPortStart)
 	exposedPortIndex := int(cfg.SidecarExposedMetricsPortStart)
@@ -183,7 +183,7 @@ func GenerateMonitoringService(flavour ClusterFlavour, cfg *ControllerConfig, re
 	return serviceYAML, serviceMonitorYAML, nil
 }
 
-func CollectControllerStaticAssets(flavour ClusterFlavour, cfg *ControllerConfig, replacements []string) (map[string][]byte, error) {
+func CollectControllerStaticAssets(flavour ClusterFlavour, cfg *ControllPlaneConfig, replacements []string) (map[string][]byte, error) {
 	staticAssets := make(map[string][]byte)
 	for _, assetName := range cfg.StaticAssetNames {
 		assetBytes := mustReadAsset(assetName, replacements)
@@ -206,6 +206,7 @@ func applyAssetPatch(sourceJSON []byte, assetName string, replacements []string,
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply aseet %s: %v", assetName, err)
 	}
+
 	return ret, nil
 }
 

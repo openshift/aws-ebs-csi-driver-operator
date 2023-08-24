@@ -1,13 +1,32 @@
 package merge
 
 const (
-	ProvisionerAssetName         = "patches/sidecar/provisioner.yaml"
-	AttacherAssetName            = "patches/sidecar/attacher.yaml"
-	SnapshotterAssetName         = "patches/sidecar/snapshotter.yaml"
-	ResizerAssetName             = "patches/sidecar/resizer.yaml"
-	LivenessProbeAssetName       = "patches/sidecar/livenessprobe.yaml"
-	NodeDriverRegistrarAssetName = "patches/sidecar/nodedriverregistrar.yaml"
-	StandaloneKubeRBACProxy      = "patches/sidecar/kube-rbac-proxy.yaml"
+	ProvisionerAssetName         = "patches/sidecars/provisioner.yaml"
+	AttacherAssetName            = "patches/sidecars/attacher.yaml"
+	SnapshotterAssetName         = "patches/sidecars/snapshotter.yaml"
+	ResizerAssetName             = "patches/sidecars/resizer.yaml"
+	LivenessProbeAssetName       = "patches/sidecars/livenessprobe.yaml"
+	NodeDriverRegistrarAssetName = "patches/sidecars/nodedriverregistrar.yaml"
+	StandaloneKubeRBACProxy      = "patches/sidecars/kube-rbac-proxy.yaml"
+)
+
+var (
+	DefaultControllerAssetNames = []string{
+		"base/cabundle_cm.yaml",
+		"base/controller_sa.yaml",
+		"base/controller_pdb.yaml",
+		"base/rbac/kube_rbac_proxy_role.yaml",
+		"base/rbac/kube_rbac_proxy_binding.yaml",
+		"base/rbac/lease_leader_election_role.yaml",
+		"base/rbac/lease_leader_election_binding.yaml",
+		"base/rbac/prometheus_role.yaml",
+		"base/rbac/prometheus_binding.yaml",
+	}
+	DefaultNodeAssetNames = []string{
+		"base/node_sa.yaml",
+		"base/rbac/privileged_role.yaml",
+		"base/rbac/privileged_role_binding.yaml",
+	}
 )
 
 var (

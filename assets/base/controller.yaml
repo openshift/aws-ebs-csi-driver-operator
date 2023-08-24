@@ -2,7 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: ${ASSET_PREFIX}-controller
-  namespace: ${CONTROLLER_NAMESPACE}
+  namespace: ${NAMESPACE}
 spec:
   selector:
     matchLabels:
