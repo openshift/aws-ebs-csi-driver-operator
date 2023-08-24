@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strconv"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/assets"
@@ -15,9 +16,10 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func GenerateAssets(flavour ClusterFlavour, cfg *CSIDriverOperatoConfig) (*CSIDriverAssets, error) {
+func GenerateAssets(flavour ClusterFlavour, cfg *CSIDriverOperatorConfig) (*CSIDriverAssets, error) {
 	replacements := []string{
 		"${ASSET_PREFIX}", cfg.AssetPrefix,
+		"${ASSET_SHORT_PREFIX}", cfg.AssetShortPrefix,
 	}
 
 	a := &CSIDriverAssets{}
@@ -44,11 +46,20 @@ func GenerateController(a *CSIDriverAssets, flavour ClusterFlavour, cfg *Control
 	}
 	a.ControllerStaticResources["service.yaml"] = service
 	a.ControllerStaticResources["service-monitor.yaml"] = serviceMonitor
+
+	staticAssets, err := CollectControllerStaticAssets(flavour, cfg, replacements)
+	if err != nil {
+		return err
+	}
+	for k, v := range staticAssets {
+		a.ControllerStaticResources[k] = v
+	}
+
 	return nil
 }
 
 func GenerateDeployment(flavour ClusterFlavour, cfg *ControllerConfig, replacements []string) ([]byte, error) {
-	deploymentJSON := mustYAMLToJSON(mustReadAsset("base/controller-base.yaml", replacements))
+	deploymentJSON := mustYAMLToJSON(mustReadAsset("base/controller.yaml", replacements))
 	var err error
 
 	localPortIndex := int(cfg.SidecarLocalMetricsPortStart)
@@ -170,6 +181,21 @@ func GenerateMonitoringService(flavour ClusterFlavour, cfg *ControllerConfig, re
 		return nil, nil, err
 	}
 	return serviceYAML, serviceMonitorYAML, nil
+}
+
+func CollectControllerStaticAssets(flavour ClusterFlavour, cfg *ControllerConfig, replacements []string) (map[string][]byte, error) {
+	staticAssets := make(map[string][]byte)
+	for _, assetName := range cfg.StaticAssetNames {
+		assetBytes := mustReadAsset(assetName, replacements)
+		staticAssets[filepath.Base(assetName)] = assetBytes
+	}
+	for _, sidecar := range cfg.Sidecars {
+		for _, assetName := range sidecar.StaticAssetNames {
+			assetBytes := mustReadAsset(assetName, replacements)
+			staticAssets[filepath.Base(assetName)] = assetBytes
+		}
+	}
+	return staticAssets, nil
 }
 
 func applyAssetPatch(sourceJSON []byte, assetName string, replacements []string, kind interface{}) ([]byte, error) {
