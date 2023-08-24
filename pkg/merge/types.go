@@ -4,8 +4,23 @@ type CSIDriverOperatorConfig struct {
 	AssetPrefix      string
 	AssetShortPrefix string
 	DriverName       string
-	ControllerConfig *ControllPlaneConfig `json:"controllerConfig,omitempty"`
-	NodeConfig       *GuestConfig         `json:"nodeConfig,omitempty"`
+	ControllerConfig *ControllPlaneConfig
+	GuestConfig      *GuestConfig
+}
+
+type Assets []Asset
+type Asset struct {
+	// TODO: this should be a set of flavours
+	ClusterFlavour *ClusterFlavour
+	AssetName      string
+}
+
+type AssetPatches []AssetPatch
+type AssetPatch struct {
+	// TODO: this should be a set of flavours
+	ClusterFlavour *ClusterFlavour
+	Name           string
+	PatchAssetName string
 }
 
 type ControllPlaneConfig struct {
@@ -13,16 +28,17 @@ type ControllPlaneConfig struct {
 	MetricsPorts                   []MetricsPort
 	SidecarLocalMetricsPortStart   uint16
 	SidecarExposedMetricsPortStart uint16
-	Sidecars                       []SidecarConfig `json:"sidecars,omitempty"`
+	Sidecars                       []SidecarConfig
 	LivenessProbePort              uint16
-	StaticAssetNames               []string
+	StaticAssets                   Assets
+	AssetPatches                   AssetPatches
 }
 
 type MetricsPort struct {
-	LocalPort           uint16 `json:"port,omitempty"`
+	LocalPort           uint16
 	ExposedPort         uint16
 	Name                string
-	InjectKubeRBACProxy bool `json:"injectKubeRBACProxy,omitempty"`
+	InjectKubeRBACProxy bool
 }
 
 type SidecarConfig struct {
@@ -35,20 +51,20 @@ type SidecarConfig struct {
 
 type LivenessProbeConfig struct {
 	// +optional
-	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
+	InitialDelaySeconds int32
 	// +optional
-	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
+	TimeoutSeconds int32
 	// +optional
-	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+	PeriodSeconds int32
 	// +optional
-	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+	FailureThreshold int32
 }
 
 type GuestConfig struct {
 	DaemonSetTemplateAssetName string
 	MetricsPorts               []MetricsPort
 	LivenessProbePort          uint16
-	StaticAssetNames           []string
+	StaticAssets               Assets
 	StorageClassAssetNames     []string
 }
 
@@ -63,5 +79,7 @@ type CSIDriverAssets struct {
 	ControllerTemplate        []byte
 	ControllerStaticResources map[string][]byte
 	NodeTemplate              []byte
-	NodeStaticResources       map[string][]byte
+	GuestStaticResources      map[string][]byte
+	FlavourAssetNames         map[ClusterFlavour][]string
+	FlavourAssetPatches       map[ClusterFlavour][]AssetPatch
 }

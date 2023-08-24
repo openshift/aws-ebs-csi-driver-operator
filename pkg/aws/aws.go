@@ -8,6 +8,7 @@ func GetAWSEBSConfig() (*merge.CSIDriverOperatorConfig, error) {
 	cfg := &merge.CSIDriverOperatorConfig{
 		AssetPrefix:      "aws-ebs-csi-driver",
 		AssetShortPrefix: "ebs",
+
 		ControllerConfig: &merge.ControllPlaneConfig{
 			DeploymentTemplateAssetName: "drivers/aws-ebs/controller.yaml",
 			LivenessProbePort:           10301,
@@ -42,16 +43,20 @@ func GetAWSEBSConfig() (*merge.CSIDriverOperatorConfig, error) {
 					"--probe-timeout=3s",
 				),
 			},
-			StaticAssetNames: merge.DefaultControllerAssetNames,
+			StaticAssets: merge.DefaultControllerAssets,
+			AssetPatches: merge.DefaultAssetPatches.WithPatches(merge.FlavourHyperShift,
+				"controller.yaml", "drivers/aws-ebs/patches/controller_minter.yaml",
+			),
 		},
-		NodeConfig: &merge.GuestConfig{
+
+		GuestConfig: &merge.GuestConfig{
 			MetricsPorts:               nil,
 			LivenessProbePort:          10301,
 			DaemonSetTemplateAssetName: "drivers/aws-ebs/node.yaml",
-			StaticAssetNames: append([]string{
+			StaticAssets: merge.DefaultNodeAssets.WithAssets("",
 				"drivers/aws-ebs/csidriver.yaml",
 				"drivers/aws-ebs/volumesnapshotclass.yaml",
-			}, merge.DefaultNodeAssetNames...),
+			),
 			StorageClassAssetNames: []string{
 				"drivers/aws-ebs/storageclass_gp2.yaml",
 				"drivers/aws-ebs/storageclass_gp3.yaml",
@@ -60,3 +65,15 @@ func GetAWSEBSConfig() (*merge.CSIDriverOperatorConfig, error) {
 	}
 	return cfg, nil
 }
+
+// TODO:
+// withHypershiftDeploymentHook
+// withHypershiftReplicasHook - from runtime, different on hypershift and standalone
+// withNamespaceDeploymentHook - not needed, ${NAMESPACE} could be set from a parameter of GenerateAssets
+// WithSecretHashAnnotationHook - generated from a new array in CSIDriverOperatorConfig
+// WithObservedProxyDeploymentHook - just add, it's the same on all clouds
+// withCustomAWSCABundle - looks like a custom AWS specific code + patch
+// withAWSRegion - simple replacement ?
+// withCustomTags, withCustomEndPoint - specific hook?
+// WithCABundleDeploymentHook - keep it, it's the same on all clouds
+// withHypershiftControlPlaneImages - simple env. var replacements on HyperShift

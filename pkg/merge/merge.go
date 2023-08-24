@@ -16,10 +16,16 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// TODO: use kustomize and yamls instead of constant yaml -> json -> yaml conversions for strategic merge patching?
+// TODO: Call GenerateAssets() only at the start of the operator, so the parsing and patching is done only once.
+// TODO: add guest assets
+
 func GenerateAssets(flavour ClusterFlavour, cfg *CSIDriverOperatorConfig) (*CSIDriverAssets, error) {
 	replacements := []string{
 		"${ASSET_PREFIX}", cfg.AssetPrefix,
 		"${ASSET_SHORT_PREFIX}", cfg.AssetShortPrefix,
+		// TODO: set namespace from somewhere
+		// TODO: set images and other env. var replacement?
 	}
 
 	a := &CSIDriverAssets{}
@@ -44,6 +50,7 @@ func GenerateController(a *CSIDriverAssets, flavour ClusterFlavour, cfg *Control
 	if a.ControllerStaticResources == nil {
 		a.ControllerStaticResources = make(map[string][]byte)
 	}
+	// TODO: use constants!
 	a.ControllerStaticResources["service.yaml"] = service
 	a.ControllerStaticResources["servicemonitor.yaml"] = serviceMonitor
 
@@ -53,6 +60,31 @@ func GenerateController(a *CSIDriverAssets, flavour ClusterFlavour, cfg *Control
 	}
 	for k, v := range staticAssets {
 		a.ControllerStaticResources[k] = v
+	}
+
+	// Patch everything, including the CSI driver deployment.
+	for _, patch := range cfg.AssetPatches {
+		if patch.ClusterFlavour != nil && *patch.ClusterFlavour != flavour {
+			continue
+		}
+		switch patch.Name {
+		case "controller.yaml":
+			controllerJSON := mustYAMLToJSON(a.ControllerTemplate)
+			controllerJSON, err = applyAssetPatch(controllerJSON, patch.PatchAssetName, replacements, &appv1.Deployment{})
+			if err != nil {
+				return err
+			}
+			a.ControllerTemplate = mustJSONToYAML(controllerJSON)
+		default:
+			assetYAML := a.ControllerStaticResources[patch.Name]
+			if assetYAML == nil {
+				return fmt.Errorf("asset %s not found to apply patch %s", patch.Name, patch.PatchAssetName)
+			}
+			// TODO: find out Kind:
+			assetJSON := mustYAMLToJSON(assetYAML)
+			assetJSON, err = applyAssetPatch(assetJSON, patch.PatchAssetName, replacements, &v1.ServiceAccount{})
+			a.ControllerStaticResources[patch.Name] = mustJSONToYAML(assetJSON)
+		}
 	}
 
 	return nil
@@ -69,14 +101,8 @@ func GenerateDeployment(flavour ClusterFlavour, cfg *ControllPlaneConfig, replac
 		baseReplacements = append(baseReplacements, "${LIVENESS_PROBE_PORT}", strconv.Itoa(int(cfg.LivenessProbePort)))
 	}
 
-	switch flavour {
-	case FlavourStandalone:
-		deploymentJSON, err = applyAssetPatch(deploymentJSON, "patches/standalone/controller.yaml", baseReplacements, &appv1.Deployment{})
-	}
-
 	// Strategic merge patch *prepends* new containers before the old ones.
 	// Inject the sidecars + kube-rbac-proxies in the reverse order then.
-
 	for i := len(cfg.Sidecars) - 1; i >= 0; i-- {
 		sidecar := cfg.Sidecars[i]
 		replacements := append([]string{}, baseReplacements...)
@@ -94,6 +120,7 @@ func GenerateDeployment(flavour ClusterFlavour, cfg *ControllPlaneConfig, replac
 			return nil, err
 		}
 
+		// TODO: Rewrite. Parse the deployment and add it to the array? Use jsonpatch?
 		// Ugly hack to add extra arguments to a sidecar.
 		jsonArgs := ""
 		for _, arg := range sidecar.ExtraArguments {
@@ -129,7 +156,7 @@ func GenerateDeployment(flavour ClusterFlavour, cfg *ControllPlaneConfig, replac
 		return nil, err
 	}
 
-	return yaml.JSONToYAML(deploymentJSON)
+	return mustJSONToYAML(deploymentJSON), nil
 }
 
 func GenerateMonitoringService(flavour ClusterFlavour, cfg *ControllPlaneConfig, replacements []string) ([]byte, []byte, error) {
@@ -180,22 +207,16 @@ func GenerateMonitoringService(flavour ClusterFlavour, cfg *ControllPlaneConfig,
 		}
 	}
 
-	serviceYAML, err := yaml.JSONToYAML(serviceJSON)
-	if err != nil {
-		return nil, nil, err
-	}
-	serviceMonitorYAML, err := yaml.JSONToYAML(serviceMonitorJSON)
-	if err != nil {
-		return nil, nil, err
-	}
-	return serviceYAML, serviceMonitorYAML, nil
+	return mustJSONToYAML(serviceJSON), mustJSONToYAML(serviceMonitorJSON), nil
 }
 
 func CollectControllerStaticAssets(flavour ClusterFlavour, cfg *ControllPlaneConfig, replacements []string) (map[string][]byte, error) {
 	staticAssets := make(map[string][]byte)
-	for _, assetName := range cfg.StaticAssetNames {
-		assetBytes := mustReadAsset(assetName, replacements)
-		staticAssets[filepath.Base(assetName)] = assetBytes
+	for _, a := range cfg.StaticAssets {
+		if a.ClusterFlavour == nil || *a.ClusterFlavour == flavour {
+			assetBytes := mustReadAsset(a.AssetName, replacements)
+			staticAssets[filepath.Base(a.AssetName)] = assetBytes
+		}
 	}
 	for _, sidecar := range cfg.Sidecars {
 		for _, assetName := range sidecar.StaticAssetNames {
@@ -234,6 +255,14 @@ func mustYAMLToJSON(yamlBytes []byte) []byte {
 	return jsonBytes
 }
 
+func mustJSONToYAML(jsonBytes []byte) []byte {
+	yamlBytes, err := yaml.JSONToYAML(jsonBytes)
+	if err != nil {
+		panic(err)
+	}
+	return yamlBytes
+}
+
 func replaceBytes(src []byte, replacements []string) []byte {
 	for i := 0; i < len(replacements); i += 2 {
 		src = bytes.ReplaceAll(src, []byte(replacements[i]), []byte(replacements[i+1]))
@@ -243,6 +272,7 @@ func replaceBytes(src []byte, replacements []string) []byte {
 
 // prependEndpointToServiceMonitor prepends the given endpoint to the ServiceMonitor's list of endpoints.
 // Using manual path, because ServiceMonitor does not have strategic merge patch support.
+// TODO: use json patch instead of custom func?
 func prependEndpointToServiceMonitor(serviceMonitorJSON []byte, endpointYAML []byte) ([]byte, error) {
 	serviceMonitor := &monitoringv1.ServiceMonitor{}
 	if err := kjson.UnmarshalCaseSensitivePreserveInts(serviceMonitorJSON, serviceMonitor); err != nil {

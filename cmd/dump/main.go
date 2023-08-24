@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws"
@@ -9,11 +10,14 @@ import (
 )
 
 func main() {
+	flavour := flag.String("flavour", "standalone", "cluster flavour")
+
+	flag.Parse()
 	cfg, err := aws.GetAWSEBSConfig()
 	if err != nil {
 		panic(err)
 	}
-	a, err := merge.GenerateAssets(merge.FlavourStandalone, cfg)
+	a, err := merge.GenerateAssets(merge.ClusterFlavour(*flavour), cfg)
 	if err != nil {
 		panic(err)
 	}

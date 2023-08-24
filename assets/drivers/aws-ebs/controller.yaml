@@ -6,6 +6,9 @@ metadata:
     config.openshift.io/inject-proxy-cabundle: csi-driver
 spec:
   template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: bound-sa-token,socket-dir
     spec:
       containers:
         - name: csi-driver
