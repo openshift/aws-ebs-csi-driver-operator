@@ -14,7 +14,6 @@ spec:
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
             - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
-            - ${EXTRA_ARGUMENTS}
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/

@@ -9,7 +9,6 @@ spec:
             - --csi-address=/csi/csi.sock
             - --health-port=${LIVENESS_PROBE_PORT}
             - --v=${LOG_LEVEL}
-            - ${EXTRA_ARGUMENTS}
           volumeMounts:
             - name: socket-dir
               mountPath: /csi

@@ -34,5 +34,6 @@ func dumpYaml(filename string, content []byte) error {
 		return nil
 	}
 	klog.Infof("dumping %s", filename)
-	return os.WriteFile(filename, content, 0644)
+	sanitized := merge.MustSanitize(string(content))
+	return os.WriteFile(filename, []byte(sanitized), 0644)
 }
