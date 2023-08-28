@@ -37,7 +37,9 @@ func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverOp
 }
 
 func (gen *AssetGenerator) GenerateAssets() (*CSIDriverAssets, error) {
-	gen.generatedAssets = &CSIDriverAssets{}
+	gen.generatedAssets = &CSIDriverAssets{
+		ControllerStaticResources: make(map[string][]byte),
+	}
 	if err := gen.generateController(); err != nil {
 		return nil, err
 	}
@@ -177,7 +179,7 @@ func (gen *AssetGenerator) generateMonitoringService() error {
 		if err != nil {
 			return err
 		}
-		serviceMonitorYAML, err = addEndpointToServiceMonitor(serviceMonitorYAML, mustReadAsset("patches/metrics/service-monitor-port.yaml", replacements))
+		serviceMonitorYAML, err = applyJSONPatch(serviceMonitorYAML, "patches/metrics/service-monitor-port.yaml.patch", replacements)
 		if err != nil {
 			return err
 		}
@@ -195,15 +197,12 @@ func (gen *AssetGenerator) generateMonitoringService() error {
 		if err != nil {
 			return err
 		}
-		serviceMonitorYAML, err = addEndpointToServiceMonitor(serviceMonitorYAML, mustReadAsset("patches/metrics/service-monitor-port.yaml", replacements))
+		serviceMonitorYAML, err = applyJSONPatch(serviceMonitorYAML, "patches/metrics/service-monitor-port.yaml.patch", replacements)
 		if err != nil {
 			return err
 		}
 	}
 
-	if gen.generatedAssets.ControllerStaticResources == nil {
-		gen.generatedAssets.ControllerStaticResources = make(map[string][]byte)
-	}
 	gen.generatedAssets.ControllerStaticResources[MetricServiceAssetName] = serviceYAML
 	gen.generatedAssets.ControllerStaticResources[MetricServiceMonitorAssetName] = serviceMonitorYAML
 	return nil
@@ -211,7 +210,6 @@ func (gen *AssetGenerator) generateMonitoringService() error {
 
 func (gen *AssetGenerator) collectControllerStaticAssets() error {
 	ctrlCfg := gen.operatorConfig.ControllerConfig
-	gen.generatedAssets.ControllerStaticResources = make(map[string][]byte)
 	for _, a := range ctrlCfg.StaticAssets {
 		if a.ClusterFlavour == nil || *a.ClusterFlavour == gen.runtimeConfig.ClusterFlavour {
 			assetBytes := mustReadAsset(a.AssetName, gen.replacements)

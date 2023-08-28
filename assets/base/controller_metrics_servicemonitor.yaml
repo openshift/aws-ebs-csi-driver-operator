@@ -4,7 +4,8 @@ metadata:
   name: ${ASSET_PREFIX}-controller-monitor
   namespace: ${NAMESPACE}
 spec:
-  endpoints:
+  # Empty list to make json-patch work
+  endpoints: []
   jobLabel: component
   selector:
     matchLabels:

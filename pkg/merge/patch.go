@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/aws-ebs-csi-driver-operator/assets"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -22,35 +23,70 @@ func applyAssetPatch(sourceYAML []byte, assetName string, replacements []string)
 }
 
 func applySidecarPatch(sourceYAML []byte, assetName string, replacements []string, extraArguments []string) ([]byte, error) {
-	patchYAML := mustReadAsset(assetName, replacements)
-	// set extra arguments
-	if len(extraArguments) > 0 {
-		patch, err := yaml.Parse(string(patchYAML))
-		if err != nil {
-			return nil, fmt.Errorf("failed to read asset %s: %v", assetName, err)
-		}
-		args, err := patch.GetSlice("spec.template.spec.containers[0].args")
-		if err != nil {
-			return nil, fmt.Errorf("failed to get arguments from %s: %v", assetName, err)
-		}
-		finalArgs := []string{}
-		for _, arg := range args {
-			finalArgs = append(finalArgs, arg.(string))
-		}
-		finalArgs = append(finalArgs, extraArguments...)
-		patch.SetMapField(yaml.NewListRNode(finalArgs...), "spec", "template", "spec", "containers", "0", "args")
-		patchYAMLString, err := patch.String()
-		if err != nil {
-			return nil, fmt.Errorf("failed to assemble asset %s with extra args: %v", assetName, err)
-		}
-		patchYAML = []byte(patchYAMLString)
+	sidecarYAML := mustReadAsset(assetName, replacements)
+
+	sidecarJSON, err := sigyaml.YAMLToJSON(sidecarYAML)
+	if err != nil {
+		return nil, err
 	}
+
+	// JSON patch does not allow adding multiple elements to a list at once.
+	// So we need to apply a patch for each extra argument.
+	finalPatchYAML := bytes.NewBuffer(nil)
+	for _, arg := range extraArguments {
+		singleArgYAMLPatch := mustReadAsset("patches/add-arg.yaml.patch", []string{"${EXTRA_ARGUMENTS}", arg})
+		finalPatchYAML.Write(singleArgYAMLPatch)
+	}
+
+	finalPatchJSON, err := sigyaml.YAMLToJSON(finalPatchYAML.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	argsPatch, err := jsonpatch.DecodePatch(finalPatchJSON)
+	if err != nil {
+		return nil, err
+	}
+	sidecarJSON, err = argsPatch.Apply(sidecarJSON)
+	if err != nil {
+		return nil, err
+	}
+	sidecarYAML, err = sigyaml.JSONToYAML(sidecarJSON)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := yaml.MergeOptions{ListIncreaseDirection: yaml.MergeOptionsListAppend}
-	ret, err := merge2.MergeStrings(string(patchYAML), string(sourceYAML), false, opts)
+	ret, err := merge2.MergeStrings(string(sidecarYAML), string(sourceYAML), false, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply asset %s: %v", assetName, err)
 	}
+
 	return []byte(ret), nil
+}
+
+func applyJSONPatch(sourceYAML []byte, assetName string, replacements []string) ([]byte, error) {
+	patchYAML := mustReadAsset(assetName, replacements)
+	patchJSON, err := sigyaml.YAMLToJSON(patchYAML)
+	if err != nil {
+		return nil, err
+	}
+	sourceJSON, err := sigyaml.YAMLToJSON(sourceYAML)
+	if err != nil {
+		return nil, err
+	}
+	patch, err := jsonpatch.DecodePatch(patchJSON)
+	if err != nil {
+		return nil, err
+	}
+	sourceJSON, err = patch.Apply(sourceJSON)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := sigyaml.JSONToYAML(sourceJSON)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func mustReadAsset(assetName string, replacements []string) []byte {

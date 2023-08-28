@@ -1,0 +1,5 @@
+# Add cmdline arg
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value:
+    ${EXTRA_ARGUMENTS}
