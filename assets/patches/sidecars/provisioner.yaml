@@ -14,6 +14,8 @@ spec:
             - --leader-election-retry-period=${LEADER_ELECTION_RETRY_PERIOD}
             - --leader-election-namespace=openshift-cluster-csi-drivers
             - --v=${LOG_LEVEL}
+          # Empty env. instead of nil for json patch to appen new env. vars there
+          env: []
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/

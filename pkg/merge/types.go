@@ -49,6 +49,7 @@ type SidecarConfig struct {
 	HasMetricsPort    bool
 	MetricPortName    string
 	StaticAssetNames  []string
+	AssetPatches      AssetPatches
 }
 
 type LivenessProbeConfig struct {

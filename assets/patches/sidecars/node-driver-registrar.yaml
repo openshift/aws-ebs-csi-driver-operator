@@ -11,6 +11,8 @@ spec:
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=/var/lib/kubelet/plugins/${DRIVER_NAME}/csi.sock
             - --v=${LOG_LEVEL}
+          # Empty env. instead of nil for json patch to appen new env. vars there
+          env: []
           lifecycle:
             preStop:
               exec:

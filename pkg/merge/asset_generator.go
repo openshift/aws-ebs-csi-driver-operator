@@ -144,7 +144,7 @@ func (gen *AssetGenerator) generateDeployment() error {
 			localPortIndex++
 			exposedPortIndex++
 		}
-		deploymentYAML, err = applySidecarPatch(deploymentYAML, sidecar.TemplateAssetName, replacements, sidecar.ExtraArguments)
+		deploymentYAML, err = addSidecar(deploymentYAML, sidecar.TemplateAssetName, replacements, sidecar.ExtraArguments, gen.runtimeConfig.ClusterFlavour, sidecar.AssetPatches)
 		if err != nil {
 			return err
 		}
@@ -178,7 +178,7 @@ func (gen *AssetGenerator) generateMonitoringService() error {
 		if err != nil {
 			return err
 		}
-		serviceMonitorYAML, err = applyJSONPatch(serviceMonitorYAML, "patches/metrics/service-monitor-port.yaml.patch", replacements)
+		serviceMonitorYAML, err = applyAssetPatch(serviceMonitorYAML, "patches/metrics/service-monitor-port.yaml.patch", replacements)
 		if err != nil {
 			return err
 		}
@@ -196,7 +196,7 @@ func (gen *AssetGenerator) generateMonitoringService() error {
 		if err != nil {
 			return err
 		}
-		serviceMonitorYAML, err = applyJSONPatch(serviceMonitorYAML, "patches/metrics/service-monitor-port.yaml.patch", replacements)
+		serviceMonitorYAML, err = applyAssetPatch(serviceMonitorYAML, "patches/metrics/service-monitor-port.yaml.patch", replacements)
 		if err != nil {
 			return err
 		}

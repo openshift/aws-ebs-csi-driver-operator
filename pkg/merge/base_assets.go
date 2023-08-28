@@ -50,6 +50,7 @@ var (
 		StaticAssetNames: []string{
 			"base/rbac/main_provisioner_binding.yaml",
 		},
+		AssetPatches: NewAssetPatches(HyperShiftOnly, "sidecar.yaml", "patches/hypershift/sidecar_kubeconfig.yaml.patch"),
 	}
 
 	// Provisioner sidecar with restore-from-snapshot support.

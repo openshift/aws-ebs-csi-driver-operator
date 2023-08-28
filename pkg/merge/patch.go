@@ -3,16 +3,23 @@ package merge
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/openshift/aws-ebs-csi-driver-operator/assets"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
 	sigyaml "sigs.k8s.io/yaml"
 )
 
 func applyAssetPatch(sourceYAML []byte, assetName string, replacements []string) ([]byte, error) {
+	if strings.HasSuffix(assetName, ".patch") {
+		return applyJSONPatch(sourceYAML, assetName, replacements)
+	}
+	return applyStrategicMergePatch(sourceYAML, assetName, replacements)
+}
+
+func applyStrategicMergePatch(sourceYAML []byte, assetName string, replacements []string) ([]byte, error) {
 	patchYAML := mustReadAsset(assetName, replacements)
 	opts := yaml.MergeOptions{ListIncreaseDirection: yaml.MergeOptionsListAppend}
 	ret, err := merge2.MergeStrings(string(patchYAML), string(sourceYAML), false, opts)
@@ -22,8 +29,38 @@ func applyAssetPatch(sourceYAML []byte, assetName string, replacements []string)
 	return []byte(ret), nil
 }
 
-func applySidecarPatch(sourceYAML []byte, assetName string, replacements []string, extraArguments []string) ([]byte, error) {
+func addSidecar(sourceYAML []byte, assetName string, replacements []string, extraArguments []string, flavour ClusterFlavour, assetPatches AssetPatches) ([]byte, error) {
 	sidecarYAML := mustReadAsset(assetName, replacements)
+
+	sidecarYAML, err := addArguments(sidecarYAML, extraArguments)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply all assetPatches
+	for _, patch := range assetPatches {
+		if !patch.ClusterFlavours.Has(flavour) {
+			continue
+		}
+		sidecarYAML, err = applyAssetPatch(sidecarYAML, patch.PatchAssetName, replacements)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	opts := yaml.MergeOptions{ListIncreaseDirection: yaml.MergeOptionsListAppend}
+	ret, err := merge2.MergeStrings(string(sidecarYAML), string(sourceYAML), false, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply asset %s: %v", assetName, err)
+	}
+
+	return []byte(ret), nil
+}
+
+func addArguments(sidecarYAML []byte, extraArguments []string) ([]byte, error) {
+	if len(extraArguments) == 0 {
+		return sidecarYAML, nil
+	}
 
 	sidecarJSON, err := sigyaml.YAMLToJSON(sidecarYAML)
 	if err != nil {
@@ -54,14 +91,7 @@ func applySidecarPatch(sourceYAML []byte, assetName string, replacements []strin
 	if err != nil {
 		return nil, err
 	}
-
-	opts := yaml.MergeOptions{ListIncreaseDirection: yaml.MergeOptionsListAppend}
-	ret, err := merge2.MergeStrings(string(sidecarYAML), string(sourceYAML), false, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply asset %s: %v", assetName, err)
-	}
-
-	return []byte(ret), nil
+	return sidecarYAML, nil
 }
 
 func applyJSONPatch(sourceYAML []byte, assetName string, replacements []string) ([]byte, error) {
@@ -102,24 +132,6 @@ func replaceBytes(src []byte, replacements []string) []byte {
 		src = bytes.ReplaceAll(src, []byte(replacements[i]), []byte(replacements[i+1]))
 	}
 	return src
-}
-
-// addEndpointToServiceMonitor adds the given endpoint to the ServiceMonitor's list of endpoints.
-// Using manual path, because ServiceMonitor does not have strategic merge patch support.
-// TODO: use json patch instead of custom func?
-func addEndpointToServiceMonitor(serviceMonitorYAML []byte, endpointYAML []byte) ([]byte, error) {
-	serviceMonitor := &monitoringv1.ServiceMonitor{}
-	if err := sigyaml.UnmarshalStrict(serviceMonitorYAML, serviceMonitor); err != nil {
-		return nil, err
-	}
-
-	endpoint := &monitoringv1.Endpoint{}
-	if err := sigyaml.UnmarshalStrict(endpointYAML, endpoint); err != nil {
-		return nil, err
-	}
-
-	serviceMonitor.Spec.Endpoints = append(serviceMonitor.Spec.Endpoints, *endpoint)
-	return sigyaml.Marshal(serviceMonitor)
 }
 
 func MustSanitize(src string) string {
