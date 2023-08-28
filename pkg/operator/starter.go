@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -154,21 +155,32 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
-	staticResourceFiles := []string{
-		"controller_pdb.yaml",
-		"cabundle_cm.yaml",
-	}
-	if isHypershift {
-		staticResourceFiles = append(staticResourceFiles, "hypershift/controller_sa.yaml")
-	} else {
-		staticResourceFiles = append(staticResourceFiles, "controller_sa.yaml")
-	}
 
 	var hostedControlPlaneLister cache.GenericLister
 	var hostedControlPlaneInformer cache.SharedInformer
 	if isHypershift {
 		hostedControlPlaneInformer = controlPlaneDynamicInformers.ForResource(hostedControlPlaneGVR).Informer()
 		hostedControlPlaneLister = controlPlaneDynamicInformers.ForResource(hostedControlPlaneGVR).Lister()
+	}
+
+	// Generate assets
+	flavour := merge.FlavourStandalone
+	if isHypershift {
+		flavour = merge.FlavourHyperShift
+	}
+	runtimeConfig := &merge.RuntimeConfig{
+		ClusterFlavour:        flavour,
+		ControlPlaneNamespace: controlPlaneNamespace,
+		Replacements:          nil,
+	}
+	operatorConfig, err := aws.GetAWSEBSConfig()
+	if err != nil {
+		return err
+	}
+	gen := merge.NewAssetGenerator(runtimeConfig, operatorConfig)
+	a, err := gen.GenerateAssets()
+	if err != nil {
+		return err
 	}
 
 	controlPlaneInformersForEvents := []factory.Informer{
@@ -195,22 +207,21 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controlPlaneKubeClient,
 		controlPlaneDynamicClient,
 		controlPlaneKubeInformersForNamespaces,
-		assetWithNamespaceFunc(controlPlaneNamespace),
-		staticResourceFiles,
+		a.GetAsset,
+		a.GetStaticControllerAssetNames(),
 	).WithCSIConfigObserverController(
 		"AWSEBSDriverCSIConfigObserverController",
 		guestConfigInformers,
 	).WithCSIDriverControllerService(
 		"AWSEBSDriverControllerServiceController",
-		assets.ReadFile,
-		"controller.yaml",
+		a.GetAsset,
+		merge.ControllerDeploymentAssetName,
 		controlPlaneKubeClient,
 		controlPlaneKubeInformersForNamespaces.InformersFor(controlPlaneNamespace),
 		guestConfigInformers,
 		controlPlaneInformersForEvents,
 		withHypershiftDeploymentHook(isHypershift, os.Getenv(hypershiftImageEnvName), controlPlaneNamespace, hostedControlPlaneLister),
 		withHypershiftReplicasHook(isHypershift, guestNodeInformer.Lister()),
-		withNamespaceDeploymentHook(controlPlaneNamespace),
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, cloudCredSecretName, controlPlaneSecretInformer),
 		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(controlPlaneNamespace, metricsCertSecretName, controlPlaneSecretInformer),
 		csidrivercontrollerservicecontroller.WithObservedProxyDeploymentHook(),
@@ -567,60 +578,9 @@ func withHypershiftDeploymentHook(isHypershift bool, hypershiftImage string, nam
 			return nil
 		}
 
-		// Remove inject-proxy annotations
-		delete(deployment.Annotations, "config.openshift.io/inject-proxy")
-		delete(deployment.Annotations, "config.openshift.io/inject-proxy-cabundle")
-
-		deployment.Spec.Template.Spec.PriorityClassName = hypershiftPriorityClass
-
-		// Inject into the pod the volumes used by CSI and token minter sidecars.
 		podSpec := &deployment.Spec.Template.Spec
-		podSpec.Volumes = append(podSpec.Volumes,
-			corev1.Volume{
-				Name: "hosted-kubeconfig",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						// FIXME: use a ServiceAccount from the guest cluster
-						SecretName: "service-network-admin-kubeconfig",
-					},
-				},
-			},
-		)
 
-		// The bound-sa-token volume must be a empty disk in Hypershift.
-		for i := range podSpec.Volumes {
-			if podSpec.Volumes[i].Name != "bound-sa-token" {
-				continue
-			}
-			podSpec.Volumes[i].VolumeSource = corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					Medium: corev1.StorageMediumMemory,
-				},
-			}
-		}
-
-		// The metrics-serving-cert volume is not used in Hypershift.
-		for i := range podSpec.Volumes {
-			if podSpec.Volumes[i].Name == "metrics-serving-cert" {
-				podSpec.Volumes = append(podSpec.Volumes[:i], podSpec.Volumes[i+1:]...)
-				break
-			}
-		}
-
-		filtered := []corev1.Container{}
-		for i := range podSpec.Containers {
-			switch podSpec.Containers[i].Name {
-			case "driver-kube-rbac-proxy":
-			case "provisioner-kube-rbac-proxy":
-			case "attacher-kube-rbac-proxy":
-			case "resizer-kube-rbac-proxy":
-			case "snapshotter-kube-rbac-proxy":
-			default:
-				filtered = append(filtered, podSpec.Containers[i])
-			}
-		}
-		podSpec.Containers = filtered
-
+		// TODO: move to AssetGenerator
 		// Inject into the CSI sidecars the hosted Kubeconfig.
 		for i := range podSpec.Containers {
 			container := &podSpec.Containers[i]
@@ -644,117 +604,12 @@ func withHypershiftDeploymentHook(isHypershift bool, hypershiftImage string, nam
 			})
 		}
 
-		// Add the token minter sidecar into the pod.
-		podSpec.Containers = append(podSpec.Containers, corev1.Container{
-			Name:            "token-minter",
-			Image:           hypershiftImage,
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Command:         []string{"/usr/bin/control-plane-operator", "token-minter"},
-			Args: []string{
-				"--service-account-namespace=openshift-cluster-csi-drivers",
-				"--service-account-name=aws-ebs-csi-driver-controller-sa",
-				"--token-audience=openshift",
-				"--token-file=/var/run/secrets/openshift/serviceaccount/token",
-				"--kubeconfig=/etc/hosted-kubernetes/kubeconfig",
-			},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("10m"),
-					corev1.ResourceMemory: resource.MustParse("10Mi"),
-				},
-			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "bound-sa-token",
-					MountPath: "/var/run/secrets/openshift/serviceaccount",
-				},
-				{
-					Name:      "hosted-kubeconfig",
-					MountPath: "/etc/hosted-kubernetes",
-					ReadOnly:  true,
-				},
-			},
-		})
-
 		// Add nodeSelector
 		nodeSelector, err := getHostedControlPlaneNodeSelector(hostedControlPlaneLister, namespace)
 		if err != nil {
 			return err
 		}
 		podSpec.NodeSelector = nodeSelector
-
-		// Add labels
-		if deployment.Spec.Template.Labels == nil {
-			deployment.Spec.Template.Labels = map[string]string{}
-		}
-		deployment.Spec.Template.Labels["hypershift.openshift.io/hosted-control-plane"] = namespace
-
-		// Add Affinity
-		if podSpec.Affinity == nil {
-			podSpec.Affinity = &corev1.Affinity{}
-		}
-		if podSpec.Affinity.PodAffinity == nil {
-			podSpec.Affinity.PodAffinity = &corev1.PodAffinity{}
-		}
-		podSpec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.WeightedPodAffinityTerm{
-			{
-				Weight: 100,
-				PodAffinityTerm: corev1.PodAffinityTerm{
-					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"hypershift.openshift.io/hosted-control-plane": namespace,
-						},
-					},
-					TopologyKey: corev1.LabelHostname,
-				},
-			},
-		}
-
-		if podSpec.Affinity.NodeAffinity == nil {
-			podSpec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
-		}
-		podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.PreferredSchedulingTerm{
-			{
-				Weight: 50,
-				Preference: corev1.NodeSelectorTerm{
-					MatchExpressions: []corev1.NodeSelectorRequirement{
-						{
-							Key:      "hypershift.openshift.io/control-plane",
-							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"true"},
-						},
-					},
-				},
-			},
-			{
-				Weight: 100,
-				Preference: corev1.NodeSelectorTerm{
-					MatchExpressions: []corev1.NodeSelectorRequirement{
-						{
-							Key:      "hypershift.openshift.io/cluster",
-							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{namespace},
-						},
-					},
-				},
-			},
-		}
-
-		// Add tolerations
-		podSpec.Tolerations = []corev1.Toleration{
-			{
-				Key:      "hypershift.openshift.io/control-plane",
-				Operator: corev1.TolerationOpEqual,
-				Value:    "true",
-				Effect:   corev1.TaintEffectNoSchedule,
-			},
-			{
-				Key:      "hypershift.openshift.io/cluster",
-				Operator: corev1.TolerationOpEqual,
-				Value:    namespace,
-				Effect:   corev1.TaintEffectNoSchedule,
-			},
-		}
 
 		return nil
 	}

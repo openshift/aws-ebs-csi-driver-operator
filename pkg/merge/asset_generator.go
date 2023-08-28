@@ -26,12 +26,11 @@ func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverOp
 	return &AssetGenerator{
 		runtimeConfig:  runtimeConfig,
 		operatorConfig: operatorConfig,
-		replacements: []string{
+		replacements: append(runtimeConfig.Replacements,
 			"${ASSET_PREFIX}", operatorConfig.AssetPrefix,
 			"${ASSET_SHORT_PREFIX}", operatorConfig.AssetShortPrefix,
-			// TODO: set namespace from somewhere
-			// TODO: set images and other env. var replacement?
-		},
+			"${NAMESPACE}", runtimeConfig.ControlPlaneNamespace,
+		),
 		generatedAssets: &CSIDriverAssets{},
 	}
 }

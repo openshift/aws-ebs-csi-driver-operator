@@ -93,5 +93,7 @@ type CSIDriverAssets struct {
 }
 
 type RuntimeConfig struct {
-	ClusterFlavour ClusterFlavour
+	ClusterFlavour        ClusterFlavour
+	ControlPlaneNamespace string
+	Replacements          []string
 }
