@@ -1,5 +1,9 @@
 package merge
 
+import (
+	"k8s.io/apimachinery/pkg/util/sets"
+)
+
 const (
 	ProvisionerAssetName         = "patches/sidecars/provisioner.yaml"
 	AttacherAssetName            = "patches/sidecars/attacher.yaml"
@@ -11,7 +15,7 @@ const (
 )
 
 var (
-	DefaultControllerAssets = NewAssets("",
+	DefaultControllerAssets = NewAssets(AllFlavours,
 		"base/cabundle_cm.yaml",
 		"base/controller_sa.yaml",
 		"base/controller_pdb.yaml",
@@ -22,16 +26,16 @@ var (
 		"base/rbac/prometheus_role.yaml",
 		"base/rbac/prometheus_binding.yaml",
 	)
-	DefaultNodeAssets = NewAssets("",
+	DefaultNodeAssets = NewAssets(AllFlavours,
 		"base/node_sa.yaml",
 		"base/rbac/privileged_role.yaml",
 		"base/rbac/privileged_role_binding.yaml",
 	)
 
-	DefaultAssetPatches = NewAssetPatches(FlavourStandalone,
+	DefaultAssetPatches = NewAssetPatches(StandaloneOnly,
 		"controller.yaml", "patches/standalone/controller_proxy.yaml",
 		"controller.yaml", "patches/standalone/controller_affinity.yaml",
-	).WithPatches(FlavourHyperShift,
+	).WithPatches(HyperShiftOnly,
 		"controller_sa.yaml", "patches/hypershift/controller_sa_pull_secret.yaml",
 		"controller.yaml", "patches/hypershift/controller_affinity.yaml",
 	)
@@ -117,46 +121,38 @@ func (cfg SidecarConfig) WithAdditionalAssets(assets ...string) SidecarConfig {
 	return newCfg
 }
 
-func (a Assets) WithAssets(flavour ClusterFlavour, assets ...string) Assets {
+func (a Assets) WithAssets(flavours sets.Set[ClusterFlavour], assets ...string) Assets {
 	newAssets := make([]Asset, 0, len(a)+len(assets))
 	newAssets = append(newAssets, a...)
-	pFlavour := &flavour
-	if flavour == "" {
-		pFlavour = nil
-	}
 	for _, assetName := range assets {
 		newAssets = append(newAssets, Asset{
-			ClusterFlavour: pFlavour,
-			AssetName:      assetName,
+			ClusterFlavours: flavours,
+			AssetName:       assetName,
 		})
 	}
 	return newAssets
 }
 
-func (p AssetPatches) WithPatches(flavour ClusterFlavour, namePatchPairs ...string) AssetPatches {
+func (p AssetPatches) WithPatches(flavours sets.Set[ClusterFlavour], namePatchPairs ...string) AssetPatches {
 	if len(namePatchPairs)%2 != 0 {
 		panic("namePatchPairs must be even")
 	}
 	newPatches := make([]AssetPatch, 0, len(p)+len(namePatchPairs)/2)
 	newPatches = append(newPatches, p...)
-	pFlavour := &flavour
-	if flavour == "" {
-		pFlavour = nil
-	}
 	for i := 0; i < len(namePatchPairs); i += 2 {
 		newPatches = append(newPatches, AssetPatch{
-			ClusterFlavour: pFlavour,
-			Name:           namePatchPairs[i],
-			PatchAssetName: namePatchPairs[i+1],
+			ClusterFlavours: flavours,
+			Name:            namePatchPairs[i],
+			PatchAssetName:  namePatchPairs[i+1],
 		})
 	}
 	return newPatches
 }
 
-func NewAssets(flavour ClusterFlavour, assets ...string) Assets {
-	return Assets{}.WithAssets(flavour, assets...)
+func NewAssets(flavours sets.Set[ClusterFlavour], assets ...string) Assets {
+	return Assets{}.WithAssets(flavours, assets...)
 }
 
-func NewAssetPatches(flavour ClusterFlavour, namePatchPairs ...string) AssetPatches {
-	return AssetPatches{}.WithPatches(flavour, namePatchPairs...)
+func NewAssetPatches(flavours sets.Set[ClusterFlavour], namePatchPairs ...string) AssetPatches {
+	return AssetPatches{}.WithPatches(flavours, namePatchPairs...)
 }

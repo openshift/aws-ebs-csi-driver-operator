@@ -69,7 +69,7 @@ func (gen *AssetGenerator) generateController() error {
 func (gen *AssetGenerator) patchController() error {
 	// Patch everything, including the CSI driver deployment.
 	for _, patch := range gen.operatorConfig.ControllerConfig.AssetPatches {
-		if patch.ClusterFlavour != nil && *patch.ClusterFlavour != gen.runtimeConfig.ClusterFlavour {
+		if !patch.ClusterFlavours.Has(gen.runtimeConfig.ClusterFlavour) {
 			continue
 		}
 		switch patch.Name {
@@ -211,7 +211,7 @@ func (gen *AssetGenerator) generateMonitoringService() error {
 func (gen *AssetGenerator) collectControllerStaticAssets() error {
 	ctrlCfg := gen.operatorConfig.ControllerConfig
 	for _, a := range ctrlCfg.StaticAssets {
-		if a.ClusterFlavour == nil || *a.ClusterFlavour == gen.runtimeConfig.ClusterFlavour {
+		if a.ClusterFlavours.Has(gen.runtimeConfig.ClusterFlavour) {
 			assetBytes := mustReadAsset(a.AssetName, gen.replacements)
 			gen.generatedAssets.ControllerStaticResources[filepath.Base(a.AssetName)] = assetBytes
 		}

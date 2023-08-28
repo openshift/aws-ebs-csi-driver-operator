@@ -1,5 +1,9 @@
 package merge
 
+import (
+	"k8s.io/apimachinery/pkg/util/sets"
+)
+
 type CSIDriverOperatorConfig struct {
 	AssetPrefix      string
 	AssetShortPrefix string
@@ -10,17 +14,15 @@ type CSIDriverOperatorConfig struct {
 
 type Assets []Asset
 type Asset struct {
-	// TODO: this should be a set of flavours
-	ClusterFlavour *ClusterFlavour
-	AssetName      string
+	ClusterFlavours sets.Set[ClusterFlavour]
+	AssetName       string
 }
 
 type AssetPatches []AssetPatch
 type AssetPatch struct {
-	// TODO: this should be a set of flavours
-	ClusterFlavour *ClusterFlavour
-	Name           string
-	PatchAssetName string
+	ClusterFlavours sets.Set[ClusterFlavour]
+	Name            string
+	PatchAssetName  string
 }
 
 type ControllPlaneConfig struct {
@@ -73,6 +75,12 @@ type ClusterFlavour string
 const (
 	FlavourStandalone ClusterFlavour = "standalone"
 	FlavourHyperShift ClusterFlavour = "hypershift"
+)
+
+var (
+	AllFlavours    = sets.New[ClusterFlavour](FlavourStandalone, FlavourHyperShift)
+	StandaloneOnly = sets.New[ClusterFlavour](FlavourStandalone)
+	HyperShiftOnly = sets.New[ClusterFlavour](FlavourHyperShift)
 )
 
 type CSIDriverAssets struct {
