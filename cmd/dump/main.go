@@ -17,7 +17,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	a, err := merge.GenerateAssets(merge.ClusterFlavour(*flavour), cfg)
+
+	rcfg := &merge.RuntimeConfig{
+		ClusterFlavour: merge.ClusterFlavour(*flavour),
+	}
+	gen := merge.NewAssetGenerator(rcfg, cfg)
+	a, err := gen.GenerateAssets()
 	if err != nil {
 		panic(err)
 	}

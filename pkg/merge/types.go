@@ -83,3 +83,7 @@ type CSIDriverAssets struct {
 	FlavourAssetNames         map[ClusterFlavour][]string
 	FlavourAssetPatches       map[ClusterFlavour][]AssetPatch
 }
+
+type RuntimeConfig struct {
+	ClusterFlavour ClusterFlavour
+}
