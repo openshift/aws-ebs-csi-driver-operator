@@ -26,7 +26,6 @@ require (
 
 require (
 	github.com/evanphx/json-patch v5.6.0+incompatible
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.67.1
 	sigs.k8s.io/kustomize/kyaml v0.14.3
 	sigs.k8s.io/yaml v1.3.0
 )

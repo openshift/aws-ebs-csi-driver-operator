@@ -1,6 +1,7 @@
 package merge
 
 import (
+	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -25,6 +26,12 @@ type AssetPatch struct {
 	PatchAssetName  string
 }
 
+type FlavourHook struct {
+	ClusterFlavours sets.Set[ClusterFlavour]
+	Hook            dc.DeploymentHookFunc
+}
+type FlavourHooks []FlavourHook
+
 type ControllPlaneConfig struct {
 	DeploymentTemplateAssetName    string
 	MetricsPorts                   []MetricsPort
@@ -34,6 +41,9 @@ type ControllPlaneConfig struct {
 	LivenessProbePort              uint16
 	StaticAssets                   Assets
 	AssetPatches                   AssetPatches
+
+	WatchedSecretNames []string
+	DeploymentHooks    FlavourHooks
 }
 
 type MetricsPort struct {

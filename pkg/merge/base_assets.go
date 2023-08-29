@@ -1,6 +1,7 @@
 package merge
 
 import (
+	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -108,6 +109,8 @@ var (
 		FlavourHyperShift: {},
 		FlavourStandalone: {},
 	}
+
+	DefaultControllerHooks = NewHooks(AllFlavours) // TODO: move hooks here
 )
 
 func (cfg SidecarConfig) WithExtraArguments(extraArguments ...string) SidecarConfig {
@@ -156,4 +159,27 @@ func NewAssets(flavours sets.Set[ClusterFlavour], assets ...string) Assets {
 
 func NewAssetPatches(flavours sets.Set[ClusterFlavour], namePatchPairs ...string) AssetPatches {
 	return AssetPatches{}.WithPatches(flavours, namePatchPairs...)
+}
+
+func NewHooks(flavours sets.Set[ClusterFlavour], hooks ...dc.DeploymentHookFunc) FlavourHooks {
+	result := make([]FlavourHook, 0, len(hooks))
+	for _, hook := range hooks {
+		result = append(result, FlavourHook{
+			ClusterFlavours: flavours,
+			Hook:            hook,
+		})
+	}
+	return result
+}
+
+func (h FlavourHooks) WithHooks(flavours sets.Set[ClusterFlavour], hooks ...dc.DeploymentHookFunc) FlavourHooks {
+	result := make([]FlavourHook, 0, len(h)+len(hooks))
+	result = append(result, h...)
+	for _, hook := range hooks {
+		result = append(result, FlavourHook{
+			ClusterFlavours: flavours,
+			Hook:            hook,
+		})
+	}
+	return result
 }

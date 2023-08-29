@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
 	"k8s.io/klog/v2"
 )
@@ -13,7 +14,9 @@ func main() {
 	flavour := flag.String("flavour", "standalone", "cluster flavour")
 
 	flag.Parse()
-	cfg, err := aws.GetAWSEBSConfig()
+
+	c := clients.NewFakeClients("namespace", false)
+	cfg, err := aws.GetAWSEBSConfig(c)
 	if err != nil {
 		panic(err)
 	}
@@ -22,6 +25,7 @@ func main() {
 		ClusterFlavour: merge.ClusterFlavour(*flavour),
 	}
 	gen := merge.NewAssetGenerator(rcfg, cfg)
+
 	a, err := gen.GenerateAssets()
 	if err != nil {
 		panic(err)
