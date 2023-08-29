@@ -6,7 +6,6 @@ metadata:
     config.openshift.io/inject-proxy-cabundle: csi-driver
 spec:
   template:
-    metadata:
     spec:
       hostNetwork: true
       containers:
@@ -27,3 +26,28 @@ spec:
             requests:
               memory: 50Mi
               cpu: 10m
+          ports:
+            - name: healthz
+              # Due to hostNetwork, this port is open on all nodes!
+              containerPort: 10300
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 10
+            failureThreshold: 5
+          volumeMounts:
+          - mountPath: /var/lib/kubelet
+            mountPropagation: Bidirectional
+            name: kubelet-dir
+          - mountPath: /csi
+            name: socket-dir
+          - mountPath: /dev
+            name: device-dir
+          - mountPath: /etc/selinux
+            name: etc-selinux
+          - mountPath: /sys/fs
+            name: sys-fs

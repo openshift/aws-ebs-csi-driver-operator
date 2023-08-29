@@ -11,6 +11,7 @@ import (
 
 const (
 	ControllerDeploymentAssetName = "controller.yaml"
+	NodeDaemonSetAssetName        = "node.yaml"
 	MetricServiceAssetName        = "service.yaml"
 	MetricServiceMonitorAssetName = "servicemonitor.yaml"
 )
@@ -30,22 +31,26 @@ func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverOp
 			"${ASSET_PREFIX}", operatorConfig.AssetPrefix,
 			"${ASSET_SHORT_PREFIX}", operatorConfig.AssetShortPrefix,
 			"${NAMESPACE}", runtimeConfig.ControlPlaneNamespace,
+			"${DRIVER_NAME}", operatorConfig.DriverName,
 		),
 		generatedAssets: &CSIDriverAssets{},
 	}
 }
 
 func (gen *AssetGenerator) GenerateAssets() (*CSIDriverAssets, error) {
-	gen.generatedAssets = &CSIDriverAssets{
-		ControllerStaticResources: make(map[string][]byte),
-	}
 	if err := gen.generateController(); err != nil {
+		return nil, err
+	}
+	if err := gen.generateGuest(); err != nil {
 		return nil, err
 	}
 	return gen.generatedAssets, nil
 }
 
 func (gen *AssetGenerator) generateController() error {
+	gen.generatedAssets = &CSIDriverAssets{
+		ControllerStaticResources: make(map[string][]byte),
+	}
 	if err := gen.generateDeployment(); err != nil {
 		return err
 	}
@@ -83,7 +88,6 @@ func (gen *AssetGenerator) patchController() error {
 			if assetYAML == nil {
 				return fmt.Errorf("asset %s not found to apply patch %s", patch.Name, patch.PatchAssetName)
 			}
-			// TODO: find out Kind:
 			assetYAML, err := applyAssetPatch(assetYAML, patch.PatchAssetName, gen.replacements)
 			if err != nil {
 				return err
@@ -220,6 +224,108 @@ func (gen *AssetGenerator) collectControllerStaticAssets() error {
 			assetBytes := mustReadAsset(assetName, gen.replacements)
 			gen.generatedAssets.ControllerStaticResources[filepath.Base(assetName)] = assetBytes
 		}
+	}
+	return nil
+}
+
+func (gen *AssetGenerator) generateGuest() error {
+	gen.generatedAssets.GuestStaticResources = make(map[string][]byte)
+	gen.generatedAssets.GuestStorageClassAssets = make(map[string][]byte)
+
+	if err := gen.generateDaemonSet(); err != nil {
+		return err
+	}
+	if err := gen.collectGuestStaticAssets(); err != nil {
+		return err
+	}
+	if err := gen.collectGuestStorageClasses(); err != nil {
+		return err
+	}
+
+	if err := gen.patchGuest(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (gen *AssetGenerator) generateDaemonSet() error {
+	cfg := gen.operatorConfig.GuestConfig
+	dsYAML := mustReadAsset("base/node.yaml", gen.replacements)
+	var err error
+
+	var replacements = append([]string{}, gen.replacements...)
+	if cfg.LivenessProbePort > 0 {
+		replacements = append(replacements, "${LIVENESS_PROBE_PORT}", strconv.Itoa(int(cfg.LivenessProbePort)))
+	}
+
+	dsYAML, err = applyAssetPatch(dsYAML, cfg.DaemonSetTemplateAssetName, replacements)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(cfg.Sidecars); i++ {
+		sidecar := cfg.Sidecars[i]
+		dsYAML, err = addSidecar(dsYAML, sidecar.TemplateAssetName, replacements, sidecar.ExtraArguments, gen.runtimeConfig.ClusterFlavour, sidecar.AssetPatches)
+		if err != nil {
+			return err
+		}
+	}
+	gen.generatedAssets.NodeTemplate = dsYAML
+	return nil
+}
+
+func (gen *AssetGenerator) patchGuest() error {
+	// Patch everything, including the CSI driver DaemonSet.
+	for _, patch := range gen.operatorConfig.GuestConfig.AssetPatches {
+		if !patch.ClusterFlavours.Has(gen.runtimeConfig.ClusterFlavour) {
+			continue
+		}
+		switch patch.Name {
+		case NodeDaemonSetAssetName:
+			dsYAML, err := applyAssetPatch(gen.generatedAssets.NodeTemplate, patch.PatchAssetName, gen.replacements)
+			if err != nil {
+				return err
+			}
+			gen.generatedAssets.NodeTemplate = dsYAML
+		default:
+			if assetYAML, ok := gen.generatedAssets.GuestStorageClassAssets[patch.Name]; ok {
+				assetYAML, err := applyAssetPatch(assetYAML, patch.PatchAssetName, gen.replacements)
+				if err != nil {
+					return err
+				}
+				gen.generatedAssets.GuestStorageClassAssets[patch.Name] = assetYAML
+				return nil
+			}
+			if assetYAML, ok := gen.generatedAssets.GuestStaticResources[patch.Name]; ok {
+				assetYAML, err := applyAssetPatch(assetYAML, patch.PatchAssetName, gen.replacements)
+				if err != nil {
+					return err
+				}
+				gen.generatedAssets.GuestStaticResources[patch.Name] = assetYAML
+				return nil
+			}
+			return fmt.Errorf("asset %s not found to apply patch %s", patch.Name, patch.PatchAssetName)
+		}
+	}
+	return nil
+}
+
+func (gen *AssetGenerator) collectGuestStaticAssets() error {
+	cfg := gen.operatorConfig.GuestConfig
+	for _, a := range cfg.StaticAssets {
+		if a.ClusterFlavours.Has(gen.runtimeConfig.ClusterFlavour) {
+			assetBytes := mustReadAsset(a.AssetName, gen.replacements)
+			gen.generatedAssets.GuestStaticResources[filepath.Base(a.AssetName)] = assetBytes
+		}
+	}
+	return nil
+}
+
+func (gen *AssetGenerator) collectGuestStorageClasses() error {
+	cfg := gen.operatorConfig.GuestConfig
+	for _, assetName := range cfg.StorageClassAssetNames {
+		assetBytes := mustReadAsset(assetName, gen.replacements)
+		gen.generatedAssets.GuestStorageClassAssets[filepath.Base(assetName)] = assetBytes
 	}
 	return nil
 }

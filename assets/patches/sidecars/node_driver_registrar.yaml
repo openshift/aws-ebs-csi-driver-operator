@@ -18,7 +18,7 @@ spec:
               exec:
                 command: ["/bin/sh", "-c", "rm -rf /registration/${DRIVER_NAME}-reg.sock /csi/csi.sock"]
           volumeMounts:
-            - name: plugin-dir
+            - name: socket-dir
               mountPath: /csi
             - name: registration-dir
               mountPath: /registration

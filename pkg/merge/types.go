@@ -1,6 +1,10 @@
 package merge
 
 import (
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
+	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
+	"github.com/openshift/library-go/pkg/operator/csi/csistorageclasscontroller"
 	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -26,11 +30,26 @@ type AssetPatch struct {
 	PatchAssetName  string
 }
 
-type FlavourHook struct {
+type FlavourDeploymentHook struct {
 	ClusterFlavours sets.Set[ClusterFlavour]
 	Hook            dc.DeploymentHookFunc
 }
-type FlavourHooks []FlavourHook
+type FlavourDeploymentHooks []FlavourDeploymentHook
+
+type FlavourDaemonSetHook struct {
+	ClusterFlavours sets.Set[ClusterFlavour]
+	Hook            csidrivernodeservicecontroller.DaemonSetHookFunc
+}
+type FlavourDaemonSetHooks []FlavourDaemonSetHook
+
+type ControllerBuilder func(c *clients.Clients) (factory.Controller, error)
+
+type FlavourControllerBuilder struct {
+	ClusterFlavours   sets.Set[ClusterFlavour]
+	ControllerBuilder ControllerBuilder
+}
+
+type FlavourControllerBuilders []FlavourControllerBuilder
 
 type ControllPlaneConfig struct {
 	DeploymentTemplateAssetName    string
@@ -43,7 +62,9 @@ type ControllPlaneConfig struct {
 	AssetPatches                   AssetPatches
 
 	WatchedSecretNames []string
-	DeploymentHooks    FlavourHooks
+	DeploymentHooks    FlavourDeploymentHooks
+
+	ExtraControllers FlavourControllerBuilders
 }
 
 type MetricsPort struct {
@@ -75,10 +96,17 @@ type LivenessProbeConfig struct {
 
 type GuestConfig struct {
 	DaemonSetTemplateAssetName string
-	MetricsPorts               []MetricsPort
-	LivenessProbePort          uint16
-	StaticAssets               Assets
-	StorageClassAssetNames     []string
+	// TODO: add node Service and ServiceMonitor for metrics
+	// MetricsPorts               []MetricsPort
+	LivenessProbePort uint16
+	Sidecars          []SidecarConfig
+
+	StorageClassAssetNames []string
+	StaticAssets           Assets
+	AssetPatches           AssetPatches
+
+	DaemonSetHooks    FlavourDaemonSetHooks
+	StorageClassHooks []csistorageclasscontroller.StorageClassHookFunc
 }
 
 type ClusterFlavour string
@@ -99,6 +127,7 @@ type CSIDriverAssets struct {
 	ControllerStaticResources map[string][]byte
 	NodeTemplate              []byte
 	GuestStaticResources      map[string][]byte
+	GuestStorageClassAssets   map[string][]byte
 	FlavourAssetNames         map[ClusterFlavour][]string
 	FlavourAssetPatches       map[ClusterFlavour][]AssetPatch
 }

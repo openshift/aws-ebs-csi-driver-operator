@@ -3,20 +3,19 @@ package clients
 import (
 	"context"
 
+	cfgclientset "github.com/openshift/client-go/config/clientset/versioned"
+	cfginformers "github.com/openshift/client-go/config/informers/externalversions"
 	cfgv1informers "github.com/openshift/client-go/config/informers/externalversions/config/v1"
+	opclient "github.com/openshift/client-go/operator/clientset/versioned"
+	opinformers "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-
-	cfgclientset "github.com/openshift/client-go/config/clientset/versioned"
-	cfginformers "github.com/openshift/client-go/config/informers/externalversions"
-	opclient "github.com/openshift/client-go/operator/clientset/versioned"
-	opinformers "github.com/openshift/client-go/operator/informers/externalversions"
-	"github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
 const (
@@ -96,4 +95,15 @@ func (c *Clients) Start(ctx context.Context) {
 	c.GuestDynamicInformer.Start(ctx.Done())
 	c.GuestOperatorInformers.Start(ctx.Done())
 	c.GuestConfigInformers.Start(ctx.Done())
+}
+
+func (c *Clients) WaitForCacheSync(ctx context.Context) {
+	c.OperatorDynamicInformers.WaitForCacheSync(ctx.Done())
+	c.ControlPlaneKubeInformers.InformersFor(c.ControlPlaneNamespace).WaitForCacheSync(ctx.Done())
+	c.ControlPlaneDynamicInformer.WaitForCacheSync(ctx.Done())
+	c.GuestKubeInformers.InformersFor(CSIDriverNamespace).WaitForCacheSync(ctx.Done())
+	c.GuestAPIExtInformer.WaitForCacheSync(ctx.Done())
+	c.GuestDynamicInformer.WaitForCacheSync(ctx.Done())
+	c.GuestOperatorInformers.WaitForCacheSync(ctx.Done())
+	c.GuestConfigInformers.WaitForCacheSync(ctx.Done())
 }

@@ -15,14 +15,16 @@ func main() {
 
 	flag.Parse()
 
-	c := clients.NewFakeClients("namespace", false)
+	c := clients.NewFakeClients(clients.CSIDriverNamespace, false)
+
 	cfg, err := aws.GetAWSEBSConfig(c)
 	if err != nil {
 		panic(err)
 	}
 
 	rcfg := &merge.RuntimeConfig{
-		ClusterFlavour: merge.ClusterFlavour(*flavour),
+		ClusterFlavour:        merge.ClusterFlavour(*flavour),
+		ControlPlaneNamespace: c.ControlPlaneNamespace,
 	}
 	gen := merge.NewAssetGenerator(rcfg, cfg)
 
@@ -31,13 +33,20 @@ func main() {
 		panic(err)
 	}
 
-	dumpYaml("controller.yaml", a.ControllerTemplate)
+	dumpYAML("controller.yaml", a.ControllerTemplate)
 	for k, v := range a.ControllerStaticResources {
-		dumpYaml(k, v)
+		dumpYAML(k, v)
+	}
+	dumpYAML("node.yaml", a.NodeTemplate)
+	for k, v := range a.GuestStorageClassAssets {
+		dumpYAML(k, v)
+	}
+	for k, v := range a.GuestStaticResources {
+		dumpYAML(k, v)
 	}
 }
 
-func dumpYaml(filename string, content []byte) error {
+func dumpYAML(filename string, content []byte) error {
 	if content == nil {
 		klog.Infof("%s not set", filename)
 		return nil

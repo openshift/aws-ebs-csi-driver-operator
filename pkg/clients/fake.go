@@ -18,13 +18,13 @@ import (
 
 func NewFakeClients(controllerNamespace string, isHyperShift bool) *Clients {
 	controlPlaneKubeClient := fakecore.NewSimpleClientset()
-	controlPlaneKubeInformers := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient)
+	controlPlaneKubeInformers := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controllerNamespace, "", CSIDriverNamespace)
 	scheme := runtime.NewScheme()
 	controlPlaneDynamicClient := fake.NewSimpleDynamicClient(scheme)
 	controlPlaneDynamicInformer := dynamicinformer.NewDynamicSharedInformerFactory(controlPlaneDynamicClient, 0)
 
 	guestKubeClient := fakecore.NewSimpleClientset()
-	guestKubeInformers := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient)
+	guestKubeInformers := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controllerNamespace, "", CSIDriverNamespace)
 
 	guestAPIExtClient := fakeextapi.NewSimpleClientset()
 	guestAPIExtInformerFactory := apiextinformers.NewSharedInformerFactory(guestAPIExtClient, 0 /*no resync */)

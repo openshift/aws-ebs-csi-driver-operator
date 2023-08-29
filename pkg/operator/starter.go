@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
+	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,8 +34,6 @@ const (
 	defaultNamespace = "openshift-cluster-csi-drivers"
 	operatorName     = "aws-ebs-csi-driver-operator"
 	operandName      = "aws-ebs-csi-driver"
-
-	kmsKeyID = "kmsKeyId"
 
 	hypershiftImageEnvName = "HYPERSHIFT_IMAGE"
 
@@ -93,6 +92,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
+	// TODO: populate informers from the operatorConfig?
 	controlPlaneControllerInformers := []factory.Informer{
 		controlPlaneSecretInformer.Informer(),
 		controlPlaneConfigMapInformer.Informer(),
@@ -132,7 +132,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		c.ControlPlaneDynamicClient,
 		c.ControlPlaneKubeInformers,
 		a.GetAsset,
-		a.GetStaticControllerAssetNames(),
+		a.GetControllerStaticAssetNames(),
 	).WithCSIConfigObserverController(
 		"AWSEBSDriverCSIConfigObserverController",
 		c.GuestConfigInformers,
@@ -149,130 +149,95 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
-	/*
-			// Start controllers that manage resources in GUEST clusters.
-			guestCSIControllerSet := csicontrollerset.NewCSIControllerSet(
-				guestOperatorClient,
-				eventRecorder,
-			).WithStaticResourcesController(
-				"AWSEBSDriverGuestStaticResourcesController",
-				guestKubeClient,
-				guestDynamicClient,
-				guestKubeInformersForNamespaces,
-				assets.ReadFile,
-				[]string{
-					"csidriver.yaml",
-					"node_sa.yaml",
-					"rbac/privileged_role.yaml",
-					"rbac/node_privileged_binding.yaml",
-				},
-			).WithConditionalStaticResourcesController(
-				"AWSEBSDriverConditionalStaticResourcesController",
-				guestKubeClient,
-				guestDynamicClient,
-				guestKubeInformersForNamespaces,
-				assets.ReadFile,
-				[]string{
-					"volumesnapshotclass.yaml",
-				},
-				// Only install when CRD exists.
-				func() bool {
-					name := "volumesnapshotclasses.snapshot.storage.k8s.io"
-					_, err := guestAPIExtClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
-					return err == nil
-				},
-				// Don't ever remove.
-				func() bool {
-					return false
-				},
-			).WithCSIDriverNodeService(
-				"AWSEBSDriverNodeServiceController",
-				assets.ReadFile,
-				"node.yaml",
-				guestKubeClient,
-				guestKubeInformersForNamespaces.InformersFor(guestNamespace),
-				[]factory.Informer{guestConfigMapInformer.Informer()},
-				csidrivernodeservicecontroller.WithObservedProxyDaemonSetHook(),
-				csidrivernodeservicecontroller.WithCABundleDaemonSetHook(
-					guestNamespace,
-					trustedCAConfigMap,
-					guestConfigMapInformer,
-				),
-			).WithStorageClassController(
-				"AWSEBSDriverStorageClassController",
-				assets.ReadFile,
-				[]string{
-					"storageclass_gp3.yaml",
-					"storageclass_gp2.yaml",
-				},
-				guestKubeClient,
-				guestKubeInformersForNamespaces.InformersFor(""),
-				guestCCDInformers,
-				getKMSKeyHook(guestCCDInformers.Operator().V1().ClusterCSIDrivers().Lister()),
-			)
 
-		if !isHypershift {
-			caSyncController, err := newCustomAWSBundleSyncer(
-				guestOperatorClient,
-				controlPlaneCloudConfigInformers,
-				controlPlaneKubeClient,
-				controlPlaneNamespace,
-				eventRecorder,
-			)
+	controllers := []factory.Controller{}
+
+	for _, builder := range operatorConfig.ControllerConfig.ExtraControllers {
+		if builder.ClusterFlavours.Has(flavour) {
+			controller, err := builder.ControllerBuilder(c)
 			if err != nil {
-				return fmt.Errorf("could not create the custom CA bundle syncer: %w", err)
+				return err
 			}
-
-			klog.Info("Starting custom CA bundle informers")
-			go controlPlaneCloudConfigInformers.Start(ctx.Done())
-
-			klog.Info("Starting custom CA bundle sync controller")
-			go caSyncController.Run(ctx, 1)
-
-			staticResourcesController := staticresourcecontroller.NewStaticResourceController(
-				"AWSEBSDriverStaticResourcesController",
-				assets.ReadFile,
-				[]string{
-					"rbac/main_attacher_binding.yaml",
-					"rbac/main_provisioner_binding.yaml",
-					"rbac/volumesnapshot_reader_provisioner_binding.yaml",
-					"rbac/main_resizer_binding.yaml",
-					"rbac/storageclass_reader_resizer_binding.yaml",
-					"rbac/main_snapshotter_binding.yaml",
-					//"service.yaml",
-					"rbac/prometheus_role.yaml",
-					"rbac/prometheus_rolebinding.yaml",
-					"rbac/kube_rbac_proxy_role.yaml",
-					"rbac/kube_rbac_proxy_binding.yaml",
-					"rbac/lease_leader_election_role.yaml",
-					"rbac/lease_leader_election_rolebinding.yaml",
-				},
-				(&resourceapply.ClientHolder{}).WithKubernetes(controlPlaneKubeClient).WithDynamicClient(controlPlaneDynamicClient),
-				guestOperatorClient,
-				eventRecorder,
-			).AddKubeInformers(controlPlaneKubeInformersForNamespaces)
-
-			klog.Info("Starting static resources controller")
-			go staticResourcesController.Run(ctx, 1)
-
-			serviceMonitorController := staticresourcecontroller.NewStaticResourceController(
-				"AWSEBSDriverServiceMonitorController",
-				assets.ReadFile,
-				[]string{"servicemonitor.yaml"},
-				(&resourceapply.ClientHolder{}).WithDynamicClient(controlPlaneDynamicClient),
-				guestOperatorClient,
-				eventRecorder,
-			).WithIgnoreNotFoundOnCreate()
-
-			klog.Info("Starting ServiceMonitor controller")
-			go serviceMonitorController.Run(ctx, 1)
+			controllers = append(controllers, controller)
 		}
-	*/
+	}
+
+	dsHooks := []csidrivernodeservicecontroller.DaemonSetHookFunc{
+		csidrivernodeservicecontroller.WithObservedProxyDaemonSetHook(),
+	}
+	for _, hook := range operatorConfig.GuestConfig.DaemonSetHooks {
+		if hook.ClusterFlavours.Has(flavour) {
+			dsHooks = append(dsHooks, hook.Hook)
+		}
+	}
+
+	// Start controllers that manage resources in GUEST clusters.
+	guestCSIControllerSet := csicontrollerset.NewCSIControllerSet(
+		c.OperatorClient,
+		c.EventRecorder,
+	).WithStaticResourcesController(
+		"AWSEBSDriverGuestStaticResourcesController",
+		c.GuestKubeClient,
+		c.GuestDynamicClient,
+		c.GuestKubeInformers,
+		a.GetAsset,
+		a.GetGuestStaticAssetNames(),
+	).
+		// TODO: conditional assets
+		/*
+			WithConditionalStaticResourcesController(
+					"AWSEBSDriverConditionalStaticResourcesController",
+					c.GuestKubeClient,
+			c.GuestDynamicClient,
+			c.GuestKubeInformers,
+					assets.ReadFile,
+					[]string{
+						"volumesnapshotclass.yaml",
+					},
+
+					// Only install when CRD exists.
+					func() bool {
+						name := "volumesnapshotclasses.snapshot.storage.k8s.io"
+						_, err := guestAPIExtClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+						return err == nil
+					},
+					// Don't ever remove.
+					func() bool {
+						return false
+					},
+				).
+		*/
+		WithCSIDriverNodeService(
+			"AWSEBSDriverNodeServiceController",
+			a.GetAsset,
+			merge.NodeDaemonSetAssetName,
+			c.GuestKubeClient,
+			c.GuestKubeInformers.InformersFor(clients.CSIDriverNamespace),
+			// TODO: populate informers from the operatorConfig?
+			[]factory.Informer{c.GetGuestConfigMapInformer(clients.CSIDriverNamespace).Informer()},
+			dsHooks...,
+		).WithStorageClassController(
+		"AWSEBSDriverStorageClassController",
+		a.GetAsset,
+		a.GetStorageClassAssetNames(),
+		c.GuestKubeClient,
+		c.GuestKubeInformers.InformersFor(""),
+		c.GuestOperatorInformers,
+	)
+
 	c.Start(ctx)
+	klog.V(2).Infof("Waiting for informers to sync")
+	c.WaitForCacheSync(ctx)
+	klog.V(2).Infof("Informers synced")
+
+	for _, controller := range controllers {
+		klog.Infof("Starting controller %s", controller.Name())
+		go controller.Run(ctx, 1)
+	}
 	klog.Info("Starting control plane controllerset")
 	go controlPlaneCSIControllerSet.Run(ctx, 1)
 	klog.Info("Starting guest controllerset")
-	//go guestCSIControllerSet.Run(ctx, 1)
+	go guestCSIControllerSet.Run(ctx, 1)
 
 	<-ctx.Done()
 

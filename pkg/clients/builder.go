@@ -43,6 +43,7 @@ func NewBuilder(clientName string, csiDrivername string, controllerConfig *contr
 			controllerConfig.OperatorNamespace,
 		},
 		guestNamespaces: []string{
+			"",
 			CloudConfigNamespace,
 			CSIDriverNamespace,
 			ManagedConfigNamespace, // TODO: is it needed?
