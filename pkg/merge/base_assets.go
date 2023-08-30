@@ -47,7 +47,7 @@ var (
 		ExtraArguments:    nil,
 		HasMetricsPort:    true,
 		MetricPortName:    "provisioner-m",
-		StaticAssetNames: []string{
+		GuestStaticAssetNames: []string{
 			"base/rbac/main_provisioner_binding.yaml",
 		},
 		AssetPatches: NewAssetPatches(HyperShiftOnly, "sidecar.yaml", "patches/hypershift/sidecar_kubeconfig.yaml.patch"),
@@ -63,7 +63,7 @@ var (
 		ExtraArguments:    nil,
 		HasMetricsPort:    true,
 		MetricPortName:    "attacher-m",
-		StaticAssetNames: []string{
+		GuestStaticAssetNames: []string{
 			"base/rbac/main_attacher_binding.yaml",
 		},
 	}
@@ -72,7 +72,7 @@ var (
 		ExtraArguments:    nil,
 		HasMetricsPort:    true,
 		MetricPortName:    "snapshotter-m",
-		StaticAssetNames: []string{
+		GuestStaticAssetNames: []string{
 			"base/rbac/main_snapshotter_binding.yaml",
 		},
 	}
@@ -81,7 +81,7 @@ var (
 		ExtraArguments:    nil,
 		HasMetricsPort:    true,
 		MetricPortName:    "resizer-m",
-		StaticAssetNames: []string{
+		GuestStaticAssetNames: []string{
 			"base/rbac/main_resizer_binding.yaml",
 			"base/rbac/storageclass_reader_resizer_binding.yaml",
 		},
@@ -118,7 +118,7 @@ func (cfg SidecarConfig) WithExtraArguments(extraArguments ...string) SidecarCon
 
 func (cfg SidecarConfig) WithAdditionalAssets(assets ...string) SidecarConfig {
 	newCfg := cfg
-	newCfg.StaticAssetNames = append(newCfg.StaticAssetNames, assets...)
+	newCfg.GuestStaticAssetNames = append(newCfg.GuestStaticAssetNames, assets...)
 	return newCfg
 }
 

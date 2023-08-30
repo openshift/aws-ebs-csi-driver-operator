@@ -216,12 +216,6 @@ func (gen *AssetGenerator) collectControllerStaticAssets() error {
 			gen.generatedAssets.ControllerStaticResources[filepath.Base(a.AssetName)] = assetBytes
 		}
 	}
-	for _, sidecar := range ctrlCfg.Sidecars {
-		for _, assetName := range sidecar.StaticAssetNames {
-			assetBytes := mustReadAsset(assetName, gen.replacements)
-			gen.generatedAssets.ControllerStaticResources[filepath.Base(assetName)] = assetBytes
-		}
-	}
 	return nil
 }
 
@@ -327,6 +321,16 @@ func (gen *AssetGenerator) collectGuestStaticAssets() error {
 			gen.generatedAssets.GuestStaticResources[filepath.Base(a.AssetName)] = assetBytes
 		}
 	}
+
+	// Collect all guest static assets from the controller config.
+	ctrlCfg := gen.operatorConfig.ControllerConfig
+	for _, sidecar := range ctrlCfg.Sidecars {
+		for _, assetName := range sidecar.GuestStaticAssetNames {
+			assetBytes := mustReadAsset(assetName, gen.replacements)
+			gen.generatedAssets.GuestStaticResources[filepath.Base(assetName)] = assetBytes
+		}
+	}
+
 	return nil
 }
 

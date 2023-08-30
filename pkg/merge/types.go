@@ -63,8 +63,9 @@ type SidecarConfig struct {
 	ExtraArguments    []string
 	HasMetricsPort    bool
 	MetricPortName    string
-	StaticAssetNames  []string
-	AssetPatches      AssetPatches
+	// Most sidecars need to add RBAC objects to the *guest* cluster, even if the sidecar runs in the control plane.
+	GuestStaticAssetNames []string
+	AssetPatches          AssetPatches
 }
 
 type GuestConfig struct {
