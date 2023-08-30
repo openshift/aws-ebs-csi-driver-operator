@@ -90,12 +90,13 @@ func GetAWSEBSConfig() (*merge.CSIDriverAssetConfig, *config.OperatorConfig, err
 			},
 			StaticAssets: merge.DefaultNodeAssets.WithAssets(merge.AllFlavours,
 				"drivers/aws-ebs/csidriver.yaml",
-				// TODO: volumesnapshotclass must be conditional - when snapshot capability is enabled
-				"drivers/aws-ebs/volumesnapshotclass.yaml",
 			),
 			StorageClassAssetNames: []string{
 				"drivers/aws-ebs/storageclass_gp2.yaml",
 				"drivers/aws-ebs/storageclass_gp3.yaml",
+			},
+			VolumeSnapshotClassAssetNames: []string{
+				"drivers/aws-ebs/volumesnapshotclass.yaml",
 			},
 		},
 	}

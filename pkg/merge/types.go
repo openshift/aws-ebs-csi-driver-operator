@@ -77,7 +77,8 @@ type GuestConfig struct {
 	StaticAssets Assets
 	AssetPatches AssetPatches
 
-	StorageClassAssetNames []string
+	StorageClassAssetNames        []string
+	VolumeSnapshotClassAssetNames []string
 }
 
 type RuntimeConfig struct {

@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/openshift/aws-ebs-csi-driver-operator/assets"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 
@@ -40,6 +42,7 @@ var (
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigString string) error {
+	// Create Clients
 	b := clients.NewBuilder(operatorName, string(opv1.AWSEBSCSIDriver), controllerConfig, resync)
 	b.WithHyperShiftGuest(guestKubeConfigString)
 	c := b.BuildOrDie(ctx)
@@ -47,7 +50,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	isHypershift := guestKubeConfigString != ""
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
 
-	// Generate assets
+	// Generate operator assets
 	flavour := merge.FlavourStandalone
 	if isHypershift {
 		flavour = merge.FlavourHyperShift
@@ -67,6 +70,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
+	// Start controllers that manage resources in the MANAGEMENT cluster.
+	controllers := []factory.Controller{}
 	controlPlaneControllerInformers := []factory.Informer{}
 	controllerHooks := []dc.DeploymentHookFunc{}
 	for _, hookBuilder := range opConfig.ControlPlaneDeploymentHooks {
@@ -85,7 +90,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controlPlaneControllerInformers = append(controlPlaneControllerInformers, controlPlaneSecretInformer.Informer())
 	}
 
-	// Start controllers that manage resources in the MANAGEMENT cluster.
 	controlPlaneCSIControllerSet := csicontrollerset.NewCSIControllerSet(
 		c.OperatorClient,
 		c.EventRecorder,
@@ -116,7 +120,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
-	controllers := []factory.Controller{}
+	// Run extra controllers
 	for _, builder := range opConfig.ExtraControlPlaneControllers {
 		if builder.ClusterFlavours.Has(flavour) {
 			controller, err := builder.ControllerBuilder(c)
@@ -150,47 +154,50 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		c.GuestKubeInformers,
 		a.GetAsset,
 		a.GetGuestStaticAssetNames(),
-	).
-		// TODO: conditional assets
-		/*
-			WithConditionalStaticResourcesController(
-					"AWSEBSDriverConditionalStaticResourcesController",
-					c.GuestKubeClient,
+	).WithCSIDriverNodeService(
+		"AWSEBSDriverNodeServiceController",
+		a.GetAsset,
+		merge.NodeDaemonSetAssetName,
+		c.GuestKubeClient,
+		c.GuestKubeInformers.InformersFor(clients.CSIDriverNamespace),
+		guestInformers,
+		dsHooks...,
+	)
+
+	if len(a.GuestStorageClassAssets) > 0 {
+		guestCSIControllerSet = guestCSIControllerSet.WithStorageClassController(
+			"AWSEBSDriverStorageClassController",
+			a.GetAsset,
+			a.GetStorageClassAssetNames(),
+			c.GuestKubeClient,
+			c.GuestKubeInformers.InformersFor(""),
+			c.GuestOperatorInformers,
+		)
+	}
+
+	if len(a.GuestVolumeSnapshotClasses) > 0 {
+		guestCSIControllerSet = guestCSIControllerSet.WithConditionalStaticResourcesController(
+			"AWSEBSDriverConditionalStaticResourcesController",
+			c.GuestKubeClient,
 			c.GuestDynamicClient,
 			c.GuestKubeInformers,
-					assets.ReadFile,
-					[]string{
-						"volumesnapshotclass.yaml",
-					},
+			assets.ReadFile,
+			[]string{
+				"volumesnapshotclass.yaml",
+			},
 
-					// Only install when CRD exists.
-					func() bool {
-						name := "volumesnapshotclasses.snapshot.storage.k8s.io"
-						_, err := guestAPIExtClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
-						return err == nil
-					},
-					// Don't ever remove.
-					func() bool {
-						return false
-					},
-				).
-		*/
-		WithCSIDriverNodeService(
-			"AWSEBSDriverNodeServiceController",
-			a.GetAsset,
-			merge.NodeDaemonSetAssetName,
-			c.GuestKubeClient,
-			c.GuestKubeInformers.InformersFor(clients.CSIDriverNamespace),
-			guestInformers,
-			dsHooks...,
-		).WithStorageClassController(
-		"AWSEBSDriverStorageClassController",
-		a.GetAsset,
-		a.GetStorageClassAssetNames(),
-		c.GuestKubeClient,
-		c.GuestKubeInformers.InformersFor(""),
-		c.GuestOperatorInformers,
-	)
+			// Only install when CRD exists.
+			func() bool {
+				name := "volumesnapshotclasses.snapshot.storage.k8s.io"
+				_, err := c.GuestAPIExtClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+				return err == nil
+			},
+			// Don't ever remove.
+			func() bool {
+				return false
+			},
+		)
+	}
 
 	c.Start(ctx)
 	klog.V(2).Infof("Waiting for informers to sync")

@@ -228,6 +228,7 @@ func (gen *AssetGenerator) collectControllerStaticAssets() error {
 func (gen *AssetGenerator) generateGuest() error {
 	gen.generatedAssets.GuestStaticResources = make(map[string][]byte)
 	gen.generatedAssets.GuestStorageClassAssets = make(map[string][]byte)
+	gen.generatedAssets.GuestVolumeSnapshotClasses = make(map[string][]byte)
 
 	if err := gen.generateDaemonSet(); err != nil {
 		return err
@@ -236,6 +237,9 @@ func (gen *AssetGenerator) generateGuest() error {
 		return err
 	}
 	if err := gen.collectGuestStorageClasses(); err != nil {
+		return err
+	}
+	if err := gen.collectGuestVolumeSnapshotClasses(); err != nil {
 		return err
 	}
 
@@ -293,6 +297,14 @@ func (gen *AssetGenerator) patchGuest() error {
 				gen.generatedAssets.GuestStorageClassAssets[patch.SourceAssetName] = assetYAML
 				return nil
 			}
+			if assetYAML, ok := gen.generatedAssets.GuestVolumeSnapshotClasses[patch.SourceAssetName]; ok {
+				assetYAML, err := applyAssetPatch(assetYAML, patch.PatchAssetName, gen.replacements)
+				if err != nil {
+					return err
+				}
+				gen.generatedAssets.GuestVolumeSnapshotClasses[patch.SourceAssetName] = assetYAML
+				return nil
+			}
 			if assetYAML, ok := gen.generatedAssets.GuestStaticResources[patch.SourceAssetName]; ok {
 				assetYAML, err := applyAssetPatch(assetYAML, patch.PatchAssetName, gen.replacements)
 				if err != nil {
@@ -323,6 +335,15 @@ func (gen *AssetGenerator) collectGuestStorageClasses() error {
 	for _, assetName := range cfg.StorageClassAssetNames {
 		assetBytes := mustReadAsset(assetName, gen.replacements)
 		gen.generatedAssets.GuestStorageClassAssets[filepath.Base(assetName)] = assetBytes
+	}
+	return nil
+}
+
+func (gen *AssetGenerator) collectGuestVolumeSnapshotClasses() error {
+	cfg := gen.operatorConfig.GuestConfig
+	for _, assetName := range cfg.VolumeSnapshotClassAssetNames {
+		assetBytes := mustReadAsset(assetName, gen.replacements)
+		gen.generatedAssets.GuestVolumeSnapshotClasses[filepath.Base(assetName)] = assetBytes
 	}
 	return nil
 }
