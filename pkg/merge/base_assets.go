@@ -1,8 +1,6 @@
 package merge
 
 import (
-	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
-	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -110,9 +108,6 @@ var (
 		FlavourHyperShift: {},
 		FlavourStandalone: {},
 	}
-
-	DefaultControllerHooks = NewHooks(AllFlavours)          // TODO: move hooks here
-	DefaultDaemonSetHooks  = NewDaemonSetHooks(AllFlavours) // TODO: move hooks here
 )
 
 func (cfg SidecarConfig) WithExtraArguments(extraArguments ...string) SidecarConfig {
@@ -148,7 +143,7 @@ func (p AssetPatches) WithPatches(flavours sets.Set[ClusterFlavour], namePatchPa
 	for i := 0; i < len(namePatchPairs); i += 2 {
 		newPatches = append(newPatches, AssetPatch{
 			ClusterFlavours: flavours,
-			Name:            namePatchPairs[i],
+			SourceAssetName: namePatchPairs[i],
 			PatchAssetName:  namePatchPairs[i+1],
 		})
 	}
@@ -161,73 +156,4 @@ func NewAssets(flavours sets.Set[ClusterFlavour], assets ...string) Assets {
 
 func NewAssetPatches(flavours sets.Set[ClusterFlavour], namePatchPairs ...string) AssetPatches {
 	return AssetPatches{}.WithPatches(flavours, namePatchPairs...)
-}
-
-func NewHooks(flavours sets.Set[ClusterFlavour], hooks ...dc.DeploymentHookFunc) FlavourDeploymentHooks {
-	result := make([]FlavourDeploymentHook, 0, len(hooks))
-	for _, hook := range hooks {
-		result = append(result, FlavourDeploymentHook{
-			ClusterFlavours: flavours,
-			Hook:            hook,
-		})
-	}
-	return result
-}
-
-func (h FlavourDeploymentHooks) WithHooks(flavours sets.Set[ClusterFlavour], hooks ...dc.DeploymentHookFunc) FlavourDeploymentHooks {
-	result := make([]FlavourDeploymentHook, 0, len(h)+len(hooks))
-	result = append(result, h...)
-	for _, hook := range hooks {
-		result = append(result, FlavourDeploymentHook{
-			ClusterFlavours: flavours,
-			Hook:            hook,
-		})
-	}
-	return result
-}
-
-func NewControllerBuilders(flavours sets.Set[ClusterFlavour], builders ...ControllerBuilder) FlavourControllerBuilders {
-	result := make([]FlavourControllerBuilder, 0, len(builders))
-	for _, builder := range builders {
-		result = append(result, FlavourControllerBuilder{
-			ClusterFlavours:   flavours,
-			ControllerBuilder: builder,
-		})
-	}
-	return result
-}
-
-func (b FlavourControllerBuilders) WithBuilders(flavours sets.Set[ClusterFlavour], builders ...ControllerBuilder) FlavourControllerBuilders {
-	result := make([]FlavourControllerBuilder, 0, len(b)+len(builders))
-	result = append(result, b...)
-	for _, builder := range builders {
-		result = append(result, FlavourControllerBuilder{
-			ClusterFlavours:   flavours,
-			ControllerBuilder: builder,
-		})
-	}
-	return result
-}
-
-func NewDaemonSetHooks(flavours sets.Set[ClusterFlavour], hooks ...csidrivernodeservicecontroller.DaemonSetHookFunc) FlavourDaemonSetHooks {
-	result := make([]FlavourDaemonSetHook, 0, len(hooks))
-	for _, hook := range hooks {
-		result = append(result, FlavourDaemonSetHook{
-			ClusterFlavours: flavours,
-			Hook:            hook,
-		})
-	}
-	return result
-}
-
-func (h FlavourDaemonSetHooks) WithHooks(flavours sets.Set[ClusterFlavour], hooks ...csidrivernodeservicecontroller.DaemonSetHookFunc) FlavourDaemonSetHooks {
-	result := make([]FlavourDaemonSetHook, 0, len(h)+len(hooks))
-	result = append(result, h...)
-	for _, hook := range hooks {
-		result = append(result, FlavourDaemonSetHook{
-			ClusterFlavours: flavours,
-			Hook:            hook,
-		})
-	}
-	return result
 }

@@ -133,22 +133,3 @@ func replaceBytes(src []byte, replacements []string) []byte {
 	}
 	return src
 }
-
-func MustSanitize(src string) string {
-	sanitized, err := Sanitize(src)
-	if err != nil {
-		panic(err)
-	}
-
-	return sanitized
-}
-
-func Sanitize(src string) (string, error) {
-	var obj interface{}
-	sigyaml.Unmarshal([]byte(src), &obj)
-	bytes, err := sigyaml.Marshal(obj)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
-}

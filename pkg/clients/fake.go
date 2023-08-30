@@ -16,6 +16,7 @@ import (
 	fakecore "k8s.io/client-go/kubernetes/fake"
 )
 
+// TODO: allow a test to pass some existing objects to initialize the client
 func NewFakeClients(controllerNamespace string, isHyperShift bool) *Clients {
 	controlPlaneKubeClient := fakecore.NewSimpleClientset()
 	controlPlaneKubeInformers := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, controllerNamespace, "", CSIDriverNamespace)

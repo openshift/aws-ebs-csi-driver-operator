@@ -7,8 +7,7 @@ import (
 	opv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
-	oplister "github.com/openshift/client-go/operator/listers/operator/v1"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/operator/config"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
@@ -34,13 +33,13 @@ const (
 	kmsKeyID              = "kmsKeyId"
 )
 
-func GetAWSEBSConfig(c *clients.Clients) (*merge.CSIDriverOperatorConfig, error) {
-	cfg := &merge.CSIDriverOperatorConfig{
+func GetAWSEBSConfig() (*merge.CSIDriverAssetConfig, *config.OperatorConfig, error) {
+	assetCfg := &merge.CSIDriverAssetConfig{
 		AssetPrefix:      "aws-ebs-csi-driver",
 		AssetShortPrefix: "ebs",
 		DriverName:       "ebs.csi.aws.com",
 
-		ControllerConfig: &merge.ControllPlaneConfig{
+		ControllerConfig: &merge.ControlPlaneConfig{
 			DeploymentTemplateAssetName: "drivers/aws-ebs/controller.yaml",
 			LivenessProbePort:           10301,
 			MetricsPorts: []merge.MetricsPort{
@@ -78,103 +77,111 @@ func GetAWSEBSConfig(c *clients.Clients) (*merge.CSIDriverOperatorConfig, error)
 			AssetPatches: merge.DefaultAssetPatches.WithPatches(merge.HyperShiftOnly,
 				"controller.yaml", "drivers/aws-ebs/patches/controller_minter.yaml",
 			),
-			WatchedSecretNames: []string{
-				cloudCredSecretName,
-				metricsCertSecretName,
-			},
-			DeploymentHooks: merge.DefaultControllerHooks.WithHooks(merge.AllFlavours,
-				withAWSRegion(c.GetGuestInfraInformer().Lister()),
-				withCustomTags(c.GetGuestInfraInformer().Lister()),
-				withCustomEndPoint(c.GetGuestInfraInformer().Lister()),
-				csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
-					c.ControlPlaneNamespace,
-					trustedCAConfigMap,
-					c.GetControlPlaneConfigMapInformer(c.ControlPlaneNamespace),
-				),
-			).WithHooks(merge.StandaloneOnly,
-				withCustomAWSCABundle(cloudConfigName, c.GetGuestConfigMapInformer(c.ControlPlaneNamespace).Lister().ConfigMaps(c.ControlPlaneNamespace)),
-			).WithHooks(merge.HyperShiftOnly,
-				withCustomAWSCABundle("user-ca-bundle", c.GetGuestConfigMapInformer(c.ControlPlaneNamespace).Lister().ConfigMaps(c.ControlPlaneNamespace)),
-			),
-			ExtraControllers: merge.NewControllerBuilders(merge.StandaloneOnly,
-				newCustomAWSBundleSyncer),
 		},
 
 		GuestConfig: &merge.GuestConfig{
-			LivenessProbePort: 10300,
+			DaemonSetTemplateAssetName: "drivers/aws-ebs/node.yaml",
+			LivenessProbePort:          10300,
 			Sidecars: []merge.SidecarConfig{
 				merge.DefaultNodeDriverRegistrar,
 				merge.DefaultLivenessProbe.WithExtraArguments(
 					"--probe-timeout=3s",
 				),
 			},
-			DaemonSetTemplateAssetName: "drivers/aws-ebs/node.yaml",
 			StaticAssets: merge.DefaultNodeAssets.WithAssets(merge.AllFlavours,
 				"drivers/aws-ebs/csidriver.yaml",
+				// TODO: volumesnapshotclass must be conditional - when snapshot capability is enabled
 				"drivers/aws-ebs/volumesnapshotclass.yaml",
 			),
 			StorageClassAssetNames: []string{
 				"drivers/aws-ebs/storageclass_gp2.yaml",
 				"drivers/aws-ebs/storageclass_gp3.yaml",
 			},
-			DaemonSetHooks: merge.DefaultDaemonSetHooks.WithHooks(
-				merge.AllFlavours,
-				csidrivernodeservicecontroller.WithCABundleDaemonSetHook(
-					clients.CSIDriverNamespace,
-					trustedCAConfigMap,
-					c.GetGuestConfigMapInformer(clients.CSIDriverNamespace),
-				)),
-			StorageClassHooks: []csistorageclasscontroller.StorageClassHookFunc{
-				getKMSKeyHook(c.GuestOperatorInformers.Operator().V1().ClusterCSIDrivers().Lister()),
-			},
 		},
 	}
-	return cfg, nil
+
+	opCfg := &config.OperatorConfig{
+		ControlPlaneDeploymentHooks: config.DefaultControllerHooks.WithHooks(merge.AllFlavours,
+			withAWSRegion,
+			withCustomTags,
+			withCustomEndPoint,
+			withCABundleDeploymentHook,
+		).WithHooks(merge.StandaloneOnly,
+			getCustomAWSCABundleBuilder(cloudConfigName),
+		).WithHooks(merge.HyperShiftOnly,
+			getCustomAWSCABundleBuilder("user-ca-bundle"),
+		),
+
+		ControlPlaneWatchedSecretNames: []string{
+			cloudCredSecretName,
+			metricsCertSecretName,
+		},
+
+		ExtraControlPlaneControllers: config.NewControllerBuilders(merge.StandaloneOnly,
+			newCustomAWSBundleSyncer),
+
+		GuestDaemonSetHooks: config.DefaultDaemonSetHooks.WithHooks(merge.AllFlavours,
+			withCABundleDaemonSetHook,
+		),
+
+		StorageClassHooks: []config.StorageClassHookBuilder{
+			getKMSKeyHook,
+		},
+	}
+	return assetCfg, opCfg, nil
 }
 
 // withCustomAWSCABundle executes the asset as a template to fill out the parts required when using a custom CA bundle.
 // The `caBundleConfigMap` parameter specifies the name of the ConfigMap containing the custom CA bundle. If the
 // argument supplied is empty, then no custom CA bundle will be used.
-func withCustomAWSCABundle(cmName string, cloudConfigLister corev1listers.ConfigMapNamespaceLister) dc.DeploymentHookFunc {
-	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		configName, err := customAWSCABundle(cmName, cloudConfigLister)
-		if err != nil {
-			return fmt.Errorf("could not determine if a custom CA bundle is in use: %w", err)
-		}
-		if configName == "" {
-			return nil
-		}
-
-		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: "ca-bundle",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: configName},
-				},
-			},
-		})
-		for i := range deployment.Spec.Template.Spec.Containers {
-			container := &deployment.Spec.Template.Spec.Containers[i]
-			if container.Name != "csi-driver" {
-				continue
+func getCustomAWSCABundleBuilder(cmName string) config.DeploymentHookBuilder {
+	return func(c *clients.Clients) (dc.DeploymentHookFunc, []factory.Informer) {
+		hook := func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+			cloudConfigLister := c.GetControlPlaneConfigMapInformer(c.ControlPlaneNamespace).Lister().ConfigMaps(c.ControlPlaneNamespace)
+			configName, err := customAWSCABundle(cmName, cloudConfigLister)
+			if err != nil {
+				return fmt.Errorf("could not determine if a custom CA bundle is in use: %w", err)
 			}
-			container.Env = append(container.Env, corev1.EnvVar{
-				Name:  "AWS_CA_BUNDLE",
-				Value: "/etc/ca/ca-bundle.pem",
+			if configName == "" {
+				return nil
+			}
+
+			deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{
+				Name: "ca-bundle",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: configName},
+					},
+				},
 			})
-			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-				Name:      "ca-bundle",
-				MountPath: "/etc/ca",
-				ReadOnly:  true,
-			})
-			return nil
+			for i := range deployment.Spec.Template.Spec.Containers {
+				container := &deployment.Spec.Template.Spec.Containers[i]
+				if container.Name != "csi-driver" {
+					continue
+				}
+				container.Env = append(container.Env, corev1.EnvVar{
+					Name:  "AWS_CA_BUNDLE",
+					Value: "/etc/ca/ca-bundle.pem",
+				})
+				container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+					Name:      "ca-bundle",
+					MountPath: "/etc/ca",
+					ReadOnly:  true,
+				})
+				return nil
+			}
+			return fmt.Errorf("could not use custom CA bundle because the csi-driver container is missing from the deployment")
 		}
-		return fmt.Errorf("could not use custom CA bundle because the csi-driver container is missing from the deployment")
+		informers := []factory.Informer{
+			c.GetControlPlaneConfigMapInformer(c.ControlPlaneNamespace).Informer(),
+		}
+		return hook, informers
 	}
 }
 
-func withCustomEndPoint(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
-	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+func withCustomEndPoint(c *clients.Clients) (dc.DeploymentHookFunc, []factory.Informer) {
+	hook := func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		infraLister := c.GetGuestInfraInformer().Lister()
 		infra, err := infraLister.Get(infrastructureName)
 		if err != nil {
 			return err
@@ -206,11 +213,13 @@ func withCustomEndPoint(infraLister v1.InfrastructureLister) dc.DeploymentHookFu
 		}
 		return nil
 	}
+	informers := []factory.Informer{
+		c.GetGuestInfraInformer().Informer(),
+	}
+	return hook, informers
 }
 
-func newCustomAWSBundleSyncer(
-	c *clients.Clients,
-) (factory.Controller, error) {
+func newCustomAWSBundleSyncer(c *clients.Clients) (factory.Controller, error) {
 	// sync config map with additional trust bundle to the operator namespace,
 	// so the operator can get it as a ConfigMap volume.
 	srcConfigMap := resourcesynccontroller.ResourceLocation{
@@ -252,8 +261,9 @@ func customAWSCABundle(configName string, cloudConfigLister corev1listers.Config
 
 // withCustomTags add tags from Infrastructure.Status.PlatformStatus.AWS.ResourceTags to the driver command line as
 // --extra-tags=<key1>=<value1>,<key2>=<value2>,...
-func withCustomTags(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
-	return func(spec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+func withCustomTags(c *clients.Clients) (dc.DeploymentHookFunc, []factory.Informer) {
+	hook := func(spec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		infraLister := c.GetGuestInfraInformer().Lister()
 		infra, err := infraLister.Get(infrastructureName)
 		if err != nil {
 			return err
@@ -284,10 +294,15 @@ func withCustomTags(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
 		}
 		return nil
 	}
+	informers := []factory.Informer{
+		c.GetGuestInfraInformer().Informer(),
+	}
+	return hook, informers
 }
 
-func withAWSRegion(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
-	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+func withAWSRegion(c *clients.Clients) (dc.DeploymentHookFunc, []factory.Informer) {
+	hook := func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		infraLister := c.GetGuestInfraInformer().Lister()
 		infra, err := infraLister.Get(infrastructureName)
 		if err != nil {
 			return err
@@ -314,13 +329,18 @@ func withAWSRegion(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
 		}
 		return nil
 	}
+	informers := []factory.Informer{
+		c.GetGuestInfraInformer().Informer(),
+	}
+	return hook, informers
 }
 
 // getKMSKeyHook checks for AWSCSIDriverConfigSpec in the ClusterCSIDriver object.
 // If it contains KMSKeyARN, it sets the corresponding parameter in the StorageClass.
 // This allows the admin to specify a customer managed key to be used by default.
-func getKMSKeyHook(ccdLister oplister.ClusterCSIDriverLister) csistorageclasscontroller.StorageClassHookFunc {
-	return func(_ *opv1.OperatorSpec, class *storagev1.StorageClass) error {
+func getKMSKeyHook(c *clients.Clients) (csistorageclasscontroller.StorageClassHookFunc, []factory.Informer) {
+	hook := func(_ *opv1.OperatorSpec, class *storagev1.StorageClass) error {
+		ccdLister := c.GuestOperatorInformers.Operator().V1().ClusterCSIDrivers().Lister()
 		ccd, err := ccdLister.Get(class.Provisioner)
 		if err != nil {
 			return err
@@ -345,4 +365,32 @@ func getKMSKeyHook(ccdLister oplister.ClusterCSIDriverLister) csistorageclasscon
 		class.Parameters[kmsKeyID] = arn
 		return nil
 	}
+	informers := []factory.Informer{
+		c.GuestOperatorInformers.Operator().V1().ClusterCSIDrivers().Informer(),
+	}
+	return hook, informers
+}
+
+func withCABundleDeploymentHook(c *clients.Clients) (dc.DeploymentHookFunc, []factory.Informer) {
+	hook := csidrivercontrollerservicecontroller.WithCABundleDeploymentHook(
+		c.ControlPlaneNamespace,
+		trustedCAConfigMap,
+		c.GetControlPlaneConfigMapInformer(c.ControlPlaneNamespace),
+	)
+	informers := []factory.Informer{
+		c.GetControlPlaneConfigMapInformer(c.ControlPlaneNamespace).Informer(),
+	}
+	return hook, informers
+}
+
+func withCABundleDaemonSetHook(c *clients.Clients) (csidrivernodeservicecontroller.DaemonSetHookFunc, []factory.Informer) {
+	hook := csidrivernodeservicecontroller.WithCABundleDaemonSetHook(
+		clients.CSIDriverNamespace,
+		trustedCAConfigMap,
+		c.GetGuestConfigMapInformer(clients.CSIDriverNamespace),
+	)
+	informers := []factory.Informer{
+		c.GetGuestConfigMapInformer(clients.CSIDriverNamespace).Informer(),
+	}
+	return hook, informers
 }

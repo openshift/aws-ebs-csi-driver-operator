@@ -2,6 +2,16 @@ package merge
 
 import "fmt"
 
+type CSIDriverAssets struct {
+	ControllerTemplate        []byte
+	ControllerStaticResources map[string][]byte
+	NodeTemplate              []byte
+	GuestStaticResources      map[string][]byte
+	GuestStorageClassAssets   map[string][]byte
+	FlavourAssetNames         map[ClusterFlavour][]string
+	FlavourAssetPatches       map[ClusterFlavour][]AssetPatch
+}
+
 func (a *CSIDriverAssets) GetAsset(assetName string) ([]byte, error) {
 	switch assetName {
 	case ControllerDeploymentAssetName:

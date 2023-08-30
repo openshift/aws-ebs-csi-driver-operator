@@ -6,9 +6,6 @@ import (
 	"strconv"
 )
 
-// TODO: Call GenerateAssets() only at the start of the operator, so the parsing and patching is done only once.
-// TODO: add guest assets
-
 const (
 	ControllerDeploymentAssetName = "controller.yaml"
 	NodeDaemonSetAssetName        = "node.yaml"
@@ -18,12 +15,12 @@ const (
 
 type AssetGenerator struct {
 	runtimeConfig   *RuntimeConfig
-	operatorConfig  *CSIDriverOperatorConfig
+	operatorConfig  *CSIDriverAssetConfig
 	replacements    []string
 	generatedAssets *CSIDriverAssets
 }
 
-func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverOperatorConfig) *AssetGenerator {
+func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverAssetConfig) *AssetGenerator {
 	return &AssetGenerator{
 		runtimeConfig:  runtimeConfig,
 		operatorConfig: operatorConfig,
@@ -76,7 +73,7 @@ func (gen *AssetGenerator) patchController() error {
 		if !patch.ClusterFlavours.Has(gen.runtimeConfig.ClusterFlavour) {
 			continue
 		}
-		switch patch.Name {
+		switch patch.SourceAssetName {
 		case ControllerDeploymentAssetName:
 			controllerYAML, err := applyAssetPatch(gen.generatedAssets.ControllerTemplate, patch.PatchAssetName, gen.replacements)
 			if err != nil {
@@ -84,15 +81,15 @@ func (gen *AssetGenerator) patchController() error {
 			}
 			gen.generatedAssets.ControllerTemplate = controllerYAML
 		default:
-			assetYAML := gen.generatedAssets.ControllerStaticResources[patch.Name]
+			assetYAML := gen.generatedAssets.ControllerStaticResources[patch.SourceAssetName]
 			if assetYAML == nil {
-				return fmt.Errorf("asset %s not found to apply patch %s", patch.Name, patch.PatchAssetName)
+				return fmt.Errorf("asset %s not found to apply patch %s", patch.SourceAssetName, patch.PatchAssetName)
 			}
 			assetYAML, err := applyAssetPatch(assetYAML, patch.PatchAssetName, gen.replacements)
 			if err != nil {
 				return err
 			}
-			gen.generatedAssets.ControllerStaticResources[patch.Name] = assetYAML
+			gen.generatedAssets.ControllerStaticResources[patch.SourceAssetName] = assetYAML
 		}
 	}
 	return nil
@@ -280,7 +277,7 @@ func (gen *AssetGenerator) patchGuest() error {
 		if !patch.ClusterFlavours.Has(gen.runtimeConfig.ClusterFlavour) {
 			continue
 		}
-		switch patch.Name {
+		switch patch.SourceAssetName {
 		case NodeDaemonSetAssetName:
 			dsYAML, err := applyAssetPatch(gen.generatedAssets.NodeTemplate, patch.PatchAssetName, gen.replacements)
 			if err != nil {
@@ -288,23 +285,23 @@ func (gen *AssetGenerator) patchGuest() error {
 			}
 			gen.generatedAssets.NodeTemplate = dsYAML
 		default:
-			if assetYAML, ok := gen.generatedAssets.GuestStorageClassAssets[patch.Name]; ok {
+			if assetYAML, ok := gen.generatedAssets.GuestStorageClassAssets[patch.SourceAssetName]; ok {
 				assetYAML, err := applyAssetPatch(assetYAML, patch.PatchAssetName, gen.replacements)
 				if err != nil {
 					return err
 				}
-				gen.generatedAssets.GuestStorageClassAssets[patch.Name] = assetYAML
+				gen.generatedAssets.GuestStorageClassAssets[patch.SourceAssetName] = assetYAML
 				return nil
 			}
-			if assetYAML, ok := gen.generatedAssets.GuestStaticResources[patch.Name]; ok {
+			if assetYAML, ok := gen.generatedAssets.GuestStaticResources[patch.SourceAssetName]; ok {
 				assetYAML, err := applyAssetPatch(assetYAML, patch.PatchAssetName, gen.replacements)
 				if err != nil {
 					return err
 				}
-				gen.generatedAssets.GuestStaticResources[patch.Name] = assetYAML
+				gen.generatedAssets.GuestStaticResources[patch.SourceAssetName] = assetYAML
 				return nil
 			}
-			return fmt.Errorf("asset %s not found to apply patch %s", patch.Name, patch.PatchAssetName)
+			return fmt.Errorf("asset %s not found to apply patch %s", patch.SourceAssetName, patch.PatchAssetName)
 		}
 	}
 	return nil

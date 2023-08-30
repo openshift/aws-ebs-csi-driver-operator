@@ -17,7 +17,7 @@ func main() {
 
 	c := clients.NewFakeClients(clients.CSIDriverNamespace, false)
 
-	cfg, err := aws.GetAWSEBSConfig(c)
+	cfg, _, err := aws.GetAWSEBSConfig()
 	if err != nil {
 		panic(err)
 	}
