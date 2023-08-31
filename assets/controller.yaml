@@ -104,6 +104,7 @@ spec:
           - --upstream=http://127.0.0.1:8206/
           - --tls-cert-file=/etc/tls/private/tls.crt
           - --tls-private-key-file=/etc/tls/private/tls.key
+          - --tls-cipher-suites=${TLS_CIPHER_SUITES}
           - --logtostderr=true
           image: ${KUBE_RBAC_PROXY_IMAGE}
           imagePullPolicy: IfNotPresent
@@ -151,6 +152,7 @@ spec:
           - --upstream=http://127.0.0.1:8202/
           - --tls-cert-file=/etc/tls/private/tls.crt
           - --tls-private-key-file=/etc/tls/private/tls.key
+          - --tls-cipher-suites=${TLS_CIPHER_SUITES}
           - --logtostderr=true
           image: ${KUBE_RBAC_PROXY_IMAGE}
           imagePullPolicy: IfNotPresent
@@ -193,6 +195,7 @@ spec:
           - --upstream=http://127.0.0.1:8203/
           - --tls-cert-file=/etc/tls/private/tls.crt
           - --tls-private-key-file=/etc/tls/private/tls.key
+          - --tls-cipher-suites=${TLS_CIPHER_SUITES}
           - --logtostderr=true
           image: ${KUBE_RBAC_PROXY_IMAGE}
           imagePullPolicy: IfNotPresent
@@ -236,6 +239,7 @@ spec:
           - --upstream=http://127.0.0.1:8204/
           - --tls-cert-file=/etc/tls/private/tls.crt
           - --tls-private-key-file=/etc/tls/private/tls.key
+          - --tls-cipher-suites=${TLS_CIPHER_SUITES}
           - --logtostderr=true
           image: ${KUBE_RBAC_PROXY_IMAGE}
           imagePullPolicy: IfNotPresent
@@ -278,6 +282,7 @@ spec:
           - --upstream=http://127.0.0.1:8205/
           - --tls-cert-file=/etc/tls/private/tls.crt
           - --tls-private-key-file=/etc/tls/private/tls.key
+          - --tls-cipher-suites=${TLS_CIPHER_SUITES}
           - --logtostderr=true
           image: ${KUBE_RBAC_PROXY_IMAGE}
           imagePullPolicy: IfNotPresent
