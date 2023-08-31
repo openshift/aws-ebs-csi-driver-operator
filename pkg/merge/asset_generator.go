@@ -27,7 +27,6 @@ func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverAs
 		replacements: append(runtimeConfig.Replacements,
 			"${ASSET_PREFIX}", operatorConfig.AssetPrefix,
 			"${ASSET_SHORT_PREFIX}", operatorConfig.AssetShortPrefix,
-			"${NAMESPACE}", runtimeConfig.ControlPlaneNamespace,
 			"${DRIVER_NAME}", operatorConfig.DriverName,
 		),
 		generatedAssets: &CSIDriverAssets{},
@@ -204,7 +203,10 @@ func (gen *AssetGenerator) generateMonitoringService() error {
 	}
 
 	gen.generatedAssets.ControllerStaticResources[MetricServiceAssetName] = serviceYAML
-	gen.generatedAssets.ControllerStaticResources[MetricServiceMonitorAssetName] = serviceMonitorYAML
+	if gen.runtimeConfig.ClusterFlavour != FlavourHyperShift {
+		// TODO: figure out monitoring on HyperShift. The operator does not have RBAC for ServiceMonitors now.
+		gen.generatedAssets.ControllerStaticResources[MetricServiceMonitorAssetName] = serviceMonitorYAML
+	}
 	return nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"gopkg.in/yaml.v2"
@@ -22,9 +23,28 @@ type CSIDriverAssets struct {
 	GuestStaticResources       map[string][]byte
 	GuestStorageClassAssets    map[string][]byte
 	GuestVolumeSnapshotClasses map[string][]byte
+
+	replacer *strings.Replacer
 }
 
 func (a *CSIDriverAssets) GetAsset(assetName string) ([]byte, error) {
+
+	asset, err := a.getRawAsset(assetName)
+	if err != nil {
+		return nil, err
+	}
+	if a.replacer == nil {
+		return asset, nil
+	}
+	assetString := a.replacer.Replace(string(asset))
+	return []byte(assetString), nil
+}
+
+func (a *CSIDriverAssets) SetReplacements(replacements []string) {
+	a.replacer = strings.NewReplacer(replacements...)
+}
+
+func (a *CSIDriverAssets) getRawAsset(assetName string) ([]byte, error) {
 	switch assetName {
 	case ControllerDeploymentAssetName:
 		return a.ControllerTemplate, nil

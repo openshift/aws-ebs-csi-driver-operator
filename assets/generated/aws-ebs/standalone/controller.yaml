@@ -5,7 +5,7 @@ metadata:
     config.openshift.io/inject-proxy: csi-driver
     config.openshift.io/inject-proxy-cabundle: csi-driver
   name: aws-ebs-csi-driver-controller
-  namespace: openshift-cluster-csi-drivers
+  namespace: ${NAMESPACE}
 spec:
   selector:
     matchLabels:

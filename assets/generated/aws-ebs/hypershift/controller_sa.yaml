@@ -4,4 +4,4 @@ imagePullSecrets:
 kind: ServiceAccount
 metadata:
   name: aws-ebs-csi-driver-controller-sa
-  namespace: openshift-cluster-csi-drivers
+  namespace: ${NAMESPACE}

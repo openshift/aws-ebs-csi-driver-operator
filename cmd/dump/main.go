@@ -4,7 +4,6 @@ import (
 	"flag"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws"
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
 )
 
@@ -14,13 +13,10 @@ func main() {
 
 	flag.Parse()
 
-	c := clients.NewFakeClients(clients.CSIDriverNamespace, false)
-
 	cfg := aws.GetAWSEBSGeneratorConfig()
 
 	rcfg := &merge.RuntimeConfig{
-		ClusterFlavour:        merge.ClusterFlavour(*flavour),
-		ControlPlaneNamespace: c.ControlPlaneNamespace,
+		ClusterFlavour: merge.ClusterFlavour(*flavour),
 	}
 	gen := merge.NewAssetGenerator(rcfg, cfg)
 	a, err := gen.GenerateAssets()

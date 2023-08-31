@@ -83,7 +83,6 @@ type GuestConfig struct {
 }
 
 type RuntimeConfig struct {
-	ClusterFlavour        ClusterFlavour
-	ControlPlaneNamespace string
-	Replacements          []string
+	ClusterFlavour ClusterFlavour
+	Replacements   []string
 }

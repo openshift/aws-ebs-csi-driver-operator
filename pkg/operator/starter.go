@@ -62,6 +62,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
+	a.SetReplacements(defaultReplacements(controlPlaneNamespace))
 
 	// Start controllers that manage resources in the MANAGEMENT cluster.
 	controllers := []factory.Controller{}

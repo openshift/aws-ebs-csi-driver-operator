@@ -5,7 +5,7 @@ metadata:
     config.openshift.io/inject-proxy: csi-driver
     config.openshift.io/inject-proxy-cabundle: csi-driver
   name: aws-ebs-csi-driver-controller
-  namespace: openshift-cluster-csi-drivers
+  namespace: ${NAMESPACE}
 spec:
   selector:
     matchLabels:
@@ -22,7 +22,7 @@ spec:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: aws-ebs-csi-driver-controller
-        hypershift.openshift.io/hosted-control-plane: openshift-cluster-csi-drivers
+        hypershift.openshift.io/hosted-control-plane: ${NAMESPACE}
     spec:
       affinity:
         nodeAffinity:
@@ -39,14 +39,14 @@ spec:
               - key: hypershift.openshift.io/cluster
                 operator: In
                 values:
-                - openshift-cluster-csi-drivers
+                - ${NAMESPACE}
             weight: 100
         podAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - podAffinityTerm:
               labelSelector:
                 matchLabels:
-                  hypershift.openshift.io/hosted-control-plane: openshift-cluster-csi-drivers
+                  hypershift.openshift.io/hosted-control-plane: ${NAMESPACE}
               topologyKey: kubernetes.io/hostname
             weight: 100
         podAntiAffinity:
@@ -359,7 +359,7 @@ spec:
       - effect: NoSchedule
         key: hypershift.openshift.io/cluster
         operator: Equal
-        value: openshift-cluster-csi-drivers
+        value: ${NAMESPACE}
       volumes:
       - emptyDir: {}
         name: socket-dir

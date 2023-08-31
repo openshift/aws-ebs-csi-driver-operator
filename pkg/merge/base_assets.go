@@ -19,10 +19,10 @@ var (
 		"base/cabundle_cm.yaml",
 		"base/controller_sa.yaml",
 		"base/controller_pdb.yaml",
+	).WithAssets(StandaloneOnly,
+		// TODO: figure out metrics in hypershift - it's probably a different Prometheus there
 		"base/rbac/kube_rbac_proxy_role.yaml",
 		"base/rbac/kube_rbac_proxy_binding.yaml",
-		"base/rbac/lease_leader_election_role.yaml",
-		"base/rbac/lease_leader_election_binding.yaml",
 		"base/rbac/prometheus_role.yaml",
 		"base/rbac/prometheus_binding.yaml",
 	)
@@ -30,6 +30,9 @@ var (
 		"base/node_sa.yaml",
 		"base/rbac/privileged_role.yaml",
 		"base/rbac/node_privileged_binding.yaml",
+		// The controller Deployment runs leader election in the GUEST cluster
+		"base/rbac/lease_leader_election_role.yaml",
+		"base/rbac/lease_leader_election_binding.yaml",
 	)
 
 	DefaultAssetPatches = NewAssetPatches(StandaloneOnly,
