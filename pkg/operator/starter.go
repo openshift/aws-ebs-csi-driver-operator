@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/assets"
@@ -55,17 +56,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if isHypershift {
 		flavour = merge.FlavourHyperShift
 	}
-	runtimeConfig := &merge.RuntimeConfig{
-		ClusterFlavour:        flavour,
-		ControlPlaneNamespace: controlPlaneNamespace,
-		Replacements:          nil,
-	}
-	genConfig, opConfig, err := aws.GetAWSEBSConfig()
-	if err != nil {
-		return err
-	}
-	gen := merge.NewAssetGenerator(runtimeConfig, genConfig)
-	a, err := gen.GenerateAssets()
+	opConfig := aws.GetAWSEBSOperatorConfig()
+	assetDir := filepath.Join("generated/aws-ebs", string(flavour))
+	a, err := merge.NewFromAssets(assets.ReadFile, assetDir)
 	if err != nil {
 		return err
 	}

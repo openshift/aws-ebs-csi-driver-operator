@@ -40,3 +40,6 @@ test-e2e:
 	hack/e2e.sh
 
 .PHONY: test-e2e
+
+update:
+	hack/update-generated-assets.sh

@@ -5,17 +5,17 @@ import (
 )
 
 // Sanitize reorders YAML files to a canonical order, so they can be compared easily with `diff`.
-func Sanitize(src string) (string, error) {
+func Sanitize(src []byte) ([]byte, error) {
 	var obj interface{}
-	sigyaml.Unmarshal([]byte(src), &obj)
+	sigyaml.Unmarshal(src, &obj)
 	bytes, err := sigyaml.Marshal(obj)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(bytes), nil
+	return bytes, nil
 }
 
-func MustSanitize(src string) string {
+func MustSanitize(src []byte) []byte {
 	s, err := Sanitize(src)
 	if err != nil {
 		panic(err)

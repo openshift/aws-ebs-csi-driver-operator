@@ -33,8 +33,8 @@ const (
 	kmsKeyID              = "kmsKeyId"
 )
 
-func GetAWSEBSConfig() (*merge.CSIDriverAssetConfig, *config.OperatorConfig, error) {
-	assetCfg := &merge.CSIDriverAssetConfig{
+func GetAWSEBSGeneratorConfig() *merge.CSIDriverAssetConfig {
+	return &merge.CSIDriverAssetConfig{
 		AssetPrefix:      "aws-ebs-csi-driver",
 		AssetShortPrefix: "ebs",
 		DriverName:       "ebs.csi.aws.com",
@@ -100,8 +100,10 @@ func GetAWSEBSConfig() (*merge.CSIDriverAssetConfig, *config.OperatorConfig, err
 			},
 		},
 	}
+}
 
-	opCfg := &config.OperatorConfig{
+func GetAWSEBSOperatorConfig() *config.OperatorConfig {
+	return &config.OperatorConfig{
 		ControlPlaneDeploymentHooks: config.DefaultControllerHooks.WithHooks(merge.AllFlavours,
 			withAWSRegion,
 			withCustomTags,
@@ -129,7 +131,6 @@ func GetAWSEBSConfig() (*merge.CSIDriverAssetConfig, *config.OperatorConfig, err
 			getKMSKeyHook,
 		},
 	}
-	return assetCfg, opCfg, nil
 }
 
 // withCustomAWSCABundle executes the asset as a template to fill out the parts required when using a custom CA bundle.
