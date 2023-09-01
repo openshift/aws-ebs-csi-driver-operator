@@ -40,7 +40,7 @@ func GetAWSEBSGeneratorConfig() *merge.CSIDriverGeneratorConfig {
 		DriverName:       "ebs.csi.aws.com",
 
 		ControllerConfig: &merge.ControlPlaneConfig{
-			DeploymentTemplateAssetName: "drivers/aws-ebs/controller.yaml",
+			DeploymentTemplateAssetName: "drivers/aws-ebs/patches/controller.yaml",
 			LivenessProbePort:           10301,
 			MetricsPorts: []merge.MetricsPort{
 				{
@@ -80,7 +80,7 @@ func GetAWSEBSGeneratorConfig() *merge.CSIDriverGeneratorConfig {
 		},
 
 		GuestConfig: &merge.GuestConfig{
-			DaemonSetTemplateAssetName: "drivers/aws-ebs/node.yaml",
+			DaemonSetTemplateAssetName: "drivers/aws-ebs/patches/node.yaml",
 			LivenessProbePort:          10300,
 			Sidecars: []merge.SidecarConfig{
 				merge.DefaultNodeDriverRegistrar,
@@ -89,14 +89,14 @@ func GetAWSEBSGeneratorConfig() *merge.CSIDriverGeneratorConfig {
 				),
 			},
 			StaticAssets: merge.DefaultNodeAssets.WithAssets(merge.AllFlavours,
-				"drivers/aws-ebs/csidriver.yaml",
+				"drivers/aws-ebs/base/csidriver.yaml",
 			),
 			StorageClassAssetNames: []string{
-				"drivers/aws-ebs/storageclass_gp2.yaml",
-				"drivers/aws-ebs/storageclass_gp3.yaml",
+				"drivers/aws-ebs/base/storageclass_gp2.yaml",
+				"drivers/aws-ebs/base/storageclass_gp3.yaml",
 			},
 			VolumeSnapshotClassAssetNames: []string{
-				"drivers/aws-ebs/volumesnapshotclass.yaml",
+				"drivers/aws-ebs/base/volumesnapshotclass.yaml",
 			},
 		},
 	}
