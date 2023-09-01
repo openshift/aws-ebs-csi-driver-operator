@@ -54,28 +54,28 @@ func GetAWSEBSGeneratorConfig() *generator.CSIDriverGeneratorConfig {
 			SidecarLocalMetricsPortStart:   common.AWSEBSLoopbackMetricsPortStart + 1,
 			SidecarExposedMetricsPortStart: common.AWSEBSExposedMetricsPortStart + 1,
 			Sidecars: []generator.SidecarConfig{
-				generator.DefaultProvisionerWithSnapshots.WithExtraArguments(
+				common.DefaultProvisionerWithSnapshots.WithExtraArguments(
 					"--default-fstype=ext4",
 					"--feature-gates=Topology=true",
 					"--extra-create-metadata=true",
 					"--timeout=60s",
 				),
-				generator.DefaultAttacher.WithExtraArguments(
+				common.DefaultAttacher.WithExtraArguments(
 					"--timeout=60s",
 				),
-				generator.DefaultResizer.WithExtraArguments(
+				common.DefaultResizer.WithExtraArguments(
 					"--timeout=300s",
 				),
-				generator.DefaultSnapshotter.WithExtraArguments(
+				common.DefaultSnapshotter.WithExtraArguments(
 					"--timeout=300s",
 					"--extra-create-metadata",
 				),
-				generator.DefaultLivenessProbe.WithExtraArguments(
+				common.DefaultLivenessProbe.WithExtraArguments(
 					"--probe-timeout=3s",
 				),
 			},
-			StaticAssets: generator.DefaultControllerAssets,
-			AssetPatches: generator.DefaultAssetPatches.WithPatches(generator.HyperShiftOnly,
+			StaticAssets: common.DefaultControllerAssets,
+			AssetPatches: common.DefaultAssetPatches.WithPatches(generator.HyperShiftOnly,
 				"controller.yaml", "drivers/aws-ebs/patches/controller_minter.yaml",
 			),
 		},
@@ -84,12 +84,12 @@ func GetAWSEBSGeneratorConfig() *generator.CSIDriverGeneratorConfig {
 			DaemonSetTemplateAssetName: "drivers/aws-ebs/patches/node.yaml",
 			LivenessProbePort:          10300,
 			Sidecars: []generator.SidecarConfig{
-				generator.DefaultNodeDriverRegistrar,
-				generator.DefaultLivenessProbe.WithExtraArguments(
+				common.DefaultNodeDriverRegistrar,
+				common.DefaultLivenessProbe.WithExtraArguments(
 					"--probe-timeout=3s",
 				),
 			},
-			StaticAssets: generator.DefaultNodeAssets.WithAssets(generator.AllFlavours,
+			StaticAssets: common.DefaultNodeAssets.WithAssets(generator.AllFlavours,
 				"drivers/aws-ebs/base/csidriver.yaml",
 			),
 			StorageClassAssetNames: []string{

@@ -86,3 +86,51 @@ type RuntimeConfig struct {
 	ClusterFlavour ClusterFlavour
 	Replacements   []string
 }
+
+func (cfg SidecarConfig) WithExtraArguments(extraArguments ...string) SidecarConfig {
+	newCfg := cfg
+	newCfg.ExtraArguments = extraArguments
+	return newCfg
+}
+
+func (cfg SidecarConfig) WithAdditionalAssets(assets ...string) SidecarConfig {
+	newCfg := cfg
+	newCfg.GuestStaticAssetNames = append(newCfg.GuestStaticAssetNames, assets...)
+	return newCfg
+}
+
+func (a Assets) WithAssets(flavours sets.Set[ClusterFlavour], assets ...string) Assets {
+	newAssets := make([]Asset, 0, len(a)+len(assets))
+	newAssets = append(newAssets, a...)
+	for _, assetName := range assets {
+		newAssets = append(newAssets, Asset{
+			ClusterFlavours: flavours,
+			AssetName:       assetName,
+		})
+	}
+	return newAssets
+}
+
+func (p AssetPatches) WithPatches(flavours sets.Set[ClusterFlavour], namePatchPairs ...string) AssetPatches {
+	if len(namePatchPairs)%2 != 0 {
+		panic("namePatchPairs must be even")
+	}
+	newPatches := make([]AssetPatch, 0, len(p)+len(namePatchPairs)/2)
+	newPatches = append(newPatches, p...)
+	for i := 0; i < len(namePatchPairs); i += 2 {
+		newPatches = append(newPatches, AssetPatch{
+			ClusterFlavours: flavours,
+			SourceAssetName: namePatchPairs[i],
+			PatchAssetName:  namePatchPairs[i+1],
+		})
+	}
+	return newPatches
+}
+
+func NewAssets(flavours sets.Set[ClusterFlavour], assets ...string) Assets {
+	return Assets{}.WithAssets(flavours, assets...)
+}
+
+func NewAssetPatches(flavours sets.Set[ClusterFlavour], namePatchPairs ...string) AssetPatches {
+	return AssetPatches{}.WithPatches(flavours, namePatchPairs...)
+}

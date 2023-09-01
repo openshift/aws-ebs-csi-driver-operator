@@ -120,7 +120,7 @@ func (gen *AssetGenerator) generateDeployment() error {
 		)
 		localPortIndex++
 		exposedPortIndex++
-		deploymentYAML, err = applyAssetPatch(deploymentYAML, StandaloneKubeRBACProxy, replacements)
+		deploymentYAML, err = applyAssetPatch(deploymentYAML, "patches/sidecars/kube_rbac_proxy.yaml", replacements)
 		if err != nil {
 			return err
 		}

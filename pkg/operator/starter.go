@@ -176,7 +176,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			c.GuestKubeClient,
 			c.GuestDynamicClient,
 			c.GuestKubeInformers,
-			assets.ReadFile,
+			a.GetAsset,
 			[]string{
 				"volumesnapshotclass.yaml",
 			},
