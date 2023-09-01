@@ -6,6 +6,7 @@ import (
 
 	opv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/config/common"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generator"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/operator/config"
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -44,14 +45,14 @@ func GetAWSEBSGeneratorConfig() *generator.CSIDriverGeneratorConfig {
 			LivenessProbePort:           10301,
 			MetricsPorts: []generator.MetricsPort{
 				{
-					LocalPort:           8201,
+					LocalPort:           common.AWSEBSLoopbackMetricsPortStart,
 					InjectKubeRBACProxy: true,
-					ExposedPort:         9201,
+					ExposedPort:         common.AWSEBSExposedMetricsPortStart,
 					Name:                "driver-m",
 				},
 			},
-			SidecarLocalMetricsPortStart:   8202,
-			SidecarExposedMetricsPortStart: 9202,
+			SidecarLocalMetricsPortStart:   common.AWSEBSLoopbackMetricsPortStart + 1,
+			SidecarExposedMetricsPortStart: common.AWSEBSExposedMetricsPortStart + 1,
 			Sidecars: []generator.SidecarConfig{
 				generator.DefaultProvisionerWithSnapshots.WithExtraArguments(
 					"--default-fstype=ext4",
