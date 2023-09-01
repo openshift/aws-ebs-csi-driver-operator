@@ -1,4 +1,4 @@
-package merge
+package generated_assets
 
 import (
 	"fmt"
@@ -13,7 +13,11 @@ import (
 )
 
 const (
-	manifestFileName = "manifests.yaml"
+	manifestFileName              = "manifests.yaml"
+	ControllerDeploymentAssetName = "controller.yaml"
+	NodeDaemonSetAssetName        = "node.yaml"
+	MetricServiceAssetName        = "service.yaml"
+	MetricServiceMonitorAssetName = "servicemonitor.yaml"
 )
 
 type CSIDriverAssets struct {

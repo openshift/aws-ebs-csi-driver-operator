@@ -1,4 +1,4 @@
-package merge
+package generated_assets
 
 import (
 	sigyaml "sigs.k8s.io/yaml"

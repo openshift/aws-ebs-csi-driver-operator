@@ -1,4 +1,4 @@
-package merge
+package generator
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"

@@ -2,7 +2,7 @@ package config
 
 import (
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generator"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
 	"github.com/openshift/library-go/pkg/operator/csi/csistorageclasscontroller"
@@ -12,7 +12,7 @@ import (
 
 type DeploymentHookBuilder func(c *clients.Clients) (dc.DeploymentHookFunc, []factory.Informer)
 type FlavourDeploymentHook struct {
-	ClusterFlavours sets.Set[merge.ClusterFlavour]
+	ClusterFlavours sets.Set[generator.ClusterFlavour]
 	Hook            DeploymentHookBuilder
 }
 
@@ -20,7 +20,7 @@ type FlavourDeploymentHooks []FlavourDeploymentHook
 
 type DaemonSetHookBuilder func(c *clients.Clients) (csidrivernodeservicecontroller.DaemonSetHookFunc, []factory.Informer)
 type FlavourDaemonSetHook struct {
-	ClusterFlavours sets.Set[merge.ClusterFlavour]
+	ClusterFlavours sets.Set[generator.ClusterFlavour]
 	Hook            DaemonSetHookBuilder
 }
 type FlavourDaemonSetHooks []FlavourDaemonSetHook
@@ -28,7 +28,7 @@ type FlavourDaemonSetHooks []FlavourDaemonSetHook
 type ControllerBuilder func(c *clients.Clients) (factory.Controller, error)
 
 type FlavourControllerBuilder struct {
-	ClusterFlavours   sets.Set[merge.ClusterFlavour]
+	ClusterFlavours   sets.Set[generator.ClusterFlavour]
 	ControllerBuilder ControllerBuilder
 }
 
@@ -45,7 +45,7 @@ type OperatorConfig struct {
 	StorageClassHooks   []StorageClassHookBuilder // No flavours here, but can be added when needed
 }
 
-func NewDeploymentHooks(flavours sets.Set[merge.ClusterFlavour], hooks ...DeploymentHookBuilder) FlavourDeploymentHooks {
+func NewDeploymentHooks(flavours sets.Set[generator.ClusterFlavour], hooks ...DeploymentHookBuilder) FlavourDeploymentHooks {
 	result := make([]FlavourDeploymentHook, 0, len(hooks))
 	for _, hook := range hooks {
 		result = append(result, FlavourDeploymentHook{
@@ -56,7 +56,7 @@ func NewDeploymentHooks(flavours sets.Set[merge.ClusterFlavour], hooks ...Deploy
 	return result
 }
 
-func (h FlavourDeploymentHooks) WithHooks(flavours sets.Set[merge.ClusterFlavour], hooks ...DeploymentHookBuilder) FlavourDeploymentHooks {
+func (h FlavourDeploymentHooks) WithHooks(flavours sets.Set[generator.ClusterFlavour], hooks ...DeploymentHookBuilder) FlavourDeploymentHooks {
 	result := make([]FlavourDeploymentHook, 0, len(h)+len(hooks))
 	result = append(result, h...)
 	for _, hook := range hooks {
@@ -68,7 +68,7 @@ func (h FlavourDeploymentHooks) WithHooks(flavours sets.Set[merge.ClusterFlavour
 	return result
 }
 
-func NewControllerBuilders(flavours sets.Set[merge.ClusterFlavour], builders ...ControllerBuilder) FlavourControllerBuilders {
+func NewControllerBuilders(flavours sets.Set[generator.ClusterFlavour], builders ...ControllerBuilder) FlavourControllerBuilders {
 	result := make([]FlavourControllerBuilder, 0, len(builders))
 	for _, builder := range builders {
 		result = append(result, FlavourControllerBuilder{
@@ -79,7 +79,7 @@ func NewControllerBuilders(flavours sets.Set[merge.ClusterFlavour], builders ...
 	return result
 }
 
-func (b FlavourControllerBuilders) WithBuilders(flavours sets.Set[merge.ClusterFlavour], builders ...ControllerBuilder) FlavourControllerBuilders {
+func (b FlavourControllerBuilders) WithBuilders(flavours sets.Set[generator.ClusterFlavour], builders ...ControllerBuilder) FlavourControllerBuilders {
 	result := make([]FlavourControllerBuilder, 0, len(b)+len(builders))
 	result = append(result, b...)
 	for _, builder := range builders {
@@ -91,7 +91,7 @@ func (b FlavourControllerBuilders) WithBuilders(flavours sets.Set[merge.ClusterF
 	return result
 }
 
-func NewDaemonSetHooks(flavours sets.Set[merge.ClusterFlavour], hooks ...DaemonSetHookBuilder) FlavourDaemonSetHooks {
+func NewDaemonSetHooks(flavours sets.Set[generator.ClusterFlavour], hooks ...DaemonSetHookBuilder) FlavourDaemonSetHooks {
 	result := make([]FlavourDaemonSetHook, 0, len(hooks))
 	for _, hook := range hooks {
 		result = append(result, FlavourDaemonSetHook{
@@ -102,7 +102,7 @@ func NewDaemonSetHooks(flavours sets.Set[merge.ClusterFlavour], hooks ...DaemonS
 	return result
 }
 
-func (h FlavourDaemonSetHooks) WithHooks(flavours sets.Set[merge.ClusterFlavour], hooks ...DaemonSetHookBuilder) FlavourDaemonSetHooks {
+func (h FlavourDaemonSetHooks) WithHooks(flavours sets.Set[generator.ClusterFlavour], hooks ...DaemonSetHookBuilder) FlavourDaemonSetHooks {
 	result := make([]FlavourDaemonSetHook, 0, len(h)+len(hooks))
 	result = append(result, h...)
 	for _, hook := range hooks {

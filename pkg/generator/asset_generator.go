@@ -1,23 +1,18 @@
-package merge
+package generator
 
 import (
 	"fmt"
 	"path/filepath"
 	"strconv"
-)
 
-const (
-	ControllerDeploymentAssetName = "controller.yaml"
-	NodeDaemonSetAssetName        = "node.yaml"
-	MetricServiceAssetName        = "service.yaml"
-	MetricServiceMonitorAssetName = "servicemonitor.yaml"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated-assets"
 )
 
 type AssetGenerator struct {
 	runtimeConfig   *RuntimeConfig
 	operatorConfig  *CSIDriverGeneratorConfig
 	replacements    []string
-	generatedAssets *CSIDriverAssets
+	generatedAssets *generated_assets.CSIDriverAssets
 }
 
 func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverGeneratorConfig) *AssetGenerator {
@@ -29,11 +24,11 @@ func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverGe
 			"${ASSET_SHORT_PREFIX}", operatorConfig.AssetShortPrefix,
 			"${DRIVER_NAME}", operatorConfig.DriverName,
 		),
-		generatedAssets: &CSIDriverAssets{},
+		generatedAssets: &generated_assets.CSIDriverAssets{},
 	}
 }
 
-func (gen *AssetGenerator) GenerateAssets() (*CSIDriverAssets, error) {
+func (gen *AssetGenerator) GenerateAssets() (*generated_assets.CSIDriverAssets, error) {
 	if err := gen.generateController(); err != nil {
 		return nil, err
 	}
@@ -44,7 +39,7 @@ func (gen *AssetGenerator) GenerateAssets() (*CSIDriverAssets, error) {
 }
 
 func (gen *AssetGenerator) generateController() error {
-	gen.generatedAssets = &CSIDriverAssets{
+	gen.generatedAssets = &generated_assets.CSIDriverAssets{
 		ControllerStaticResources: make(map[string][]byte),
 	}
 	if err := gen.generateDeployment(); err != nil {
@@ -73,7 +68,7 @@ func (gen *AssetGenerator) patchController() error {
 			continue
 		}
 		switch patch.SourceAssetName {
-		case ControllerDeploymentAssetName:
+		case generated_assets.ControllerDeploymentAssetName:
 			controllerYAML, err := applyAssetPatch(gen.generatedAssets.ControllerTemplate, patch.PatchAssetName, gen.replacements)
 			if err != nil {
 				return err
@@ -202,10 +197,10 @@ func (gen *AssetGenerator) generateMonitoringService() error {
 		}
 	}
 
-	gen.generatedAssets.ControllerStaticResources[MetricServiceAssetName] = serviceYAML
+	gen.generatedAssets.ControllerStaticResources[generated_assets.MetricServiceAssetName] = serviceYAML
 	if gen.runtimeConfig.ClusterFlavour != FlavourHyperShift {
 		// TODO: figure out monitoring on HyperShift. The operator does not have RBAC for ServiceMonitors now.
-		gen.generatedAssets.ControllerStaticResources[MetricServiceMonitorAssetName] = serviceMonitorYAML
+		gen.generatedAssets.ControllerStaticResources[generated_assets.MetricServiceMonitorAssetName] = serviceMonitorYAML
 	}
 	return nil
 }
@@ -278,7 +273,7 @@ func (gen *AssetGenerator) patchGuest() error {
 			continue
 		}
 		switch patch.SourceAssetName {
-		case NodeDaemonSetAssetName:
+		case generated_assets.NodeDaemonSetAssetName:
 			dsYAML, err := applyAssetPatch(gen.generatedAssets.NodeTemplate, patch.PatchAssetName, gen.replacements)
 			if err != nil {
 				return err

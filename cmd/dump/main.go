@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws-ebs"
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/config/aws-ebs"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generator"
 )
 
 func main() {
@@ -15,10 +15,10 @@ func main() {
 
 	cfg := aws_ebs.GetAWSEBSGeneratorConfig()
 
-	rcfg := &merge.RuntimeConfig{
-		ClusterFlavour: merge.ClusterFlavour(*flavour),
+	rcfg := &generator.RuntimeConfig{
+		ClusterFlavour: generator.ClusterFlavour(*flavour),
 	}
-	gen := merge.NewAssetGenerator(rcfg, cfg)
+	gen := generator.NewAssetGenerator(rcfg, cfg)
 	a, err := gen.GenerateAssets()
 	if err != nil {
 		panic(err)

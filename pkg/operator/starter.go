@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/assets"
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws-ebs"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/config/aws-ebs"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generated-assets"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generator"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,13 +53,13 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
 
 	// Generate operator assets
-	flavour := merge.FlavourStandalone
+	flavour := generator.FlavourStandalone
 	if isHypershift {
-		flavour = merge.FlavourHyperShift
+		flavour = generator.FlavourHyperShift
 	}
 	opConfig := aws_ebs.GetAWSEBSOperatorConfig()
 	assetDir := filepath.Join("generated/aws-ebs", string(flavour))
-	a, err := merge.NewFromAssets(assets.ReadFile, assetDir)
+	a, err := generated_assets.NewFromAssets(assets.ReadFile, assetDir)
 	if err != nil {
 		return err
 	}
@@ -103,7 +104,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	).WithCSIDriverControllerService(
 		"AWSEBSDriverControllerServiceController",
 		a.GetAsset,
-		merge.ControllerDeploymentAssetName,
+		generated_assets.ControllerDeploymentAssetName,
 		c.ControlPlaneKubeClient,
 		c.ControlPlaneKubeInformers.InformersFor(controlPlaneNamespace),
 		c.GuestConfigInformers,
@@ -151,7 +152,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	).WithCSIDriverNodeService(
 		"AWSEBSDriverNodeServiceController",
 		a.GetAsset,
-		merge.NodeDaemonSetAssetName,
+		generated_assets.NodeDaemonSetAssetName,
 		c.GuestKubeClient,
 		c.GuestKubeInformers.InformersFor(clients.CSIDriverNamespace),
 		guestInformers,

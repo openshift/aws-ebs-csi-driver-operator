@@ -6,7 +6,7 @@ import (
 
 	opv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generator"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
@@ -19,15 +19,15 @@ import (
 )
 
 var (
-	DefaultControllerHooks = NewDeploymentHooks(merge.StandaloneOnly,
+	DefaultControllerHooks = NewDeploymentHooks(generator.StandaloneOnly,
 		getProxyHook,
 		getStandaloneReplicasHook,
-	).WithHooks(merge.HyperShiftOnly,
+	).WithHooks(generator.HyperShiftOnly,
 		getHypershiftReplicasHook,
 		getHypershiftNodeSelectorHook,
 		getHypershiftControlPlaneImages,
 	)
-	DefaultDaemonSetHooks = NewDaemonSetHooks(merge.AllFlavours)
+	DefaultDaemonSetHooks = NewDaemonSetHooks(generator.AllFlavours)
 
 	hostedControlPlaneGVR = schema.GroupVersionResource{
 		Group:    "hypershift.openshift.io",

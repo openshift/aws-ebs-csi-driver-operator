@@ -6,7 +6,7 @@ import (
 
 	opv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/generator"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/operator/config"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
@@ -33,16 +33,16 @@ const (
 	kmsKeyID              = "kmsKeyId"
 )
 
-func GetAWSEBSGeneratorConfig() *merge.CSIDriverGeneratorConfig {
-	return &merge.CSIDriverGeneratorConfig{
+func GetAWSEBSGeneratorConfig() *generator.CSIDriverGeneratorConfig {
+	return &generator.CSIDriverGeneratorConfig{
 		AssetPrefix:      "aws-ebs-csi-driver",
 		AssetShortPrefix: "ebs",
 		DriverName:       "ebs.csi.aws.com",
 
-		ControllerConfig: &merge.ControlPlaneConfig{
+		ControllerConfig: &generator.ControlPlaneConfig{
 			DeploymentTemplateAssetName: "drivers/aws-ebs/patches/controller.yaml",
 			LivenessProbePort:           10301,
-			MetricsPorts: []merge.MetricsPort{
+			MetricsPorts: []generator.MetricsPort{
 				{
 					LocalPort:           8201,
 					InjectKubeRBACProxy: true,
@@ -52,43 +52,43 @@ func GetAWSEBSGeneratorConfig() *merge.CSIDriverGeneratorConfig {
 			},
 			SidecarLocalMetricsPortStart:   8202,
 			SidecarExposedMetricsPortStart: 9202,
-			Sidecars: []merge.SidecarConfig{
-				merge.DefaultProvisionerWithSnapshots.WithExtraArguments(
+			Sidecars: []generator.SidecarConfig{
+				generator.DefaultProvisionerWithSnapshots.WithExtraArguments(
 					"--default-fstype=ext4",
 					"--feature-gates=Topology=true",
 					"--extra-create-metadata=true",
 					"--timeout=60s",
 				),
-				merge.DefaultAttacher.WithExtraArguments(
+				generator.DefaultAttacher.WithExtraArguments(
 					"--timeout=60s",
 				),
-				merge.DefaultResizer.WithExtraArguments(
+				generator.DefaultResizer.WithExtraArguments(
 					"--timeout=300s",
 				),
-				merge.DefaultSnapshotter.WithExtraArguments(
+				generator.DefaultSnapshotter.WithExtraArguments(
 					"--timeout=300s",
 					"--extra-create-metadata",
 				),
-				merge.DefaultLivenessProbe.WithExtraArguments(
+				generator.DefaultLivenessProbe.WithExtraArguments(
 					"--probe-timeout=3s",
 				),
 			},
-			StaticAssets: merge.DefaultControllerAssets,
-			AssetPatches: merge.DefaultAssetPatches.WithPatches(merge.HyperShiftOnly,
+			StaticAssets: generator.DefaultControllerAssets,
+			AssetPatches: generator.DefaultAssetPatches.WithPatches(generator.HyperShiftOnly,
 				"controller.yaml", "drivers/aws-ebs/patches/controller_minter.yaml",
 			),
 		},
 
-		GuestConfig: &merge.GuestConfig{
+		GuestConfig: &generator.GuestConfig{
 			DaemonSetTemplateAssetName: "drivers/aws-ebs/patches/node.yaml",
 			LivenessProbePort:          10300,
-			Sidecars: []merge.SidecarConfig{
-				merge.DefaultNodeDriverRegistrar,
-				merge.DefaultLivenessProbe.WithExtraArguments(
+			Sidecars: []generator.SidecarConfig{
+				generator.DefaultNodeDriverRegistrar,
+				generator.DefaultLivenessProbe.WithExtraArguments(
 					"--probe-timeout=3s",
 				),
 			},
-			StaticAssets: merge.DefaultNodeAssets.WithAssets(merge.AllFlavours,
+			StaticAssets: generator.DefaultNodeAssets.WithAssets(generator.AllFlavours,
 				"drivers/aws-ebs/base/csidriver.yaml",
 			),
 			StorageClassAssetNames: []string{
@@ -104,14 +104,14 @@ func GetAWSEBSGeneratorConfig() *merge.CSIDriverGeneratorConfig {
 
 func GetAWSEBSOperatorConfig() *config.OperatorConfig {
 	return &config.OperatorConfig{
-		ControlPlaneDeploymentHooks: config.DefaultControllerHooks.WithHooks(merge.AllFlavours,
+		ControlPlaneDeploymentHooks: config.DefaultControllerHooks.WithHooks(generator.AllFlavours,
 			withAWSRegion,
 			withCustomTags,
 			withCustomEndPoint,
 			withCABundleDeploymentHook,
-		).WithHooks(merge.StandaloneOnly,
+		).WithHooks(generator.StandaloneOnly,
 			getCustomAWSCABundleBuilder(cloudConfigName),
-		).WithHooks(merge.HyperShiftOnly,
+		).WithHooks(generator.HyperShiftOnly,
 			getCustomAWSCABundleBuilder("user-ca-bundle"),
 		),
 
@@ -120,10 +120,10 @@ func GetAWSEBSOperatorConfig() *config.OperatorConfig {
 			metricsCertSecretName,
 		},
 
-		ExtraControlPlaneControllers: config.NewControllerBuilders(merge.StandaloneOnly,
+		ExtraControlPlaneControllers: config.NewControllerBuilders(generator.StandaloneOnly,
 			newCustomAWSBundleSyncer),
 
-		GuestDaemonSetHooks: config.DefaultDaemonSetHooks.WithHooks(merge.AllFlavours,
+		GuestDaemonSetHooks: config.DefaultDaemonSetHooks.WithHooks(generator.AllFlavours,
 			withCABundleDaemonSetHook,
 		),
 
