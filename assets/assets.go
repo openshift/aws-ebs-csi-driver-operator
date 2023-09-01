@@ -4,7 +4,7 @@ import (
 	"embed"
 )
 
-//go:embed *.yaml hypershift/*.yaml rbac/*.yaml base/* patches/* drivers/* generated/*
+//go:embed base/* patches/* drivers/* generated/*
 var f embed.FS
 
 // ReadFile reads and returns the content of the named file.
