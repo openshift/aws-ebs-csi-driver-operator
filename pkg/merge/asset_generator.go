@@ -15,12 +15,12 @@ const (
 
 type AssetGenerator struct {
 	runtimeConfig   *RuntimeConfig
-	operatorConfig  *CSIDriverAssetConfig
+	operatorConfig  *CSIDriverGeneratorConfig
 	replacements    []string
 	generatedAssets *CSIDriverAssets
 }
 
-func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverAssetConfig) *AssetGenerator {
+func NewAssetGenerator(runtimeConfig *RuntimeConfig, operatorConfig *CSIDriverGeneratorConfig) *AssetGenerator {
 	return &AssetGenerator{
 		runtimeConfig:  runtimeConfig,
 		operatorConfig: operatorConfig,

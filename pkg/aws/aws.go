@@ -33,8 +33,8 @@ const (
 	kmsKeyID              = "kmsKeyId"
 )
 
-func GetAWSEBSGeneratorConfig() *merge.CSIDriverAssetConfig {
-	return &merge.CSIDriverAssetConfig{
+func GetAWSEBSGeneratorConfig() *merge.CSIDriverGeneratorConfig {
+	return &merge.CSIDriverGeneratorConfig{
 		AssetPrefix:      "aws-ebs-csi-driver",
 		AssetShortPrefix: "ebs",
 		DriverName:       "ebs.csi.aws.com",

@@ -30,7 +30,7 @@ type AssetPatch struct {
 	PatchAssetName  string
 }
 
-type CSIDriverAssetConfig struct {
+type CSIDriverGeneratorConfig struct {
 	AssetPrefix      string
 	AssetShortPrefix string
 	DriverName       string
