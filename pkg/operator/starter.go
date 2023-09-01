@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/openshift/aws-ebs-csi-driver-operator/assets"
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws-ebs"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/clients"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
@@ -56,7 +56,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if isHypershift {
 		flavour = merge.FlavourHyperShift
 	}
-	opConfig := aws.GetAWSEBSOperatorConfig()
+	opConfig := aws_ebs.GetAWSEBSOperatorConfig()
 	assetDir := filepath.Join("generated/aws-ebs", string(flavour))
 	a, err := merge.NewFromAssets(assets.ReadFile, assetDir)
 	if err != nil {

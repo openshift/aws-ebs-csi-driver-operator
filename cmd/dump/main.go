@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws"
+	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/aws-ebs"
 	"github.com/openshift/aws-ebs-csi-driver-operator/pkg/merge"
 )
 
@@ -13,7 +13,7 @@ func main() {
 
 	flag.Parse()
 
-	cfg := aws.GetAWSEBSGeneratorConfig()
+	cfg := aws_ebs.GetAWSEBSGeneratorConfig()
 
 	rcfg := &merge.RuntimeConfig{
 		ClusterFlavour: merge.ClusterFlavour(*flavour),
