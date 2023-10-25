@@ -15,7 +15,7 @@ require (
 	golang.org/x/net v0.17.0 // indirect
 	k8s.io/api v0.28.2
 	k8s.io/apiextensions-apiserver v0.28.2
-	k8s.io/apimachinery v0.28.2
+	k8s.io/apimachinery v0.28.3
 	k8s.io/client-go v0.28.2
 	k8s.io/component-base v0.28.2
 	k8s.io/klog/v2 v2.100.1
