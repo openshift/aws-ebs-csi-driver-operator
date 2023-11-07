@@ -10,6 +10,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/configobserver"
+	libgoapiserver "github.com/openshift/library-go/pkg/operator/configobserver/apiserver"
 	"github.com/openshift/library-go/pkg/operator/configobserver/proxy"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
@@ -22,9 +23,18 @@ func ProxyConfigPath() []string {
 	return []string{"targetcsiconfig", "proxy"}
 }
 
+func CipherSuitesPath() []string {
+	return []string{"targetcsiconfig", "servingInfo", "cipherSuites"}
+}
+
+func MinTLSVersionPath() []string {
+	return []string{"targetcsiconfig", "servingInfo", "minTLSVersion"}
+}
+
 // Listers implement the configobserver.Listers interface.
 type Listers struct {
-	ProxyLister_ configlistersv1.ProxyLister
+	ProxyLister_     configlistersv1.ProxyLister
+	APIServerLister_ configlistersv1.APIServerLister
 
 	ResourceSync       resourcesynccontroller.ResourceSyncer
 	PreRunCachesSynced []cache.InformerSynced
@@ -32,6 +42,10 @@ type Listers struct {
 
 func (l Listers) ProxyLister() configlistersv1.ProxyLister {
 	return l.ProxyLister_
+}
+
+func (l Listers) APIServerLister() configlistersv1.APIServerLister {
+	return l.APIServerLister_
 }
 
 func (l Listers) ResourceSyncer() resourcesynccontroller.ResourceSyncer {
@@ -66,16 +80,23 @@ func NewCSIConfigObserverController(
 			operatorClient,
 			eventRecorder.WithComponentSuffix("csi-config-observer-controller-"+strings.ToLower(name)),
 			Listers{
-				ProxyLister_: configinformers.Config().V1().Proxies().Lister(),
+				APIServerLister_: configinformers.Config().V1().APIServers().Lister(),
+				ProxyLister_:     configinformers.Config().V1().Proxies().Lister(),
 				PreRunCachesSynced: append([]cache.InformerSynced{},
 					operatorClient.Informer().HasSynced,
 					configinformers.Config().V1().Proxies().Informer().HasSynced,
+					configinformers.Config().V1().APIServers().Informer().HasSynced,
 				),
 			},
 			informers,
 			proxy.NewProxyObserveFunc(ProxyConfigPath()),
+			observeTLSSecurityProfile,
 		),
 	}
 
 	return c
+}
+
+func observeTLSSecurityProfile(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return libgoapiserver.ObserveTLSSecurityProfileWithPaths(genericListers, recorder, existingConfig, MinTLSVersionPath(), CipherSuitesPath())
 }

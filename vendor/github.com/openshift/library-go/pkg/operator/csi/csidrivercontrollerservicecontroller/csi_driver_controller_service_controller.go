@@ -78,6 +78,7 @@ func NewCSIDriverControllerServiceController(
 	optionalInformers = append(optionalInformers, configInformer.Config().V1().Infrastructures().Informer())
 	var optionalManifestHooks []dc.ManifestHookFunc
 	optionalManifestHooks = append(optionalManifestHooks, WithPlaceholdersHook(configInformer))
+	optionalManifestHooks = append(optionalManifestHooks, WithServingInfo())
 	leConfig := leaderelection.LeaderElectionDefaulting(configv1.LeaderElection{}, "default", "default")
 	optionalManifestHooks = append(optionalManifestHooks, WithLeaderElectionReplacerHook(leConfig))
 
