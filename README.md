@@ -1,3 +1,9 @@
+> [!warning]
+> **This repo is obsolete in OCP 4.15.**
+> AWS EBS CSI driver operator in 4.15 and newer is built from https://github.com/openshift/csi-operator.
+> 4.14 and older branches in this repo are still in use, until EOL of the corresponding OCP version.
+> See [this enhancement](https://github.com/openshift/enhancements/blob/master/enhancements/storage/csi-driver-operator-merge.md) for details.
+
 # aws-ebs-csi-driver operator
 
 An operator to deploy the [AWS EBS CSI driver](https://github.com/openshift/aws-ebs-csi-driver) in OKD.
