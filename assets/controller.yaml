@@ -92,6 +92,7 @@ spec:
             timeoutSeconds: 3
             periodSeconds: 10
             failureThreshold: 5
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - name: aws-credentials
               mountPath: /var/run/secrets/aws
@@ -125,6 +126,7 @@ spec:
             requests:
               memory: 20Mi
               cpu: 10m
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
           - mountPath: /etc/tls/private
             name: metrics-serving-cert
@@ -155,6 +157,7 @@ spec:
             requests:
               memory: 50Mi
               cpu: 10m
+          terminationMessagePolicy: FallbackToLogsOnError
           # kube-rbac-proxy for external-provisioner container.
           # Provides https proxy for http-based external-provisioner metrics.
         - name: provisioner-kube-rbac-proxy
@@ -175,6 +178,7 @@ spec:
             requests:
               memory: 20Mi
               cpu: 10m
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
           - mountPath: /etc/tls/private
             name: metrics-serving-cert
@@ -195,6 +199,7 @@ spec:
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -220,6 +225,7 @@ spec:
             requests:
               memory: 20Mi
               cpu: 10m
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
           - mountPath: /etc/tls/private
             name: metrics-serving-cert
@@ -247,6 +253,7 @@ spec:
             requests:
               memory: 50Mi
               cpu: 10m
+          terminationMessagePolicy: FallbackToLogsOnError
         - name: resizer-kube-rbac-proxy
           args:
           - --secure-listen-address=0.0.0.0:9204
@@ -265,6 +272,7 @@ spec:
             requests:
               memory: 20Mi
               cpu: 10m
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
           - mountPath: /etc/tls/private
             name: metrics-serving-cert
@@ -293,6 +301,7 @@ spec:
             requests:
               memory: 50Mi
               cpu: 10m
+          terminationMessagePolicy: FallbackToLogsOnError
         - name: snapshotter-kube-rbac-proxy
           args:
           - --secure-listen-address=0.0.0.0:9205
@@ -322,6 +331,7 @@ spec:
             - --probe-timeout=3s
             - --health-port=10301
             - --v=${LOG_LEVEL}
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
