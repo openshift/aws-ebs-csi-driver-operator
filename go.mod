@@ -12,7 +12,7 @@ require (
 	github.com/openshift/library-go v0.0.0-20230411112128-95e3095d3677
 	github.com/prometheus/client_golang v1.12.1
 	github.com/spf13/cobra v1.4.0
-	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/net v1.26.9 // indirect
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.0
 	k8s.io/client-go v0.25.0
